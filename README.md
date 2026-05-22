@@ -122,25 +122,37 @@ This project is in active development. The following roadmap outlines the planne
 
 ## 🤝 Contributing
 
-Contributions are welcome and encouraged. This project supports the Virginia Beach Council of PTAs and its local units, so clarity, accessibility, and maintainability are priorities.
+Contributions are welcome and encouraged — and they are **not limited to code**.
+
+This project supports the Virginia Beach Council of PTAs and its local units, so community input is incredibly valuable. Whether you're a developer, a PTA volunteer, a parent, or someone with ideas to improve the platform, your contributions matter.
 
 ### Ways to Contribute
-- Fix bugs or improve existing features  
-- Add new components or UI improvements  
-- Improve documentation  
-- Help refine the multi‑unit engine  
-- Assist with integrations (SignUpGenius, GiveBacks, etc.)  
+- **Submit ideas** for new features or improvements  
+- **Report issues** such as bugs, typos, or confusing pages  
+- **Suggest enhancements** to usability, accessibility, or design  
+- **Share feedback** on workflows or user experience  
+- **Help refine documentation**  
+- **Contribute code** (new features, fixes, refactoring, etc.)  
 
-### Contribution Process
-1. Fork the repository  
-2. Create a feature branch:  
-   `git checkout -b feature/my-improvement`  
-3. Commit your changes with clear messages  
-4. Push the branch:  
-   `git push origin feature/my-improvement`  
-5. Open a Pull Request describing your changes  
+### How to Contribute
+1. Go to the **Issues** tab in GitHub  
+2. Create a new issue for:
+   - Ideas  
+   - Feature requests  
+   - Bug reports  
+   - Questions  
+   - Suggestions  
+3. If you're contributing code:
+   - Fork the repository  
+   - Create a feature branch:  
+     `git checkout -b feature/my-improvement`  
+   - Commit your changes with clear messages  
+   - Push the branch:  
+     `git push origin feature/my-improvement`  
+   - Open a Pull Request describing your changes  
 
-Please keep PRs focused and readable.
+Please keep PRs focused and readable.  
+All contributions — big or small — help make this platform better for every PTA unit in Virginia Beach.
 
 ---
 

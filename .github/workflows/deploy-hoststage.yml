@@ -1,0 +1,99 @@
+name: Build & Deploy Stage
+
+on:
+  push:
+    branches: [ HostStage ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore WebApp/WebApp.csproj
+
+      # - name: Write showoff appsettings
+      #   run: printf '%s' "$APPSETTINGS_SHOWOFF" > WebApp/appsettings.Production.json
+      #   env:
+      #     APPSETTINGS_SHOWOFF: ${{ secrets.APPSETTINGS_SHOWOFF }}
+
+      - name: Publish
+        run: |
+          dotnet publish WebApp/WebApp.csproj \
+            -c Release \
+            -o ./publish \
+            --no-restore
+
+      - name: Put site offline
+        run: |
+          python3 - << 'PYEOF'
+          import ftplib, io, os
+          with open('./publish/_app_offline.htm', 'rb') as f:
+              content = f.read()
+          server = os.environ['FTP_SERVER'].strip()
+          if '://' in server:
+              server = server.split('://', 1)[1]
+          server = server.rstrip('/')
+          ftp = ftplib.FTP()
+          ftp.connect(server)
+          ftp.login(os.environ['FTP_USERNAME'], os.environ['FTP_PASSWORD'])
+          ftp.storbinary('STOR app_offline.htm', io.BytesIO(content))
+          ftp.quit()
+          print('app_offline.htm uploaded')
+          PYEOF
+          sleep 5
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+
+      - name: Deploy via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./publish/
+          server-dir: /
+          dangerous-clean-slate: false
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/appsettings.Development.json
+            **/app_offline.htm
+            **/_app_offline.htm
+
+      - name: Bring site back online
+        if: always()
+        run: |
+          python3 - << 'PYEOF'
+          import ftplib, os
+          server = os.environ['FTP_SERVER'].strip()
+          if '://' in server:
+              server = server.split('://', 1)[1]
+          server = server.rstrip('/')
+          ftp = ftplib.FTP()
+          ftp.connect(server)
+          ftp.login(os.environ['FTP_USERNAME'], os.environ['FTP_PASSWORD'])
+          try:
+              ftp.delete('app_offline.htm')
+              print('app_offline.htm deleted')
+          except ftplib.error_perm:
+              print('app_offline.htm not found, site already online')
+          ftp.quit()
+          PYEOF
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}

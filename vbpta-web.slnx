@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/SolutionFiles/">
+    <File Path=".gitignore" />
+  </Folder>
+  <Project Path="WebApp/WebApp.csproj" />
+</Solution>

@@ -1,0 +1,86 @@
+@page "/bootstrap/change-email"
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject PasswordlessSignInService PasswordlessSignInService
+
+<PageTitle>Change Bootstrap Email</PageTitle>
+
+<h1>Change Bootstrap Email</h1>
+
+@if (!_initialized)
+{
+    <p>Loading...</p>
+}
+else if (!_canChange)
+{
+    <p>@_statusMessage</p>
+}
+else
+{
+    <p>
+        Bootstrap mode is active. Change <strong>@PasswordlessSignInService.BootstrapAdminEmail</strong>
+        to your real admin email to unlock normal logins.
+    </p>
+    <div>
+        <label for="newEmail">New admin email</label><br />
+        <input id="newEmail" @bind="_newEmail" />
+    </div>
+    <button @onclick="ChangeEmailAsync">Change email</button>
+    @if (!string.IsNullOrWhiteSpace(_statusMessage))
+    {
+        <p>@_statusMessage</p>
+    }
+}
+
+@code {
+    private bool _initialized;
+    private bool _canChange;
+    private string _newEmail = string.Empty;
+    private string _statusMessage = string.Empty;
+    private string? _userId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user.Identity?.IsAuthenticated != true)
+        {
+            _statusMessage = "You must sign in first.";
+            _initialized = true;
+            return;
+        }
+
+        _userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        var email = user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
+            ?? user.Identity?.Name;
+        _canChange = string.Equals(
+            email,
+            PasswordlessSignInService.BootstrapAdminEmail,
+            StringComparison.OrdinalIgnoreCase);
+        if (!_canChange)
+        {
+            _statusMessage = "This page is only for the bootstrap admin account.";
+        }
+
+        _initialized = true;
+    }
+
+    private async Task ChangeEmailAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_userId))
+        {
+            _statusMessage = "Unable to identify signed-in user.";
+            return;
+        }
+
+        try
+        {
+            await PasswordlessSignInService.ChangeBootstrapEmailAsync(_userId, _newEmail);
+            _statusMessage = "Bootstrap email changed. You can now use normal login for all users.";
+            _canChange = false;
+        }
+        catch (InvalidOperationException ex)
+        {
+            _statusMessage = ex.Message;
+        }
+    }
+}

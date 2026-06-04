@@ -1,0 +1,65 @@
+@page "/announcements"
+@inject NavigationManager NavigationManager
+@inject ISiteContext SiteContext
+@inject IAnnouncementService AnnouncementService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Announcements</PageTitle>
+
+<h1>Announcements</h1>
+
+@if (!_initialized)
+{
+	<p>Loading...</p>
+}
+else if (_announcements.Count == 0)
+{
+	<p>No announcements are available for this site.</p>
+}
+else
+{
+	@if (_isAuthenticatedButNoRole)
+	{
+		<div class="alert alert-info">
+			<p>You are viewing public announcements. If you'd like to see more content, please contact the site administrator.</p>
+		</div>
+	}
+
+	<ul>
+		@foreach (var announcement in _announcements)
+		{
+			<li>
+				<strong>@announcement.Title</strong>
+				@if (SiteContext.IsAdminContext && announcement.Site is not null)
+				{
+					<span> (@announcement.Site.SiteName)</span>
+				}
+				<div>@announcement.Content</div>
+			</li>
+		}
+	</ul>
+}
+
+@code {
+	private bool _initialized;
+	private bool _isAuthenticatedButNoRole;
+	private IReadOnlyList<SiteEngine.Entities.Announcement> _announcements = Array.Empty<SiteEngine.Entities.Announcement>();
+
+	protected override async Task OnInitializedAsync()
+	{
+		var host = new Uri(NavigationManager.Uri).Host;
+		await SiteContext.InitializeAsync(host);
+		
+		var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+		var isAuthenticated = authState.User.Identity?.IsAuthenticated ?? false;
+		var userId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+		if (isAuthenticated && userId is not null)
+		{
+			_isAuthenticatedButNoRole = !await SiteContext.IsUserAuthorizedAtCurrentSiteAsync(userId);
+		}
+
+		_announcements = await AnnouncementService.GetVisibleAnnouncementsAsync();
+		_initialized = true;
+	}
+}

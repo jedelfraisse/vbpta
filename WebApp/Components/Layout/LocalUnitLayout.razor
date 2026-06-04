@@ -1,0 +1,58 @@
+@inherits SiteLayoutBase
+
+@code {
+    protected override async Task OnParametersSetAsync()
+    {
+        await RefreshUserStateAsync();
+    }
+}
+
+<style>
+    :root {
+        --primary-color: @SiteContext.SiteConfig.PrimaryColor;
+        --accent-color: @SiteContext.SiteConfig.AccentColor;
+    }
+</style>
+
+<div class="layout-shell local-shell">
+    <header class="page-header" role="banner">
+        <div class="brand-block">
+            <img class="site-logo" src="@SiteContext.SiteConfig.LogoUrl" alt="@SiteContext.SiteConfig.SiteName logo" />
+            <div>
+                <div class="site-kicker">Local Unit</div>
+                <h1>@SiteContext.SiteConfig.SiteName</h1>
+            </div>
+        </div>
+        <nav>
+            <a href="/">Home</a>
+            <span> | </span><a href="/announcements">Announcements</a>
+            @if (ShowAdminLink)
+            {
+                <span> | </span><a href="/admin">Admin</a>
+            }
+            <AuthorizeView>
+                <Authorized>
+                    <span> | </span><a href="/logout">Logout</a>
+                </Authorized>
+                <NotAuthorized>
+                    <span> | </span><a href="/login">Login</a>
+                </NotAuthorized>
+            </AuthorizeView>
+        </nav>
+    </header>
+
+    <img class="banner-image" src="@SiteContext.SiteConfig.BannerUrl" alt="" />
+
+    @if (ShowBootstrapReminder)
+    {
+        <div class="alert alert-warning" role="alert">
+            You are signed in with bootstrap email <strong>@PasswordlessSignInService.BootstrapAdminEmail</strong>.
+            Change it now before any other users can sign in:
+            <a href="/bootstrap/change-email">Change bootstrap email</a>.
+        </div>
+    }
+
+    <main class="layout-body">
+        @Body
+    </main>
+</div>

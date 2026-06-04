@@ -1,0 +1,113 @@
+@page "/admin/sites"
+@inject NavigationManager NavigationManager
+@inject ISiteContext SiteContext
+@inject IAdminDashboardService AdminDashboardService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@using SiteEngine.Entities
+
+<PageTitle>Manage Sites</PageTitle>
+
+<h1>Manage Sites</h1>
+
+@if (!_initialized)
+{
+	<p>Loading...</p>
+}
+else if (!SiteContext.IsAdminContext)
+{
+	<p>Admin access is only available from an admin hostname.</p>
+}
+else if (!_isAuthenticated)
+{
+	<p>You must <a href="/login?returnUrl=%2Fadmin%2Fsites">sign in</a> to use this page.</p>
+}
+else if (!_isAdmin)
+{
+	<NoAccess />
+}
+else
+{
+	<p><a href="/admin">Back to Dashboard</a></p>
+	<p><a class="btn btn-primary" href="/admin/sites/create">Create Site</a></p>
+
+	@if (_sites.Count == 0)
+	{
+		<p>No sites found.</p>
+	}
+	else
+	{
+		<table>
+			<thead>
+				<tr>
+					<th>Site</th>
+					<th>Hostname</th>
+					<th>Type</th>
+					<th>Announcements</th>
+					<th>Events</th>
+					<th>Actions</th>
+				</tr>
+			</thead>
+			<tbody>
+				@foreach (var site in _sites)
+				{
+					<tr>
+						<td>@site.SiteName</td>
+						<td>@site.Hostname</td>
+						<td>@(site.IsAdminPortal ? "Admin" : "Site")</td>
+						<td>@site.AnnouncementCount</td>
+						<td>@site.EventCount</td>
+						<td>
+							<a href="@($"/admin/sites/{site.SiteId}")">Details</a> |
+							<a href="@BuildSiteHomeUrl(site.Hostname)" target="_blank" rel="noopener">Visit</a> |
+							<a href="@($"/admin/sites/{site.SiteId}/edit")">Edit</a>
+						</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	}
+}
+
+@code {
+	private bool _initialized;
+	private bool _isAuthenticated;
+	private bool _isAdmin;
+	private string? _userId;
+	private IReadOnlyList<AdminSiteSummary> _sites = Array.Empty<AdminSiteSummary>();
+
+	protected override async Task OnInitializedAsync()
+	{
+		var host = new Uri(NavigationManager.Uri).Host;
+		await SiteContext.InitializeAsync(host);
+		var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+		_isAuthenticated = authState.User.Identity?.IsAuthenticated ?? false;
+		_userId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+		if (_isAuthenticated && SiteContext.IsAdminContext)
+		{
+			_isAdmin = await SiteContext.UserHasRoleAtCurrentSiteAsync(_userId, SiteRole.Admin);
+			if (_isAdmin)
+			{
+				_sites = await AdminDashboardService.GetSiteSummariesAsync(_userId);
+			}
+		}
+
+		_initialized = true;
+	}
+
+	private string BuildSiteHomeUrl(string hostname)
+	{
+		var currentUri = new Uri(NavigationManager.Uri);
+		var builder = new UriBuilder(currentUri.Scheme, hostname)
+		{
+			Path = "/"
+		};
+
+		if (!currentUri.IsDefaultPort)
+		{
+			builder.Port = currentUri.Port;
+		}
+
+		return builder.Uri.ToString();
+	}
+}

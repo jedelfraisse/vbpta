@@ -1,0 +1,52 @@
+@using System.Security.Claims
+@inject ISiteContext SiteContext
+@inject NavigationManager Navigation
+
+<div class="no-access-container">
+	<div class="alert alert-info alert-lg">
+		<h3>Access Restricted</h3>
+		<p>
+			You are logged in, but you don't have access to this site's content.
+		</p>
+		@if (!string.IsNullOrEmpty(AdminEmail))
+		{
+			<p>
+				If you believe you should have access, please contact the site administrator at
+				<strong>
+					<a href="mailto:@AdminEmail">@AdminEmail</a>
+				</strong>
+			</p>
+		}
+		<hr />
+		<button class="btn btn-secondary" @onclick="GoHome">Go to Home</button>
+	</div>
+</div>
+
+@code {
+	private string? AdminEmail;
+
+	protected override async Task OnInitializedAsync()
+	{
+		AdminEmail = await SiteContext.GetCurrentSiteAdminEmailAsync();
+	}
+
+	private void GoHome()
+	{
+		Navigation.NavigateTo("/");
+	}
+}
+
+<style>
+	.no-access-container {
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		min-height: 60vh;
+		padding: 2rem;
+	}
+
+	.alert-lg {
+		max-width: 500px;
+		padding: 2rem;
+	}
+</style>

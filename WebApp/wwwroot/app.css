@@ -1,5 +1,5 @@
-h1:focus {
-    outline: none;
+body {
+    margin: 0;
 }
 
 .valid.modified:not([type=checkbox]) {

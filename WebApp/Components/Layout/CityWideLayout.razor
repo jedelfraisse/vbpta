@@ -1,0 +1,101 @@
+@inherits SiteLayoutBase
+
+@code {
+    protected override async Task OnParametersSetAsync()
+    {
+        await RefreshUserStateAsync();
+    }
+}
+
+<style>
+    :root {
+        --primary-color: @SiteContext.SiteConfig.PrimaryColor;
+        --accent-color: @SiteContext.SiteConfig.AccentColor;
+    }
+</style>
+
+<div class="city-shell">
+    <div class="top-strip">
+        Virginia Congress Of Parents And Teachers - @SiteContext.SiteConfig.SiteName
+    </div>
+
+    <header class="masthead" role="banner">
+        <div class="masthead-logos">
+            <img class="site-logo" src="@SiteContext.SiteConfig.LogoUrl" alt="@SiteContext.SiteConfig.SiteName logo" />
+            <div class="masthead-title">
+                <h1>@SiteContext.SiteConfig.SiteName</h1>
+                <p>@SiteContext.SiteConfig.WelcomeText</p>
+            </div>
+            <img class="city-logo" src="@("/images/city-logo.png")" alt="Virginia Beach City logo" />
+            <img class="schoolsystem-logo" src="@("/images/schoolsystem-logo.png")" alt="Virginia Beach City Public Schools logo" />
+
+        </div>
+    </header>
+
+    <nav class="primary-nav" aria-label="Primary">
+        <a href="/">Home</a>
+            <a href="#">About</a>
+            <a href="#">Our Local Units</a>
+            <a href="#">Programs</a>
+            <a href="#">Get Involved</a>
+            <a href="#">Events</a>
+            <a href="#">Sponsors</a>
+            <a href="/announcements">News/Announcements</a>
+            <a href="#">Awards</a>
+        @if (ShowAdminLink)
+        {
+            <a href="/admin">Admin</a>
+        }
+        <AuthorizeView>
+            <Authorized>
+                <a href="/logout">Logout</a>
+            </Authorized>
+            <NotAuthorized>
+                <a href="/login">Login</a>
+            </NotAuthorized>
+        </AuthorizeView>
+    </nav>
+
+    @if (ShowBootstrapReminder)
+    {
+        <div class="alert alert-warning city-alert" role="alert">
+            You are signed in with bootstrap email <strong>@PasswordlessSignInService.BootstrapAdminEmail</strong>.
+            Change it now before any other users can sign in:
+            <a href="/bootstrap/change-email">Change bootstrap email</a>.
+        </div>
+    }
+
+    <main class="city-main">
+        <section class="city-content-frame">
+            @Body
+        </section>
+    </main>
+
+    <div class="footer-stack">
+        <footer class="footer-nav">
+            <a href="/">Home</a>
+            <a href="#">About</a>
+            <a href="#">Our Local Units</a>
+            <a href="#">Programs</a>
+            <a href="#">Get Involved</a>
+            <a href="#">Events</a>
+            <a href="#">Sponsors</a>
+            <a href="/announcements">News/Announcements</a>
+            <a href="#">Awards</a>
+            <a href="/admin">Admin</a>
+        </footer>
+
+        <footer class="footer-links">
+            <span>Quick Links:</span>
+            <a href="https://virginiabeachcouncilpta.givebacks.com/" target="_blank" rel="noopener noreferrer">Council GiveBacks</a>
+            <a href="https://www.facebook.com/p/Virginia-Beach-Council-of-PTAs-100064654665299/" target="_blank" rel="noopener noreferrer">Facebook</a>
+            <a href="https://vapta.org/" target="_blank" rel="noopener noreferrer">Virginia PTA</a>
+            <a href="https://www.pta.org/" target="_blank" rel="noopener noreferrer">National PTA</a>
+            <a href="https://www.vbschools.com/" target="_blank" rel="noopener noreferrer">Virginia Beach City Public Schools</a>
+        </footer>
+
+        <footer class="footer-legal">
+            © Virginia Beach Council of PTAs. PTA ID# 00053175 - PTA and VBCPS trademarks are acknowledged and respected.
+        </footer>
+    </div>
+</div>

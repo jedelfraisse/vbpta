@@ -1,0 +1,85 @@
+@page "/login"
+@inject NavigationManager NavigationManager
+@inject PasswordlessSignInService PasswordlessSignInService
+
+<PageTitle>Sign in</PageTitle>
+
+<h1>Sign in</h1>
+
+<div class="home-container">
+    <p>Use your email address and one-time code.</p>
+
+    <div>
+        <label for="email">Email</label><br />
+        <input id="email" @bind="_email" />
+    </div>
+
+    @if (!_codeSent)
+    {
+        <button @onclick="SendCodeAsync">Send code</button>
+    }
+    else
+    {
+        <div>
+            <label for="code">Code</label><br />
+            <input id="code" @bind="_code" />
+        </div>
+        <button @onclick="VerifyCodeAsync">Sign in</button>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(_statusMessage))
+    {
+        <p>@_statusMessage</p>
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? Error { get; set; }
+
+    private string _email = string.Empty;
+    private string _code = string.Empty;
+    private bool _codeSent;
+    private string _statusMessage = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        if (!string.IsNullOrWhiteSpace(Error))
+        {
+            _statusMessage = Error;
+        }
+    }
+
+    private async Task SendCodeAsync()
+    {
+        try
+        {
+            await PasswordlessSignInService.RequestCodeAsync(_email);
+            _codeSent = true;
+            _statusMessage = string.Equals(
+                _email?.Trim(),
+                PasswordlessSignInService.BootstrapAdminEmail,
+                StringComparison.OrdinalIgnoreCase)
+                ? $"Use bootstrap code {PasswordlessSignInService.BootstrapAdminCode} on the admin site, then change the bootstrap email immediately."
+                : "A sign-in code was sent.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            _statusMessage = ex.Message;
+        }
+    }
+
+    private Task VerifyCodeAsync()
+    {
+        var encodedEmail = Uri.EscapeDataString(_email ?? string.Empty);
+        var encodedCode = Uri.EscapeDataString(_code ?? string.Empty);
+        var encodedReturnUrl = Uri.EscapeDataString(ReturnUrl ?? "/");
+        NavigationManager.NavigateTo(
+            $"/auth/passwordless/complete?email={encodedEmail}&code={encodedCode}&returnUrl={encodedReturnUrl}",
+            forceLoad: true);
+        return Task.CompletedTask;
+    }
+}

@@ -166,6 +166,52 @@ This project uses:
 - **Docker** (managed automatically by Aspire)  
 - **.NET Aspire** for local orchestration and developer onboarding  
 
+### Current local setup (tenant host + EF Core)
+
+The active solution projects are:
+
+- `WebApp` (Blazor host/UI)
+- `SiteEngine` (entities, EF Core DbContext, site resolution, scoped services)
+
+Local development uses SQL Server LocalDB by default:
+
+- `WebApp/appsettings.Development.json` → `ConnectionStrings:DefaultConnection`
+- default DB name: `VbptaWeb_Dev`
+
+Create and apply migrations:
+
+```bash
+dotnet ef migrations add InitialCreate --project SiteEngine\SiteEngine.csproj --startup-project WebApp\WebApp.csproj
+dotnet ef database update --project SiteEngine\SiteEngine.csproj --startup-project WebApp\WebApp.csproj
+```
+
+Automatic migration trigger marker:
+
+- Place `run-migration.txt` at `WebApp/wwwroot/run-migration.txt`
+- On startup, the app applies migrations and renames the marker to:
+  - `run-migration.<timestamp>.done` on success
+  - `run-migration.failed.<timestamp>.txt` on failure
+
+Passwordless sign-in (email code) setup:
+
+- Login page: `/login`
+- Logout page: `/logout`
+- Admin page requires both:
+  - admin hostname context
+  - authenticated user session
+- Configure SMTP in `WebApp/appsettings*.json` under `EmailLogin`.
+- If `EmailLogin:SmtpHost` is empty, sign-in codes are logged locally for development.
+
+Per-site public asset folders:
+
+- Site-specific public files are stored under:
+  - `WebApp/wwwroot/site-data/{hostname}/images/`
+- On startup, the app ensures these folders exist for all sites in the `Sites` table.
+- New site creation also ensures folder creation automatically.
+- If site creation uses default logo/banner values, defaults are copied to:
+  - `logo.png`
+  - `banner.png`
+
 ### Prerequisites
 - .NET 9 SDK  
 - Docker Desktop  

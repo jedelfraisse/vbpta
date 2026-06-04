@@ -1,0 +1,47 @@
+﻿
+.city-home-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+    gap: 1.25rem;
+    align-items: start;
+}
+
+.city-home-card {
+    border-radius: 24px;
+    padding: 1rem 1.25rem;
+    background: #fff;
+    min-height: 260px;
+    box-sizing: border-box;
+}
+
+.city-home-card-accent {
+    border: 2px solid #f5b400;
+}
+
+.city-home-card-info {
+    border: 2px solid #2aa6ff;
+}
+
+.city-home-card h2,
+.city-home-card h3 {
+    text-align: center;
+    margin: 0 0 0.75rem;
+}
+
+.city-home-card p {
+    text-align: center;
+    margin: 0.5rem 0;
+}
+
+.city-home-thumbs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+    .city-home-thumbs div {
+        aspect-ratio: 1;
+        background: #000;
+        border-radius: 2px;
+    }

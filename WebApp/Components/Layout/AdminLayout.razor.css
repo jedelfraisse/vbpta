@@ -1,0 +1,43 @@
+.layout-shell {
+    min-height: 100vh;
+}
+
+.admin-shell .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    background: rgba(0, 0, 0, 0.08);
+}
+
+.brand-block {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.site-kicker {
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.site-logo {
+    max-width: 160px;
+    max-height: 90px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+}
+
+.admin-shell .banner-image {
+    display: block;
+    width: 100%;
+    max-height: 120px;
+    object-fit: cover;
+}
+
+.layout-body {
+    padding: 1.5rem;
+}

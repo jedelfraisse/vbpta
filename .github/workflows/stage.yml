@@ -1,0 +1,86 @@
+name: Deploy Stage
+
+on:
+  push:
+    branches: [ "stage" ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Detect migration changes
+        id: migration_changes
+        run: |
+          BEFORE_SHA="${{ github.event.before }}"
+          if [ -z "$BEFORE_SHA" ] || [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            BEFORE_SHA="$(git rev-parse HEAD^)"
+          fi
+
+          if git diff --name-only "$BEFORE_SHA" "${{ github.sha }}" | grep -q '^SiteEngine/Migrations/'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Restore
+        run: dotnet restore vbpta-web.slnx
+
+      - name: Build
+        run: dotnet build vbpta-web.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test vbpta-web.slnx --configuration Release --no-build
+
+      - name: Publish
+        run: dotnet publish WebApp/WebApp.csproj --configuration Release --output ./publish --no-build
+
+      - name: Add migration trigger marker
+        if: steps.migration_changes.outputs.changed == 'true'
+        run: echo "run migrations" > ./publish/wwwroot/run-migration.txt
+
+      - name: Upload app-offline.htm
+        run: |
+          curl --silent --show-error --fail \
+            --user "${{ secrets.FTP_STAGE_USER }}:${{ secrets.FTP_STAGE_PASS }}" \
+            --upload-file ./Deployment/app-offline.htm \
+            "ftp://${{ secrets.FTP_STAGE_HOST }}/app-offline.htm"
+
+      - name: Deploy publish folder
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_STAGE_HOST }}
+          username: ${{ secrets.FTP_STAGE_USER }}
+          password: ${{ secrets.FTP_STAGE_PASS }}
+          local-dir: ./publish/
+          server-dir: /
+          dangerous-clean-slate: false
+          exclude: |
+            **/obj/**
+            **/bin/**
+            **/logs/**
+            **/SiteEngine/Migrations/**
+
+      - name: Delete app-offline.htm
+        if: always()
+        run: |
+          curl --silent --show-error --user "${{ secrets.FTP_STAGE_USER }}:${{ secrets.FTP_STAGE_PASS }}" \
+            --quote "DELE app-offline.htm" \
+            "ftp://${{ secrets.FTP_STAGE_HOST }}/"
+
+      - name: Health check
+        if: always() && env.STAGE_HEALTHCHECK_URL != ''
+        env:
+          STAGE_HEALTHCHECK_URL: ${{ secrets.STAGE_HEALTHCHECK_URL }}
+        run: curl --silent --show-error --fail "$STAGE_HEALTHCHECK_URL"

@@ -1,0 +1,424 @@
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using SiteEngine.Data;
+using SiteEngine.Entities;
+using SiteEngine.Identity;
+using SiteEngine.Sites;
+using System.Text.RegularExpressions;
+
+namespace SiteEngine.Services;
+
+public class AdminDashboardService(
+	IDbContextFactory<AppDbContext> dbContextFactory,
+	ISiteContext siteContext,
+	ISiteResolver siteResolver,
+	ISitePublicAssetService sitePublicAssetService,
+	UserManager<SiteUser> userManager) : IAdminDashboardService
+{
+	private readonly IDbContextFactory<AppDbContext> _dbContextFactory = dbContextFactory;
+	private readonly ISiteContext _siteContext = siteContext;
+	private readonly ISiteResolver _siteResolver = siteResolver;
+	private readonly ISitePublicAssetService _sitePublicAssetService = sitePublicAssetService;
+	private readonly UserManager<SiteUser> _userManager = userManager;
+
+	public async Task<AdminDashboardOverview> GetOverviewAsync(string? currentUserId, CancellationToken cancellationToken = default)
+	{
+		await EnsureAuthorizedAsync(currentUserId);
+		await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+		var totalSites = await dbContext.Sites.CountAsync(cancellationToken);
+		var totalUsers = await dbContext.Users.CountAsync(cancellationToken);
+		var assignedUsers = await dbContext.SiteUserRoles
+			.Select(x => x.UserId)
+			.Distinct()
+			.CountAsync(cancellationToken);
+		var globalAdmins = await dbContext.SiteUserRoles
+			.Where(x => x.SiteId == SeedData.DefaultAdminSiteId && x.Role == SiteRole.Admin)
+			.Select(x => x.UserId)
+			.Distinct()
+			.CountAsync(cancellationToken);
+
+		return new AdminDashboardOverview
+		{
+			TotalSites = totalSites,
+			TotalUsers = totalUsers,
+			AssignedUsers = assignedUsers,
+			GlobalAdmins = globalAdmins
+		};
+	}
+
+	public async Task<IReadOnlyList<AdminSiteSummary>> GetSiteSummariesAsync(string? currentUserId, CancellationToken cancellationToken = default)
+	{
+		await EnsureAuthorizedAsync(currentUserId);
+		await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+		return await dbContext.Sites
+			.AsNoTracking()
+			.OrderBy(x => x.SiteName)
+			.Select(x => new AdminSiteSummary
+			{
+				SiteId = x.Id,
+				Hostname = x.Hostname,
+				SiteName = x.SiteName,
+				IsAdminPortal = x.IsAdminPortal,
+				AnnouncementCount = x.Announcements.Count,
+				EventCount = x.Events.Count,
+				HealthStatus = "Healthy"
+			})
+			.ToListAsync(cancellationToken);
+	}
+
+	public async Task<AdminSiteDetail?> GetSiteDetailAsync(string? currentUserId, Guid siteId, CancellationToken cancellationToken = default)
+	{
+		await EnsureAuthorizedAsync(currentUserId);
+		await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+		var site = await dbContext.Sites
+			.AsNoTracking()
+			.SingleOrDefaultAsync(x => x.Id == siteId, cancellationToken);
+		if (site is null)
+		{
+			return null;
+		}
+
+		var announcementCount = await dbContext.Announcements
+			.AsNoTracking()
+			.CountAsync(x => x.SiteId == siteId, cancellationToken);
+		var eventCount = await dbContext.Events
+			.AsNoTracking()
+			.CountAsync(x => x.SiteId == siteId, cancellationToken);
+		var assignedUsers = await dbContext.SiteUserRoles
+			.AsNoTracking()
+			.Where(x => x.SiteId == siteId)
+			.Select(x => x.UserId)
+			.Distinct()
+			.CountAsync(cancellationToken);
+
+		var roleCounts = await dbContext.SiteUserRoles
+			.AsNoTracking()
+			.Where(x => x.SiteId == siteId)
+			.GroupBy(x => x.Role)
+			.Select(g => new { Role = g.Key, Count = g.Select(x => x.UserId).Distinct().Count() })
+			.ToListAsync(cancellationToken);
+
+		return new AdminSiteDetail
+		{
+			SiteId = site.Id,
+			Hostname = site.Hostname,
+			SiteName = site.SiteName,
+			IsAdminPortal = site.IsAdminPortal,
+			LogoUrl = site.LogoUrl,
+			BannerUrl = site.BannerUrl,
+			PrimaryColor = site.PrimaryColor,
+			AccentColor = site.AccentColor,
+			WelcomeText = site.WelcomeText,
+			AnnouncementCount = announcementCount,
+			EventCount = eventCount,
+			AssignedUsers = assignedUsers,
+			AdminCount = roleCounts.SingleOrDefault(x => x.Role == SiteRole.Admin)?.Count ?? 0,
+			BoardMemberCount = roleCounts.SingleOrDefault(x => x.Role == SiteRole.BoardMember)?.Count ?? 0,
+			VolunteerCount = roleCounts.SingleOrDefault(x => x.Role == SiteRole.Volunteer)?.Count ?? 0
+		};
+	}
+
+	public async Task<Guid> CreateSiteAsync(string? currentUserId, AdminCreateSiteRequest request, CancellationToken cancellationToken = default)
+	{
+		await EnsureAuthorizedAsync(currentUserId);
+		var normalizedHostname = NormalizeAndValidateHostname(request.Hostname);
+		await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+		var exists = await dbContext.Sites
+			.AsNoTracking()
+			.AnyAsync(x => x.Hostname == normalizedHostname, cancellationToken);
+		if (exists)
+		{
+			throw new InvalidOperationException($"A site with hostname '{normalizedHostname}' already exists.");
+		}
+
+		var now = DateTimeOffset.UtcNow;
+		var useDefaultLogo = string.IsNullOrWhiteSpace(request.LogoUrl);
+		var useDefaultBanner = string.IsNullOrWhiteSpace(request.BannerUrl);
+		var site = new Site
+		{
+			Id = Guid.NewGuid(),
+			Hostname = normalizedHostname,
+			IsAdminPortal = false,
+			SiteName = GetValueOrDefault(request.SiteName, SeedData.DefaultCitySite.SiteName),
+			LogoUrl = useDefaultLogo
+				? "images/logo.png"
+				: GetValueOrDefault(request.LogoUrl, SeedData.DefaultCitySite.LogoUrl),
+			BannerUrl = useDefaultBanner
+				? "images/banner.png"
+				: GetValueOrDefault(request.BannerUrl, SeedData.DefaultCitySite.BannerUrl),
+			PrimaryColor = GetValueOrDefault(request.PrimaryColor, SeedData.DefaultCitySite.PrimaryColor),
+			AccentColor = GetValueOrDefault(request.AccentColor, SeedData.DefaultCitySite.AccentColor),
+			WelcomeText = GetValueOrDefault(request.WelcomeText, SeedData.DefaultCitySite.WelcomeText),
+			CreatedAtUtc = now,
+			UpdatedAtUtc = now
+		};
+
+		dbContext.Sites.Add(site);
+		await dbContext.SaveChangesAsync(cancellationToken);
+		await _sitePublicAssetService.EnsureSiteFoldersAsync(normalizedHostname, seedDefaults: useDefaultLogo || useDefaultBanner, cancellationToken);
+		_siteResolver.InvalidateHost(normalizedHostname);
+		return site.Id;
+	}
+
+	public async Task<bool> UpdateSiteAsync(string? currentUserId, Guid siteId, AdminUpdateSiteRequest request, CancellationToken cancellationToken = default)
+	{
+		await EnsureAuthorizedAsync(currentUserId);
+		var normalizedHostname = NormalizeAndValidateHostname(request.Hostname);
+		await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+		var site = await dbContext.Sites.SingleOrDefaultAsync(x => x.Id == siteId, cancellationToken);
+		if (site is null)
+		{
+			return false;
+		}
+
+		var duplicateHostname = await dbContext.Sites
+			.AsNoTracking()
+			.AnyAsync(x => x.Id != siteId && x.Hostname == normalizedHostname, cancellationToken);
+		if (duplicateHostname)
+		{
+			throw new InvalidOperationException($"A site with hostname '{normalizedHostname}' already exists.");
+		}
+
+		var originalHostname = site.Hostname;
+		site.Hostname = normalizedHostname;
+		site.SiteName = GetValueOrDefault(request.SiteName, site.SiteName);
+		site.LogoUrl = GetValueOrDefault(request.LogoUrl, site.LogoUrl);
+		site.BannerUrl = GetValueOrDefault(request.BannerUrl, site.BannerUrl);
+		site.PrimaryColor = GetValueOrDefault(request.PrimaryColor, site.PrimaryColor);
+		site.AccentColor = GetValueOrDefault(request.AccentColor, site.AccentColor);
+		site.WelcomeText = GetValueOrDefault(request.WelcomeText, site.WelcomeText);
+		site.UpdatedAtUtc = DateTimeOffset.UtcNow;
+
+		await dbContext.SaveChangesAsync(cancellationToken);
+		await _sitePublicAssetService.EnsureSiteFoldersAsync(normalizedHostname, seedDefaults: false, cancellationToken);
+		_siteResolver.InvalidateHost(originalHostname);
+		_siteResolver.InvalidateHost(normalizedHostname);
+		return true;
+	}
+
+	public async Task<IReadOnlyList<AdminUserSummary>> GetUserSummariesAsync(string? currentUserId, CancellationToken cancellationToken = default)
+	{
+		await EnsureAuthorizedAsync(currentUserId);
+		await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+		var summaries = await dbContext.Users
+			.AsNoTracking()
+			.OrderBy(x => x.Email)
+			.Select(x => new AdminUserSummary
+			{
+				UserId = x.Id,
+				Email = x.Email ?? x.UserName ?? string.Empty,
+				IsGlobalAdmin = dbContext.SiteUserRoles.Any(r => r.UserId == x.Id && r.SiteId == SeedData.DefaultAdminSiteId && r.Role == SiteRole.Admin),
+				AssignedSiteCount = dbContext.SiteUserRoles
+					.Where(r => r.UserId == x.Id)
+					.Select(r => r.SiteId)
+					.Distinct()
+					.Count()
+			})
+			.ToListAsync(cancellationToken);
+
+		return summaries;
+	}
+
+	public async Task<AdminUserDetail?> GetUserDetailAsync(string? currentUserId, string userId, CancellationToken cancellationToken = default)
+	{
+		await EnsureAuthorizedAsync(currentUserId);
+		if (string.IsNullOrWhiteSpace(userId))
+		{
+			return null;
+		}
+
+		await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+		var user = await dbContext.Users
+			.AsNoTracking()
+			.SingleOrDefaultAsync(x => x.Id == userId, cancellationToken);
+		if (user is null)
+		{
+			return null;
+		}
+
+		var siteRoles = await dbContext.SiteUserRoles
+			.AsNoTracking()
+			.Where(x => x.UserId == userId)
+			.Include(x => x.Site)
+			.Select(x => new AdminUserSiteRole
+			{
+				SiteId = x.SiteId,
+				SiteName = x.Site.SiteName,
+				Hostname = x.Site.Hostname,
+				Role = x.Role
+			})
+			.OrderBy(x => x.SiteName)
+			.ThenBy(x => x.Role)
+			.ToListAsync(cancellationToken);
+
+		return new AdminUserDetail
+		{
+			UserId = user.Id,
+			Email = user.Email ?? user.UserName ?? string.Empty,
+			IsGlobalAdmin = siteRoles.Any(x => x.SiteId == SeedData.DefaultAdminSiteId && x.Role == SiteRole.Admin),
+			SiteRoles = siteRoles
+		};
+	}
+
+	public async Task<string> CreateUserAsync(string? currentUserId, AdminCreateUserRequest request, CancellationToken cancellationToken = default)
+	{
+		await EnsureAuthorizedAsync(currentUserId);
+		var normalizedEmail = NormalizeAndValidateEmail(request.Email);
+		var existing = await _userManager.FindByEmailAsync(normalizedEmail);
+		if (existing is not null)
+		{
+			throw new InvalidOperationException("A user with that email already exists.");
+		}
+
+		var user = new SiteUser
+		{
+			UserName = normalizedEmail,
+			Email = normalizedEmail,
+			EmailConfirmed = true
+		};
+		var result = await _userManager.CreateAsync(user);
+		if (!result.Succeeded)
+		{
+			throw new InvalidOperationException(BuildIdentityErrors(result));
+		}
+
+		await SetGlobalAdminAsync(user.Id, request.IsGlobalAdmin, cancellationToken);
+		return user.Id;
+	}
+
+	public async Task<bool> UpdateUserAsync(string? currentUserId, string userId, AdminUpdateUserRequest request, CancellationToken cancellationToken = default)
+	{
+		await EnsureAuthorizedAsync(currentUserId);
+		if (string.IsNullOrWhiteSpace(userId))
+		{
+			return false;
+		}
+
+		var user = await _userManager.FindByIdAsync(userId);
+		if (user is null)
+		{
+			return false;
+		}
+
+		var normalizedEmail = NormalizeAndValidateEmail(request.Email);
+		if (!string.Equals(user.Email, normalizedEmail, StringComparison.OrdinalIgnoreCase))
+		{
+			var existing = await _userManager.FindByEmailAsync(normalizedEmail);
+			if (existing is not null && !string.Equals(existing.Id, userId, StringComparison.Ordinal))
+			{
+				throw new InvalidOperationException("A user with that email already exists.");
+			}
+
+			var setUserName = await _userManager.SetUserNameAsync(user, normalizedEmail);
+			if (!setUserName.Succeeded)
+			{
+				throw new InvalidOperationException(BuildIdentityErrors(setUserName));
+			}
+
+			var setEmail = await _userManager.SetEmailAsync(user, normalizedEmail);
+			if (!setEmail.Succeeded)
+			{
+				throw new InvalidOperationException(BuildIdentityErrors(setEmail));
+			}
+		}
+
+		await SetGlobalAdminAsync(userId, request.IsGlobalAdmin, cancellationToken);
+		return true;
+	}
+
+	private async Task SetGlobalAdminAsync(string userId, bool shouldBeGlobalAdmin, CancellationToken cancellationToken)
+	{
+		await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+		var existing = await dbContext.SiteUserRoles
+			.SingleOrDefaultAsync(
+				x => x.UserId == userId && x.SiteId == SeedData.DefaultAdminSiteId && x.Role == SiteRole.Admin,
+				cancellationToken);
+
+		if (shouldBeGlobalAdmin && existing is null)
+		{
+			dbContext.SiteUserRoles.Add(new SiteUserRole
+			{
+				UserId = userId,
+				SiteId = SeedData.DefaultAdminSiteId,
+				Role = SiteRole.Admin,
+				CreatedAt = DateTime.UtcNow
+			});
+			await dbContext.SaveChangesAsync(cancellationToken);
+			return;
+		}
+
+		if (!shouldBeGlobalAdmin && existing is not null)
+		{
+			dbContext.SiteUserRoles.Remove(existing);
+			await dbContext.SaveChangesAsync(cancellationToken);
+		}
+	}
+
+	private async Task EnsureAuthorizedAsync(string? currentUserId)
+	{
+		if (!_siteContext.IsAdminContext)
+		{
+			throw new InvalidOperationException("Admin actions are only available in admin site context.");
+		}
+
+		var isAdmin = await _siteContext.UserHasRoleAtCurrentSiteAsync(currentUserId, SiteRole.Admin);
+		if (!isAdmin)
+		{
+			throw new InvalidOperationException("You must be a global admin to access this page.");
+		}
+	}
+
+	private static string NormalizeAndValidateHostname(string hostname)
+	{
+		var normalized = hostname?.Trim().ToLowerInvariant() ?? string.Empty;
+		if (string.IsNullOrWhiteSpace(normalized))
+		{
+			throw new InvalidOperationException("Hostname is required.");
+		}
+
+		if (normalized.Contains("://", StringComparison.Ordinal) ||
+			normalized.Contains('/', StringComparison.Ordinal) ||
+			normalized.Contains(':', StringComparison.Ordinal))
+		{
+			throw new InvalidOperationException("Hostname must not include scheme, path, or port.");
+		}
+
+		if (!Regex.IsMatch(normalized, "^[a-z0-9.-]+$"))
+		{
+			throw new InvalidOperationException("Hostname contains unsupported characters.");
+		}
+
+		return normalized;
+	}
+
+	private static string NormalizeAndValidateEmail(string email)
+	{
+		var normalized = email?.Trim().ToLowerInvariant() ?? string.Empty;
+		if (string.IsNullOrWhiteSpace(normalized))
+		{
+			throw new InvalidOperationException("Email is required.");
+		}
+
+		if (!Regex.IsMatch(normalized, "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"))
+		{
+			throw new InvalidOperationException("Email is not valid.");
+		}
+
+		return normalized;
+	}
+
+	private static string GetValueOrDefault(string? value, string fallback)
+	{
+		var normalized = value?.Trim();
+		return string.IsNullOrWhiteSpace(normalized) ? fallback : normalized;
+	}
+
+	private static string BuildIdentityErrors(IdentityResult result)
+	{
+		return string.Join("; ", result.Errors.Select(x => x.Description));
+	}
+}

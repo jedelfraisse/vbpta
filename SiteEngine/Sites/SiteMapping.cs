@@ -1,0 +1,47 @@
+using SiteEngine.Config;
+using SiteEngine.Entities;
+
+namespace SiteEngine.Sites;
+
+public static class SiteMapping
+{
+	public static SiteConfig ToSiteConfig(this Site site)
+	{
+		var logoUrl = ResolveSiteAssetUrl(site, site.LogoUrl, isLogo: true);
+		var bannerUrl = ResolveSiteAssetUrl(site, site.BannerUrl, isLogo: false);
+
+		return new SiteConfig
+		{
+			SiteName = site.SiteName,
+			LogoUrl = logoUrl,
+			BannerUrl = bannerUrl,
+			PrimaryColor = site.PrimaryColor,
+			AccentColor = site.AccentColor,
+			WelcomeText = site.WelcomeText
+		};
+	}
+
+	private static string ResolveSiteAssetUrl(Site site, string? configuredUrl, bool isLogo)
+	{
+		var normalized = configuredUrl?.Trim() ?? string.Empty;
+		if (string.IsNullOrWhiteSpace(normalized))
+		{
+			normalized = isLogo ? "images/logo.png" : "images/banner.png";
+		}
+
+		if (site.IsAdminPortal || IsAbsoluteUrl(normalized))
+		{
+			return normalized;
+		}
+
+		var hostSegment = site.Hostname.Trim().ToLowerInvariant();
+		return $"/site-data/{hostSegment}/{normalized.TrimStart('/')}";
+	}
+
+	private static bool IsAbsoluteUrl(string value)
+	{
+		return value.StartsWith("/", StringComparison.Ordinal)
+			|| value.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+			|| value.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+	}
+}

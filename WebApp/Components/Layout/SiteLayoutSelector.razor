@@ -1,0 +1,37 @@
+@inject NavigationManager NavigationManager
+@inject ISiteContext SiteContext
+@inherits LayoutComponentBase
+@using SiteEngine.Data
+
+@code {
+    private Type _layoutType = typeof(CityWideLayout);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var host = new Uri(NavigationManager.Uri).Host;
+        await SiteContext.InitializeAsync(host);
+        _layoutType = ResolveLayoutType();
+    }
+
+    private Type ResolveLayoutType()
+    {
+        if (SiteContext.IsAdminContext)
+        {
+            return typeof(AdminLayout);
+        }
+
+        if (SiteContext.CurrentSite is null)
+        {
+            return typeof(CityWideLayout);
+        }
+
+        return string.Equals(
+            SiteContext.CurrentSite?.Hostname,
+            SeedData.DefaultCityHostname,
+            StringComparison.OrdinalIgnoreCase)
+            ? typeof(CityWideLayout)
+            : typeof(LocalUnitLayout);
+    }
+}
+
+<LayoutView Layout="_layoutType" ChildContent="@Body" />

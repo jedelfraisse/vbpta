@@ -1,84 +1,55 @@
 using Microsoft.EntityFrameworkCore;
 using SiteEngine.Data;
-using SiteEngine.Services;
 
 namespace WebApp.Infrastructure;
 
 public static class SitePublicAssetFolderExtensions
 {
-	public static async Task EnsureSitePublicAssetFoldersAsync(this WebApplication app)
-	{
-		await using var scope = app.Services.CreateAsyncScope();
-		var dbContextFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
-		var sitePublicAssetService = scope.ServiceProvider.GetRequiredService<ISitePublicAssetService>();
+    public static async Task EnsureSitePublicAssetFoldersAsync(this WebApplication app)
+    {
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var env = scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>();
 
-		await using var dbContext = await dbContextFactory.CreateDbContextAsync();
-		var sites = await dbContext.Sites
-			.OrderBy(x => x.Hostname)
-			.ToListAsync();
+        // Root folder for all site-specific assets
+        var root = Path.Combine(env.WebRootPath, "sites");
+        Directory.CreateDirectory(root);
 
-		var hasUpdates = false;
-		foreach (var site in sites)
-		{
-			var assetKey = GetAssetKey(site);
-			await sitePublicAssetService.EnsureSiteFoldersAsync(assetKey, seedDefaults: true);
+        // Default assets folder (inside wwwroot/defaults)
+        var defaultsPath = Path.Combine(env.WebRootPath, "defaults");
 
-			if (site.IsAdminPortal)
-			{
-				continue;
-			}
+        var sites = await db.Sites.AsNoTracking().ToListAsync();
 
-			var normalizedLogo = NormalizeSiteRelativeAssetPath(assetKey, site.LogoUrl, "images/logo.png");
-			var normalizedBanner = NormalizeSiteRelativeAssetPath(assetKey, site.BannerUrl, "images/banner.png");
-			if (!string.Equals(site.LogoUrl, normalizedLogo, StringComparison.Ordinal))
-			{
-				site.LogoUrl = normalizedLogo;
-				hasUpdates = true;
-			}
+        foreach (var site in sites)
+        {
+            var siteRoot = Path.Combine(root, site.PtaId);
+            Directory.CreateDirectory(siteRoot);
 
-			if (!string.Equals(site.BannerUrl, normalizedBanner, StringComparison.Ordinal))
-			{
-				site.BannerUrl = normalizedBanner;
-				hasUpdates = true;
-			}
-		}
+            // Subfolders for site assets
+            var images = Path.Combine(siteRoot, "images");
+            var documents = Path.Combine(siteRoot, "documents");
+            var uploads = Path.Combine(siteRoot, "uploads");
 
-		if (hasUpdates)
-		{
-			await dbContext.SaveChangesAsync();
-		}
-	}
+            Directory.CreateDirectory(images);
+            Directory.CreateDirectory(documents);
+            Directory.CreateDirectory(uploads);
 
-	private static string NormalizeSiteRelativeAssetPath(string assetKey, string? currentUrl, string defaultRelativePath)
-	{
-		var normalized = currentUrl?.Trim() ?? string.Empty;
-		if (string.IsNullOrWhiteSpace(normalized))
-		{
-			return defaultRelativePath;
-		}
+            // Copy default logo/banner if missing
+            CopyIfMissing(
+                Path.Combine(defaultsPath, "default-logo.png"),
+                Path.Combine(images, "logo.png"));
 
-		if (normalized.StartsWith("/images/", StringComparison.OrdinalIgnoreCase))
-		{
-			return defaultRelativePath;
-		}
+            CopyIfMissing(
+                Path.Combine(defaultsPath, "default-banner.png"),
+                Path.Combine(images, "banner.png"));
+        }
+    }
 
-		var normalizedAssetKey = assetKey.Trim().ToLowerInvariant();
-		var sitePrefix = $"/site-data/{normalizedAssetKey}/";
-		if (normalized.StartsWith(sitePrefix, StringComparison.OrdinalIgnoreCase))
-		{
-			return normalized[sitePrefix.Length..].TrimStart('/');
-		}
-
-		return normalized;
-	}
-
-	private static string GetAssetKey(SiteEngine.Entities.Site site)
-	{
-		if (site.IsAdminPortal)
-		{
-			return site.Hostname;
-		}
-
-		return site.PtaId;
-	}
+    private static void CopyIfMissing(string source, string destination)
+    {
+        if (File.Exists(source) && !File.Exists(destination))
+        {
+            File.Copy(source, destination);
+        }
+    }
 }

@@ -23,13 +23,6 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 			maxRetryCount: 5,
 			maxRetryDelay: TimeSpan.FromSeconds(10),
 			errorNumbersToAdd: null)));
-builder.Services.AddDbContextFactory<AppDbContext>(options =>
-	options.UseSqlServer(
-		builder.Configuration.GetConnectionString("DefaultConnection"),
-		sqlOptions => sqlOptions.EnableRetryOnFailure(
-			maxRetryCount: 5,
-			maxRetryDelay: TimeSpan.FromSeconds(10),
-			errorNumbersToAdd: null)));
 builder.Services.Configure<SiteHostMappingOptions>(
 	builder.Configuration.GetSection(SiteHostMappingOptions.SectionName));
 builder.Services.Configure<EmailLoginOptions>(

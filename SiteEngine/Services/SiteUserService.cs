@@ -5,75 +5,71 @@ using SiteEngine.Identity;
 
 namespace SiteEngine.Services;
 
-public class SiteUserService(IDbContextFactory<AppDbContext> dbContextFactory) : ISiteUserService
+public class SiteUserService(AppDbContext dbContext) : ISiteUserService
 {
-	public async Task<IEnumerable<SiteRole>> GetUserRolesAtSiteAsync(string userId, Guid siteId)
-	{
-		await using var dbContext = await dbContextFactory.CreateDbContextAsync();
-		return await dbContext.SiteUserRoles
-			.Where(x => x.UserId == userId && x.SiteId == siteId)
-			.Select(x => x.Role)
-			.ToListAsync();
-	}
+    private readonly AppDbContext _dbContext = dbContext;
 
-	public async Task<bool> UserHasRoleAsync(string userId, Guid siteId, SiteRole role)
-	{
-		await using var dbContext = await dbContextFactory.CreateDbContextAsync();
-		return await dbContext.SiteUserRoles
-			.AnyAsync(x => x.UserId == userId && x.SiteId == siteId && x.Role == role);
-	}
+    public async Task<IEnumerable<SiteRole>> GetUserRolesAtSiteAsync(string userId, Guid siteId)
+    {
+        return await _dbContext.SiteUserRoles
+            .Where(x => x.UserId == userId && x.SiteId == siteId)
+            .Select(x => x.Role)
+            .ToListAsync();
+    }
 
-	public async Task<SiteUserRole> AssignRoleAsync(string userId, Guid siteId, SiteRole role)
-	{
-		await using var dbContext = await dbContextFactory.CreateDbContextAsync();
-		var existing = await dbContext.SiteUserRoles
-			.FirstOrDefaultAsync(x => x.UserId == userId && x.SiteId == siteId && x.Role == role);
+    public async Task<bool> UserHasRoleAsync(string userId, Guid siteId, SiteRole role)
+    {
+        return await _dbContext.SiteUserRoles
+            .AnyAsync(x => x.UserId == userId && x.SiteId == siteId && x.Role == role);
+    }
 
-		if (existing != null)
-			return existing;
+    public async Task<SiteUserRole> AssignRoleAsync(string userId, Guid siteId, SiteRole role)
+    {
+        var existing = await _dbContext.SiteUserRoles
+            .FirstOrDefaultAsync(x => x.UserId == userId && x.SiteId == siteId && x.Role == role);
 
-		var assignment = new SiteUserRole
-		{
-			UserId = userId,
-			SiteId = siteId,
-			Role = role,
-			CreatedAt = DateTime.UtcNow
-		};
+        if (existing != null)
+            return existing;
 
-		dbContext.SiteUserRoles.Add(assignment);
-		await dbContext.SaveChangesAsync();
-		return assignment;
-	}
+        var assignment = new SiteUserRole
+        {
+            UserId = userId,
+            SiteId = siteId,
+            Role = role,
+            CreatedAt = DateTime.UtcNow
+        };
 
-	public async Task<bool> RemoveRoleAsync(string userId, Guid siteId, SiteRole role)
-	{
-		await using var dbContext = await dbContextFactory.CreateDbContextAsync();
-		var assignment = await dbContext.SiteUserRoles
-			.FirstOrDefaultAsync(x => x.UserId == userId && x.SiteId == siteId && x.Role == role);
+        _dbContext.SiteUserRoles.Add(assignment);
+        await _dbContext.SaveChangesAsync();
+        return assignment;
+    }
 
-		if (assignment == null)
-			return false;
+    public async Task<bool> RemoveRoleAsync(string userId, Guid siteId, SiteRole role)
+    {
+        var assignment = await _dbContext.SiteUserRoles
+            .FirstOrDefaultAsync(x => x.UserId == userId && x.SiteId == siteId && x.Role == role);
 
-		dbContext.SiteUserRoles.Remove(assignment);
-		await dbContext.SaveChangesAsync();
-		return true;
-	}
+        if (assignment == null)
+            return false;
 
-	public async Task<IEnumerable<SiteUser>> GetUsersWithRoleAsync(Guid siteId, SiteRole role)
-	{
-		await using var dbContext = await dbContextFactory.CreateDbContextAsync();
-		return await dbContext.SiteUserRoles
-			.Where(x => x.SiteId == siteId && x.Role == role)
-			.Select(x => x.User)
-			.ToListAsync();
-	}
+        _dbContext.SiteUserRoles.Remove(assignment);
+        await _dbContext.SaveChangesAsync();
+        return true;
+    }
 
-	public async Task<string?> GetSiteAdminEmailAsync(Guid siteId)
-	{
-		await using var dbContext = await dbContextFactory.CreateDbContextAsync();
-		return await dbContext.SiteUserRoles
-			.Where(x => x.SiteId == siteId && x.Role == SiteRole.Admin)
-			.Select(x => x.User.Email)
-			.FirstOrDefaultAsync();
-	}
+    public async Task<IEnumerable<SiteUser>> GetUsersWithRoleAsync(Guid siteId, SiteRole role)
+    {
+        return await _dbContext.SiteUserRoles
+            .Where(x => x.SiteId == siteId && x.Role == role)
+            .Select(x => x.User)
+            .ToListAsync();
+    }
+
+    public async Task<string?> GetSiteAdminEmailAsync(Guid siteId)
+    {
+        return await _dbContext.SiteUserRoles
+            .Where(x => x.SiteId == siteId && x.Role == SiteRole.Admin)
+            .Select(x => x.User.Email)
+            .FirstOrDefaultAsync();
+    }
 }

@@ -53,24 +53,20 @@
         }
     }
 
-    private async Task SendCodeAsync()
+private async Task SendCodeAsync()
+{
+    try
     {
-        try
-        {
-            await PasswordlessSignInService.RequestCodeAsync(_email);
-            _codeSent = true;
-            _statusMessage = string.Equals(
-                _email?.Trim(),
-                PasswordlessSignInService.BootstrapAdminEmail,
-                StringComparison.OrdinalIgnoreCase)
-                ? $"Use bootstrap code {PasswordlessSignInService.BootstrapAdminCode} on the admin site, then change the bootstrap email immediately."
-                : "A sign-in code was sent.";
-        }
-        catch (InvalidOperationException ex)
-        {
-            _statusMessage = ex.Message;
-        }
+        await PasswordlessSignInService.RequestCodeAsync(_email);
+        _codeSent = true;
+        _statusMessage = "A sign-in code was sent.";
     }
+    catch (InvalidOperationException ex)
+    {
+        _statusMessage = ex.Message;
+    }
+}
+
 
     private Task VerifyCodeAsync()
     {

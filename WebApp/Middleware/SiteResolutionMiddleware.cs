@@ -12,7 +12,7 @@ public class SiteResolutionMiddleware(RequestDelegate next)
 		if (await platformConfigurationService.IsInitialSetupRequiredAsync(context.RequestAborted)
 			&& !IsSetupBypassPath(context.Request.Path))
 		{
-			context.Response.Redirect("/setup");
+			context.Items["SetupMode"] = true;
 			return;
 		}
 

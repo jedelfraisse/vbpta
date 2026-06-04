@@ -56,15 +56,6 @@
         </AuthorizeView>
     </nav>
 
-    @if (ShowBootstrapReminder)
-    {
-        <div class="alert alert-warning city-alert" role="alert">
-            You are signed in with bootstrap email <strong>@PasswordlessSignInService.BootstrapAdminEmail</strong>.
-            Change it now before any other users can sign in:
-            <a href="/bootstrap/change-email">Change bootstrap email</a>.
-        </div>
-    }
-
     <main class="city-main">
         <section class="city-content-frame">
             @Body

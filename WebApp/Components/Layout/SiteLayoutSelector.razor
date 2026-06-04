@@ -1,6 +1,12 @@
 @inject NavigationManager NavigationManager
 @inject ISiteContext SiteContext
 @inherits LayoutComponentBase
+@inject IHttpContextAccessor Http
+
+<p style="position:fixed;top:0;left:0;background:black;color:white;z-index:9999;">
+    SiteLayoutSelector LOADED
+</p>
+
 @code {
     private Type _layoutType = typeof(CityWideLayout);
 
@@ -13,6 +19,13 @@
 
     private Type ResolveLayoutType()
     {
+		Console.WriteLine($"Resolving layout for host: {new Uri(NavigationManager.Uri).Host}");
+
+        if (Http.HttpContext?.Items.ContainsKey("SetupMode") == true)
+        {
+            return typeof(AdminLayout);
+        }
+
         if (SiteContext.IsAdminContext)
         {
             return typeof(AdminLayout);
@@ -27,6 +40,7 @@
             ? typeof(CityWideLayout)
             : typeof(LocalUnitLayout);
     }
+
 }
 
 <LayoutView Layout="_layoutType" ChildContent="@Body" />

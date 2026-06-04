@@ -28,6 +28,7 @@ echo Publish complete: .\publish-local
 popd
 
 echo Running WebApp from .\publish-local ...
-.\publish-local\WebApp.exe
+cd .\publish-local
+.\WebApp.exe
 
 exit /b 0

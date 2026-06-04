@@ -43,15 +43,6 @@
 
     <img class="banner-image" src="@SiteContext.SiteConfig.BannerUrl" alt="" />
 
-    @if (ShowBootstrapReminder)
-    {
-        <div class="alert alert-warning" role="alert">
-            You are signed in with bootstrap email <strong>@PasswordlessSignInService.BootstrapAdminEmail</strong>.
-            Change it now before any other users can sign in:
-            <a href="/bootstrap/change-email">Change bootstrap email</a>.
-        </div>
-    }
-
     <main class="layout-body">
         @Body
     </main>

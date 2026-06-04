@@ -66,6 +66,14 @@ else
 	{
 		var host = new Uri(NavigationManager.Uri).Host;
 		await SiteContext.InitializeAsync(host);
+
+		// On admin domain, /admin is redundant since / already shows the admin dashboard
+		if (SiteContext.IsAdminContext)
+		{
+			NavigationManager.NavigateTo("/", forceLoad: false);
+			return;
+		}
+
 		var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
 		var isAuthenticated = authState.User.Identity?.IsAuthenticated ?? false;
 		_userId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;

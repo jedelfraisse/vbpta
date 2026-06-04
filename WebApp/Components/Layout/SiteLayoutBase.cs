@@ -22,8 +22,6 @@ public abstract class SiteLayoutBase : LayoutComponentBase
 
     protected bool IsGlobalAdmin { get; private set; }
 
-    protected bool ShowBootstrapReminder { get; private set; }
-
     protected async Task RefreshUserStateAsync()
     {
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
@@ -33,7 +31,6 @@ public abstract class SiteLayoutBase : LayoutComponentBase
         {
             ShowAdminLink = false;
             IsGlobalAdmin = false;
-            ShowBootstrapReminder = false;
             return;
         }
 
@@ -43,9 +40,5 @@ public abstract class SiteLayoutBase : LayoutComponentBase
 
         var email = user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
             ?? user.Identity?.Name;
-        ShowBootstrapReminder = string.Equals(
-            email,
-            PasswordlessSignInService.BootstrapAdminEmail,
-            StringComparison.OrdinalIgnoreCase);
     }
 }

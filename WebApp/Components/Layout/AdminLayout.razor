@@ -1,82 +1,111 @@
 @inherits SiteLayoutBase
+@inject NavigationManager Nav
+@inject IHttpContextAccessor Http
+
+@using WebApp.Components.SharedPages;
 
 @code {
-    protected override async Task OnParametersSetAsync()
-    {
-        await RefreshUserStateAsync();
-    }
+	private bool IsSetupMode => Http.HttpContext?.Items.ContainsKey("SetupMode") == true;
+	protected override async Task OnParametersSetAsync()
+	{
+		await RefreshUserStateAsync();
+	}
+}
+
+Admin Layout Test
+
+@if (IsSetupMode)
+{
+	<div class="setup-center-box">
+		<InitialSetup />
+	</div>
+}
+else
+{
+	<AuthorizeView>
+		<Authorized>
+			<style>
+						:root {
+							--primary-color: @SiteContext.SiteConfig.PrimaryColor;
+							--accent-color: @SiteContext.SiteConfig.AccentColor;
+						}
+			</style>
+			<div class="layout-shell admin-shell">
+				<header class="page-header" role="banner">
+					<div class="brand-block">
+						<img class="site-logo" src="@SiteContext.SiteConfig.LogoUrl" alt="@SiteContext.SiteConfig.SiteName logo" />
+						<div>
+							<div class="site-kicker">Admin Portal</div>
+							<h1>@SiteContext.SiteConfig.SiteName</h1>
+						</div>
+
+						<nav class="primary-nav" aria-label="Primary">
+
+							<a href="/">Dashboard</a>
+							<a href="/globaladmin/users">Users</a>
+							<a href="/globaladmin/settings">Settings</a>
+							<a href="/globaladmin/sites">Unit Sites</a>
+							<a href="/logout">Logout</a>
+
+						</nav>
+					</div>
+
+				</header>
+				<main class="layout-body">
+					@Body
+				</main>
+			</div>
+		</Authorized>
+		<NotAuthorized>
+			<div class="setup-center-box">
+				<h2>Welcome to the City Wide PTA Admin Page</h2>
+
+				<p>
+					<a href="/login">Login</a>
+				</p>
+
+				<p>
+					<!-- TODO: Pull city-wide URL from database -->
+					<a href="/"><img src="/images/logo.png" alt="City-wide PTA logo" /></a><br />
+					Please go to the <a href="/">site page</a> to access the public city‑wide PTA website.
+				</p>
+			</div>
+
+			
+
+		</NotAuthorized>
+	</AuthorizeView>
+
 }
 
 <style>
-    :root {
-        --primary-color: @SiteContext.SiteConfig.PrimaryColor;
-        --accent-color: @SiteContext.SiteConfig.AccentColor;
-    }
+	.setup-center-box {
+		position: fixed;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		width: min(90%, 420px);
+		padding: 2rem;
+		background: white;
+		border-radius: 12px;
+		box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+		text-align: center;
+		font-family: system-ui, sans-serif;
+	}
+
+		.setup-center-box h2 {
+			margin-bottom: 1rem;
+			font-size: 1.4rem;
+			font-weight: 600;
+		}
+
+		.setup-center-box a {
+			color: var(--primary-color, #3366ff);
+			font-weight: 600;
+			text-decoration: none;
+		}
+
+			.setup-center-box a:hover {
+				text-decoration: underline;
+			}
 </style>
-
-<div class="layout-shell admin-shell">
-    <header class="page-header" role="banner">
-        <div class="brand-block">
-            <img class="site-logo" src="@SiteContext.SiteConfig.LogoUrl" alt="@SiteContext.SiteConfig.SiteName logo" />
-            <div>
-                <div class="site-kicker">Admin Portal</div>
-                <h1>@SiteContext.SiteConfig.SiteName</h1>
-            </div>
-        </div>
-        <nav>
-            <a href="/">Dashboard</a>
-            <span> | </span><a href="/globaladmin/sites">Sites</a>
-            <span> | </span><a href="/globaladmin/users">Users</a>
-            <span> | </span><a href="/globaladmin/settings">Settings</a>
-            <span> | </span><a href="/">Admin View</a>
-            <AuthorizeView>
-                <Authorized>
-                    <span> | </span><a href="/logout">Logout</a>
-                </Authorized>
-                <NotAuthorized>
-                    <span> | </span><a href="/login">Login</a>
-                </NotAuthorized>
-            </AuthorizeView>
-        </nav>
-    </header>
-
-
-    
-    <nav class="primary-nav" aria-label="Primary">
-        <a href="/globaladmin/sites">Dashboard</a>
-        <a href="#">About</a>
-        <a href="#">Our Local Units</a>
-        <a href="#">Programs</a>
-        <a href="#">Get Involved</a>
-        <a href="#">Events</a>
-        <a href="#">Sponsors</a>
-        <a href="/announcements">News/Announcements</a>
-        <a href="#">Awards</a>
-        @if (ShowAdminLink)
-        {
-            <a href="/admin">Admin</a>
-        }
-        <AuthorizeView>
-            <Authorized>
-                <a href="/logout">Logout</a>
-            </Authorized>
-            <NotAuthorized>
-                <a href="/login">Login</a>
-            </NotAuthorized>
-        </AuthorizeView>
-    </nav>
-
-
-    @if (ShowBootstrapReminder)
-    {
-        <div class="alert alert-warning" role="alert">
-            You are signed in with bootstrap email <strong>@PasswordlessSignInService.BootstrapAdminEmail</strong>.
-            Change it now before any other users can sign in:
-            <a href="/bootstrap/change-email">Change bootstrap email</a>.
-        </div>
-    }
-
-    <main class="layout-body">
-        @Body
-    </main>
-</div>

@@ -204,7 +204,7 @@ Passwordless sign-in (email code) setup:
 
 Initial platform setup and routing:
 
-- If `Sites` is empty, requests are redirected to `/setup` to bootstrap:
+- If `Sites` is empty, we will use the Admin layout that will show the setup page and get the following information :
   - admin email
   - city-wide site name + PTA ID
   - root/platform domains

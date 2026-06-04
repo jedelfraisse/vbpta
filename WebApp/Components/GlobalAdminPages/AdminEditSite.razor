@@ -1,4 +1,4 @@
-@page "/admin/sites/{SiteId:guid}/edit"
+@page "/globaladmin/sites/{SiteId:guid}/edit"
 @inject NavigationManager NavigationManager
 @inject ISiteContext SiteContext
 @inject IAdminDashboardService AdminDashboardService
@@ -31,15 +31,27 @@ else if (!_siteLoaded)
 }
 else
 {
-	<p><a href="@($"/admin/sites/{SiteId}")">Back to Site Details</a></p>
+	<p><a href="@($"/globaladmin/sites/{SiteId}")">Back to Site Details</a></p>
 
 	<EditForm Model="_request" OnValidSubmit="UpdateSiteAsync">
 		<DataAnnotationsValidator />
 		<ValidationSummary />
 
 		<div>
+			<label for="ptaId">PTA ID (8 digits)</label><br />
+			<InputText id="ptaId" @bind-Value="_request.PtaId" />
+		</div>
+		<div>
 			<label for="hostname">Hostname</label><br />
 			<InputText id="hostname" @bind-Value="_request.Hostname" />
+		</div>
+		<div>
+			<label for="domain">Custom Domain</label><br />
+			<InputText id="domain" @bind-Value="_request.Domain" />
+		</div>
+		<div>
+			<label for="isCityWide">City-Wide Site</label><br />
+			<InputCheckbox id="isCityWide" @bind-Value="_request.IsCityWide" />
 		</div>
 		<div>
 			<label for="siteName">Site Name</label><br />
@@ -104,7 +116,10 @@ else
 				if (detail is not null)
 				{
 					_siteLoaded = true;
+					_request.PtaId = detail.PtaId;
 					_request.Hostname = detail.Hostname;
+					_request.Domain = detail.Domain;
+					_request.IsCityWide = detail.IsCityWide;
 					_request.SiteName = detail.SiteName;
 					_request.LogoUrl = detail.LogoUrl;
 					_request.BannerUrl = detail.BannerUrl;
@@ -129,7 +144,7 @@ else
 				return;
 			}
 
-			NavigationManager.NavigateTo($"/admin/sites/{SiteId}");
+			NavigationManager.NavigateTo($"/globaladmin/sites/{SiteId}");
 		}
 		catch (InvalidOperationException ex)
 		{

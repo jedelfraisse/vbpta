@@ -8,6 +8,7 @@ public interface ISiteContext
 	Site? CurrentSite { get; }
 	SiteConfig SiteConfig { get; }
 	bool IsAdminContext { get; }
+	bool SiteNotFound { get; }
 	Task InitializeAsync(string host, CancellationToken cancellationToken = default);
 
 	/// <summary>

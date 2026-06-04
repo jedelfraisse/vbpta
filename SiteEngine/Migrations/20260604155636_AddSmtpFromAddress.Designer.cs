@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SiteEngine.Data;
 
@@ -11,9 +12,11 @@ using SiteEngine.Data;
 namespace SiteEngine.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260604155636_AddSmtpFromAddress")]
+    partial class AddSmtpFromAddress
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -329,30 +332,30 @@ namespace SiteEngine.Migrations
                         {
                             Id = new Guid("0f89ac2b-a0ac-40b8-b886-fd117e35903c"),
                             AccentColor = "#FFCC00",
-                            BannerUrl = "/images/banner.png",
+                            BannerUrl = "/images/TopBanner.png",
                             CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
                             Domain = "",
                             Hostname = "admin",
                             IsAdminPortal = true,
                             IsCityWide = false,
-                            LogoUrl = "/images/logo.png",
+                            LogoUrl = "/images/vbpta-logo.png",
                             PrimaryColor = "#003366",
                             PtaId = "00000000",
-                            SiteName = "City Wide PTA Admin",
+                            SiteName = "VBPTA Admin",
                             UpdatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            WelcomeText = "Monitor and manage all PTA sites from the this admin portal."
+                            WelcomeText = "Monitor and manage all VBPTA sites from the admin portal."
                         },
                         new
                         {
                             Id = new Guid("2b30d683-ea4b-4e9e-b616-17a2198e3b79"),
                             AccentColor = "#FFCC00",
-                            BannerUrl = "/images/banner.png",
+                            BannerUrl = "/images/TopBanner.png",
                             CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
                             Domain = "",
                             Hostname = "",
                             IsAdminPortal = false,
                             IsCityWide = true,
-                            LogoUrl = "/images/logo.png",
+                            LogoUrl = "/images/vbpta-logo.png",
                             PrimaryColor = "#003366",
                             PtaId = "10000000",
                             SiteName = "Virginia Beach Council of PTAs",

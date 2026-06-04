@@ -57,9 +57,12 @@ public class AdminDashboardService(
 			.Select(x => new AdminSiteSummary
 			{
 				SiteId = x.Id,
+				PtaId = x.PtaId,
 				Hostname = x.Hostname,
+				Domain = x.Domain,
 				SiteName = x.SiteName,
 				IsAdminPortal = x.IsAdminPortal,
+				IsCityWide = x.IsCityWide,
 				AnnouncementCount = x.Announcements.Count,
 				EventCount = x.Events.Count,
 				HealthStatus = "Healthy"
@@ -103,9 +106,12 @@ public class AdminDashboardService(
 		return new AdminSiteDetail
 		{
 			SiteId = site.Id,
+			PtaId = site.PtaId,
 			Hostname = site.Hostname,
+			Domain = site.Domain,
 			SiteName = site.SiteName,
 			IsAdminPortal = site.IsAdminPortal,
+			IsCityWide = site.IsCityWide,
 			LogoUrl = site.LogoUrl,
 			BannerUrl = site.BannerUrl,
 			PrimaryColor = site.PrimaryColor,
@@ -123,15 +129,51 @@ public class AdminDashboardService(
 	public async Task<Guid> CreateSiteAsync(string? currentUserId, AdminCreateSiteRequest request, CancellationToken cancellationToken = default)
 	{
 		await EnsureAuthorizedAsync(currentUserId);
+		var normalizedPtaId = NormalizeAndValidatePtaId(request.PtaId);
 		var normalizedHostname = NormalizeAndValidateHostname(request.Hostname);
+		var normalizedDomain = NormalizeAndValidateDomain(request.Domain);
+		ValidateRoutingInputs(normalizedHostname, normalizedDomain, request.IsCityWide);
 		await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-		var exists = await dbContext.Sites
+		var ptaIdExists = await dbContext.Sites
 			.AsNoTracking()
-			.AnyAsync(x => x.Hostname == normalizedHostname, cancellationToken);
-		if (exists)
+			.AnyAsync(x => x.PtaId == normalizedPtaId, cancellationToken);
+		if (ptaIdExists)
 		{
-			throw new InvalidOperationException($"A site with hostname '{normalizedHostname}' already exists.");
+			throw new InvalidOperationException($"A site with PTA ID '{normalizedPtaId}' already exists.");
+		}
+
+		if (!string.IsNullOrWhiteSpace(normalizedHostname))
+		{
+			var hostnameExists = await dbContext.Sites
+				.AsNoTracking()
+				.AnyAsync(x => x.Hostname == normalizedHostname, cancellationToken);
+			if (hostnameExists)
+			{
+				throw new InvalidOperationException($"A site with hostname '{normalizedHostname}' already exists.");
+			}
+		}
+
+		if (!string.IsNullOrWhiteSpace(normalizedDomain))
+		{
+			var domainExists = await dbContext.Sites
+				.AsNoTracking()
+				.AnyAsync(x => x.Domain == normalizedDomain, cancellationToken);
+			if (domainExists)
+			{
+				throw new InvalidOperationException($"A site with domain '{normalizedDomain}' already exists.");
+			}
+		}
+
+		if (request.IsCityWide)
+		{
+			var cityWideExists = await dbContext.Sites
+				.AsNoTracking()
+				.AnyAsync(x => x.IsCityWide, cancellationToken);
+			if (cityWideExists)
+			{
+				throw new InvalidOperationException("Only one city-wide site is allowed.");
+			}
 		}
 
 		var now = DateTimeOffset.UtcNow;
@@ -140,8 +182,11 @@ public class AdminDashboardService(
 		var site = new Site
 		{
 			Id = Guid.NewGuid(),
+			PtaId = normalizedPtaId,
 			Hostname = normalizedHostname,
+			Domain = normalizedDomain,
 			IsAdminPortal = false,
+			IsCityWide = request.IsCityWide,
 			SiteName = GetValueOrDefault(request.SiteName, SeedData.DefaultCitySite.SiteName),
 			LogoUrl = useDefaultLogo
 				? "images/logo.png"
@@ -158,15 +203,25 @@ public class AdminDashboardService(
 
 		dbContext.Sites.Add(site);
 		await dbContext.SaveChangesAsync(cancellationToken);
-		await _sitePublicAssetService.EnsureSiteFoldersAsync(normalizedHostname, seedDefaults: useDefaultLogo || useDefaultBanner, cancellationToken);
-		_siteResolver.InvalidateHost(normalizedHostname);
+		await _sitePublicAssetService.EnsureSiteFoldersAsync(normalizedPtaId, seedDefaults: useDefaultLogo || useDefaultBanner, cancellationToken);
+		if (!string.IsNullOrWhiteSpace(normalizedHostname))
+		{
+			_siteResolver.InvalidateHost(normalizedHostname);
+		}
+		if (!string.IsNullOrWhiteSpace(normalizedDomain))
+		{
+			_siteResolver.InvalidateHost(normalizedDomain);
+		}
 		return site.Id;
 	}
 
 	public async Task<bool> UpdateSiteAsync(string? currentUserId, Guid siteId, AdminUpdateSiteRequest request, CancellationToken cancellationToken = default)
 	{
 		await EnsureAuthorizedAsync(currentUserId);
+		var normalizedPtaId = NormalizeAndValidatePtaId(request.PtaId);
 		var normalizedHostname = NormalizeAndValidateHostname(request.Hostname);
+		var normalizedDomain = NormalizeAndValidateDomain(request.Domain);
+		ValidateRoutingInputs(normalizedHostname, normalizedDomain, request.IsCityWide);
 		await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 		var site = await dbContext.Sites.SingleOrDefaultAsync(x => x.Id == siteId, cancellationToken);
 		if (site is null)
@@ -174,16 +229,48 @@ public class AdminDashboardService(
 			return false;
 		}
 
+		var duplicatePtaId = await dbContext.Sites
+			.AsNoTracking()
+			.AnyAsync(x => x.Id != siteId && x.PtaId == normalizedPtaId, cancellationToken);
+		if (duplicatePtaId)
+		{
+			throw new InvalidOperationException($"A site with PTA ID '{normalizedPtaId}' already exists.");
+		}
+
 		var duplicateHostname = await dbContext.Sites
 			.AsNoTracking()
-			.AnyAsync(x => x.Id != siteId && x.Hostname == normalizedHostname, cancellationToken);
-		if (duplicateHostname)
+			.AnyAsync(x => x.Id != siteId && x.Hostname == normalizedHostname && x.Hostname != string.Empty, cancellationToken);
+		if (!string.IsNullOrWhiteSpace(normalizedHostname) && duplicateHostname)
 		{
 			throw new InvalidOperationException($"A site with hostname '{normalizedHostname}' already exists.");
 		}
 
+		var duplicateDomain = await dbContext.Sites
+			.AsNoTracking()
+			.AnyAsync(x => x.Id != siteId && x.Domain == normalizedDomain && x.Domain != string.Empty, cancellationToken);
+		if (!string.IsNullOrWhiteSpace(normalizedDomain) && duplicateDomain)
+		{
+			throw new InvalidOperationException($"A site with domain '{normalizedDomain}' already exists.");
+		}
+
+		if (request.IsCityWide)
+		{
+			var duplicateCityWide = await dbContext.Sites
+				.AsNoTracking()
+				.AnyAsync(x => x.Id != siteId && x.IsCityWide, cancellationToken);
+			if (duplicateCityWide)
+			{
+				throw new InvalidOperationException("Only one city-wide site is allowed.");
+			}
+		}
+
 		var originalHostname = site.Hostname;
+		var originalDomain = site.Domain;
+		var originalPtaId = site.PtaId;
+		site.PtaId = normalizedPtaId;
 		site.Hostname = normalizedHostname;
+		site.Domain = normalizedDomain;
+		site.IsCityWide = request.IsCityWide;
 		site.SiteName = GetValueOrDefault(request.SiteName, site.SiteName);
 		site.LogoUrl = GetValueOrDefault(request.LogoUrl, site.LogoUrl);
 		site.BannerUrl = GetValueOrDefault(request.BannerUrl, site.BannerUrl);
@@ -193,9 +280,24 @@ public class AdminDashboardService(
 		site.UpdatedAtUtc = DateTimeOffset.UtcNow;
 
 		await dbContext.SaveChangesAsync(cancellationToken);
-		await _sitePublicAssetService.EnsureSiteFoldersAsync(normalizedHostname, seedDefaults: false, cancellationToken);
-		_siteResolver.InvalidateHost(originalHostname);
-		_siteResolver.InvalidateHost(normalizedHostname);
+		await _sitePublicAssetService.RenameSiteFolderAsync(originalPtaId, normalizedPtaId, cancellationToken);
+		await _sitePublicAssetService.EnsureSiteFoldersAsync(normalizedPtaId, seedDefaults: false, cancellationToken);
+		if (!string.IsNullOrWhiteSpace(originalHostname))
+		{
+			_siteResolver.InvalidateHost(originalHostname);
+		}
+		if (!string.IsNullOrWhiteSpace(normalizedHostname))
+		{
+			_siteResolver.InvalidateHost(normalizedHostname);
+		}
+		if (!string.IsNullOrWhiteSpace(originalDomain))
+		{
+			_siteResolver.InvalidateHost(originalDomain);
+		}
+		if (!string.IsNullOrWhiteSpace(normalizedDomain))
+		{
+			_siteResolver.InvalidateHost(normalizedDomain);
+		}
 		return true;
 	}
 
@@ -377,7 +479,7 @@ public class AdminDashboardService(
 		var normalized = hostname?.Trim().ToLowerInvariant() ?? string.Empty;
 		if (string.IsNullOrWhiteSpace(normalized))
 		{
-			throw new InvalidOperationException("Hostname is required.");
+			return string.Empty;
 		}
 
 		if (normalized.Contains("://", StringComparison.Ordinal) ||
@@ -393,6 +495,58 @@ public class AdminDashboardService(
 		}
 
 		return normalized;
+	}
+
+	private static string NormalizeAndValidateDomain(string domain)
+	{
+		var normalized = domain?.Trim().ToLowerInvariant() ?? string.Empty;
+		if (string.IsNullOrWhiteSpace(normalized))
+		{
+			return string.Empty;
+		}
+
+		if (normalized.Contains("://", StringComparison.Ordinal) ||
+			normalized.Contains('/', StringComparison.Ordinal) ||
+			normalized.Contains(':', StringComparison.Ordinal))
+		{
+			throw new InvalidOperationException("Domain must not include scheme, path, or port.");
+		}
+
+		if (!Regex.IsMatch(normalized, "^[a-z0-9.-]+$"))
+		{
+			throw new InvalidOperationException("Domain contains unsupported characters.");
+		}
+
+		return normalized;
+	}
+
+	private static string NormalizeAndValidatePtaId(string ptaId)
+	{
+		var normalized = ptaId?.Trim() ?? string.Empty;
+		if (!Regex.IsMatch(normalized, "^\\d{8}$"))
+		{
+			throw new InvalidOperationException("PTA ID must be exactly 8 digits.");
+		}
+
+		return normalized;
+	}
+
+	private static void ValidateRoutingInputs(string hostname, string domain, bool isCityWide)
+	{
+		if (isCityWide)
+		{
+			if (!string.IsNullOrWhiteSpace(hostname) || !string.IsNullOrWhiteSpace(domain))
+			{
+				throw new InvalidOperationException("City-wide sites cannot have Hostname or Domain values.");
+			}
+
+			return;
+		}
+
+		if (string.IsNullOrWhiteSpace(hostname) && string.IsNullOrWhiteSpace(domain))
+		{
+			throw new InvalidOperationException("Provide either a Hostname or a Domain.");
+		}
 	}
 
 	private static string NormalizeAndValidateEmail(string email)

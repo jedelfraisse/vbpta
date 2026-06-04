@@ -30,7 +30,6 @@ public class SiteResolver(
 		var canonicalHost = _mappingOptions.Hosts.TryGetValue(normalizedHost, out var mappedHost)
 			? NormalizeHost(mappedHost)
 			: normalizedHost;
-
 		if (string.IsNullOrWhiteSpace(canonicalHost))
 		{
 			return Task.FromResult<SiteResolutionResult?>(null);
@@ -49,19 +48,127 @@ public class SiteResolver(
 		});
 	}
 
-	private async Task<SiteResolutionResult?> ResolveFromDatabaseAsync(string canonicalHost, CancellationToken cancellationToken)
+	private async Task<SiteResolutionResult?> ResolveFromDatabaseAsync(string host, CancellationToken cancellationToken)
 	{
 		await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
-		Site? site = await dbContext.Sites
+		var globalConfig = await dbContext.GlobalConfigs
 			.AsNoTracking()
-			.SingleOrDefaultAsync(x => x.Hostname == canonicalHost, cancellationToken);
-
-		if (site is null)
+			.OrderBy(x => x.Id)
+			.FirstOrDefaultAsync(cancellationToken);
+		if (globalConfig is null)
 		{
-			return null;
+			var directMatch = await dbContext.Sites
+				.AsNoTracking()
+				.SingleOrDefaultAsync(x => x.Hostname == host || x.Domain == host, cancellationToken);
+			return directMatch is null
+				? null
+				: new SiteResolutionResult(directMatch, directMatch.ToSiteConfig(), directMatch.IsAdminPortal);
 		}
 
-		return new SiteResolutionResult(site, site.ToSiteConfig(), site.IsAdminPortal);
+		var rootDomain = NormalizeHost(globalConfig.RootDomain);
+		var platformDomain = NormalizeHost(globalConfig.PlatformDomain);
+		var cityWideSite = await dbContext.Sites.AsNoTracking().SingleOrDefaultAsync(x => x.IsCityWide, cancellationToken);
+
+		if (IsAdminHost(host, rootDomain, platformDomain))
+		{
+			var adminSite = await dbContext.Sites
+				.AsNoTracking()
+				.SingleOrDefaultAsync(
+					x => x.PtaId == SeedData.DefaultAdminPtaId || x.IsAdminPortal,
+					cancellationToken);
+			if (adminSite is not null)
+			{
+				return new SiteResolutionResult(adminSite, adminSite.ToSiteConfig(), IsAdminContext: true);
+			}
+		}
+
+		if (!string.IsNullOrWhiteSpace(rootDomain)
+			&& string.Equals(host, rootDomain, StringComparison.OrdinalIgnoreCase)
+			&& cityWideSite is not null)
+		{
+			return new SiteResolutionResult(cityWideSite, cityWideSite.ToSiteConfig(), IsAdminContext: false);
+		}
+
+		var subdomain = ExtractSubdomain(host, platformDomain);
+		if (!string.IsNullOrWhiteSpace(subdomain))
+		{
+			var subdomainSite = await dbContext.Sites
+				.AsNoTracking()
+				.SingleOrDefaultAsync(
+					x => x.Hostname == subdomain || x.Hostname == host,
+					cancellationToken);
+			if (subdomainSite is not null)
+			{
+				return new SiteResolutionResult(subdomainSite, subdomainSite.ToSiteConfig(), subdomainSite.IsAdminPortal);
+			}
+
+			if (cityWideSite is not null)
+			{
+				return new SiteResolutionResult(cityWideSite, cityWideSite.ToSiteConfig(), cityWideSite.IsAdminPortal, SiteNotFound: true);
+			}
+		}
+
+		var customDomainSite = await dbContext.Sites
+			.AsNoTracking()
+			.SingleOrDefaultAsync(x => x.Domain == host, cancellationToken);
+		if (customDomainSite is not null)
+		{
+			return new SiteResolutionResult(customDomainSite, customDomainSite.ToSiteConfig(), customDomainSite.IsAdminPortal);
+		}
+
+		if (cityWideSite is not null)
+		{
+			return new SiteResolutionResult(cityWideSite, cityWideSite.ToSiteConfig(), cityWideSite.IsAdminPortal, SiteNotFound: true);
+		}
+
+		return null;
+	}
+
+	private static string ExtractSubdomain(string host, string platformDomain)
+	{
+		if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(platformDomain))
+		{
+			return string.Empty;
+		}
+
+		var suffix = $".{platformDomain}";
+		if (!host.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+		{
+			return string.Empty;
+		}
+
+		var leadingPart = host[..^suffix.Length];
+		if (string.IsNullOrWhiteSpace(leadingPart) || leadingPart.Contains('.', StringComparison.Ordinal))
+		{
+			return string.Empty;
+		}
+
+		return leadingPart;
+	}
+
+	private static bool IsAdminHost(string host, string rootDomain, string platformDomain)
+	{
+		if (!host.StartsWith("admin.", StringComparison.OrdinalIgnoreCase))
+		{
+			return false;
+		}
+
+		var allowedHosts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+		if (!string.IsNullOrWhiteSpace(rootDomain))
+		{
+			allowedHosts.Add($"admin.{rootDomain}");
+		}
+		if (!string.IsNullOrWhiteSpace(platformDomain))
+		{
+			allowedHosts.Add($"admin.{platformDomain}");
+		}
+
+		if (allowedHosts.Count == 0)
+		{
+			return true;
+		}
+
+		return allowedHosts.Contains(host);
 	}
 
 	private static string NormalizeHost(string? host)

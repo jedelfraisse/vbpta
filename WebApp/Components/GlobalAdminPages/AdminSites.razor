@@ -1,4 +1,4 @@
-@page "/admin/sites"
+@page "/globaladmin/sites"
 @inject NavigationManager NavigationManager
 @inject ISiteContext SiteContext
 @inject IAdminDashboardService AdminDashboardService
@@ -27,8 +27,8 @@ else if (!_isAdmin)
 }
 else
 {
-	<p><a href="/admin">Back to Dashboard</a></p>
-	<p><a class="btn btn-primary" href="/admin/sites/create">Create Site</a></p>
+	<p><a href="/globaladmin">Back to Dashboard</a></p>
+	<p><a class="btn btn-primary" href="/globaladmin/sites/create">Create Site</a></p>
 
 	@if (_sites.Count == 0)
 	{
@@ -40,7 +40,9 @@ else
 			<thead>
 				<tr>
 					<th>Site</th>
+					<th>PTA ID</th>
 					<th>Hostname</th>
+					<th>Domain</th>
 					<th>Type</th>
 					<th>Announcements</th>
 					<th>Events</th>
@@ -52,14 +54,16 @@ else
 				{
 					<tr>
 						<td>@site.SiteName</td>
+						<td>@site.PtaId</td>
 						<td>@site.Hostname</td>
-						<td>@(site.IsAdminPortal ? "Admin" : "Site")</td>
+						<td>@site.Domain</td>
+						<td>@(site.IsAdminPortal ? "Admin" : (site.IsCityWide ? "City-Wide" : "Site"))</td>
 						<td>@site.AnnouncementCount</td>
 						<td>@site.EventCount</td>
 						<td>
-							<a href="@($"/admin/sites/{site.SiteId}")">Details</a> |
-							<a href="@BuildSiteHomeUrl(site.Hostname)" target="_blank" rel="noopener">Visit</a> |
-							<a href="@($"/admin/sites/{site.SiteId}/edit")">Edit</a>
+							<a href="@($"/globaladmin/sites/{site.SiteId}")">Details</a> |
+							<a href="@BuildSiteHomeUrl(site)" target="_blank" rel="noopener">Visit</a> |
+							<a href="@($"/globaladmin/sites/{site.SiteId}/edit")">Edit</a>
 						</td>
 					</tr>
 				}
@@ -95,10 +99,18 @@ else
 		_initialized = true;
 	}
 
-	private string BuildSiteHomeUrl(string hostname)
+	private string BuildSiteHomeUrl(AdminSiteSummary site)
 	{
 		var currentUri = new Uri(NavigationManager.Uri);
-		var builder = new UriBuilder(currentUri.Scheme, hostname)
+		var targetHost = site.Domain;
+		if (string.IsNullOrWhiteSpace(targetHost))
+		{
+			targetHost = site.IsCityWide || string.IsNullOrWhiteSpace(site.Hostname)
+				? currentUri.Host.Replace("admin.", string.Empty, StringComparison.OrdinalIgnoreCase)
+				: $"{site.Hostname}.{currentUri.Host.Replace("admin.", string.Empty, StringComparison.OrdinalIgnoreCase)}";
+		}
+
+		var builder = new UriBuilder(currentUri.Scheme, targetHost)
 		{
 			Path = "/"
 		};

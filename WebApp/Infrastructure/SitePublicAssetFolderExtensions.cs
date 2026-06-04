@@ -20,15 +20,16 @@ public static class SitePublicAssetFolderExtensions
 		var hasUpdates = false;
 		foreach (var site in sites)
 		{
-			await sitePublicAssetService.EnsureSiteFoldersAsync(site.Hostname, seedDefaults: true);
+			var assetKey = GetAssetKey(site);
+			await sitePublicAssetService.EnsureSiteFoldersAsync(assetKey, seedDefaults: true);
 
 			if (site.IsAdminPortal)
 			{
 				continue;
 			}
 
-			var normalizedLogo = NormalizeSiteRelativeAssetPath(site.Hostname, site.LogoUrl, "images/logo.png");
-			var normalizedBanner = NormalizeSiteRelativeAssetPath(site.Hostname, site.BannerUrl, "images/banner.png");
+			var normalizedLogo = NormalizeSiteRelativeAssetPath(assetKey, site.LogoUrl, "images/logo.png");
+			var normalizedBanner = NormalizeSiteRelativeAssetPath(assetKey, site.BannerUrl, "images/banner.png");
 			if (!string.Equals(site.LogoUrl, normalizedLogo, StringComparison.Ordinal))
 			{
 				site.LogoUrl = normalizedLogo;
@@ -48,7 +49,7 @@ public static class SitePublicAssetFolderExtensions
 		}
 	}
 
-	private static string NormalizeSiteRelativeAssetPath(string hostname, string? currentUrl, string defaultRelativePath)
+	private static string NormalizeSiteRelativeAssetPath(string assetKey, string? currentUrl, string defaultRelativePath)
 	{
 		var normalized = currentUrl?.Trim() ?? string.Empty;
 		if (string.IsNullOrWhiteSpace(normalized))
@@ -61,13 +62,23 @@ public static class SitePublicAssetFolderExtensions
 			return defaultRelativePath;
 		}
 
-		var hostSegment = hostname.Trim().ToLowerInvariant();
-		var sitePrefix = $"/site-data/{hostSegment}/";
+		var normalizedAssetKey = assetKey.Trim().ToLowerInvariant();
+		var sitePrefix = $"/site-data/{normalizedAssetKey}/";
 		if (normalized.StartsWith(sitePrefix, StringComparison.OrdinalIgnoreCase))
 		{
 			return normalized[sitePrefix.Length..].TrimStart('/');
 		}
 
 		return normalized;
+	}
+
+	private static string GetAssetKey(SiteEngine.Entities.Site site)
+	{
+		if (site.IsAdminPortal)
+		{
+			return site.Hostname;
+		}
+
+		return site.PtaId;
 	}
 }

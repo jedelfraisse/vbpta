@@ -53,7 +53,7 @@
     {
         var host = new Uri(NavigationManager.Uri).Host;
         await SiteContext.InitializeAsync(host);
-        _siteNotFound = SiteContext.CurrentSite is null;
+        _siteNotFound = SiteContext.SiteNotFound || SiteContext.CurrentSite is null;
 
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         _userId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
@@ -61,7 +61,7 @@
         _showAdminDashboard = SiteContext.IsAdminContext && _showAdminLink;
         _showCityWideHome = !_siteNotFound
             && !SiteContext.IsAdminContext
-            && string.Equals(SiteContext.CurrentSite?.Hostname, SeedData.DefaultCityHostname, StringComparison.OrdinalIgnoreCase);
+            && (SiteContext.CurrentSite?.IsCityWide ?? false);
         _showLocalUnitHome = !_siteNotFound && !_showAdminDashboard && !_showCityWideHome;
     }
 }

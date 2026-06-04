@@ -1,4 +1,4 @@
-@page "/admin/users"
+@page "/globaladmin/users"
 @inject NavigationManager NavigationManager
 @inject ISiteContext SiteContext
 @inject IAdminDashboardService AdminDashboardService
@@ -27,8 +27,8 @@ else if (!_isAdmin)
 }
 else
 {
-	<p><a href="/admin">Back to Dashboard</a></p>
-	<p><a class="btn btn-primary" href="/admin/users/create">Create User</a></p>
+	<p><a href="/">Back to Dashboard</a></p>
+	<p><a class="btn btn-primary" href="/globaladmin/users/create">Create User</a></p>
 
 	@if (_users.Count == 0)
 	{
@@ -52,7 +52,7 @@ else
 						<td>@user.Email</td>
 						<td>@(user.IsGlobalAdmin ? "Yes" : "No")</td>
 						<td>@user.AssignedSiteCount</td>
-						<td><a href="@($"/admin/users/{Uri.EscapeDataString(user.UserId)}/edit")">Edit</a></td>
+						<td><a href="@($"/globaladmin/users/{Uri.EscapeDataString(user.UserId)}/edit")">Edit</a></td>
 					</tr>
 				}
 			</tbody>

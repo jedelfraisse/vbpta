@@ -1,4 +1,4 @@
-@page "/admin/users/create"
+@page "/globaladmin/users/create"
 @inject NavigationManager NavigationManager
 @inject ISiteContext SiteContext
 @inject IAdminDashboardService AdminDashboardService
@@ -27,7 +27,7 @@ else if (!_isAdmin)
 }
 else
 {
-	<p><a href="/admin/users">Back to Users</a></p>
+	<p><a href="/globaladmin/users">Back to Users</a></p>
 
 	<EditForm Model="_request" OnValidSubmit="CreateUserAsync">
 		<DataAnnotationsValidator />
@@ -82,7 +82,7 @@ else
 		try
 		{
 			var createdUserId = await AdminDashboardService.CreateUserAsync(_userId, _request);
-			NavigationManager.NavigateTo($"/admin/users/{Uri.EscapeDataString(createdUserId)}/edit");
+			NavigationManager.NavigateTo($"/globaladmin/users/{Uri.EscapeDataString(createdUserId)}/edit");
 		}
 		catch (InvalidOperationException ex)
 		{

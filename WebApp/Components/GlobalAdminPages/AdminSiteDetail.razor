@@ -1,4 +1,4 @@
-@page "/admin/sites/{SiteId:guid}"
+@page "/globaladmin/sites/{SiteId:guid}"
 @inject NavigationManager NavigationManager
 @inject ISiteContext SiteContext
 @inject IAdminDashboardService AdminDashboardService
@@ -35,15 +35,18 @@ else if (_detail is null)
 }
 else
 {
-	<p><a href="/admin/sites">Back to Sites</a></p>
-	<p><a class="btn btn-secondary" href="@($"/admin/sites/{SiteId}/edit")">Edit Site Metadata</a></p>
-	<p><a class="btn btn-primary" href="@BuildSiteAdminUrl(_detail.Hostname)">Edit Site Admin</a></p>
+	<p><a href="/globaladmin/sites">Back to Sites</a></p>
+	<p><a class="btn btn-secondary" href="@($"/globaladmin/sites/{SiteId}/edit")">Edit Site Metadata</a></p>
+	<p><a class="btn btn-primary" href="@BuildSiteAdminUrl(_detail)">Edit Site Admin</a></p>
 
 	<table>
 		<tbody>
 			<tr><th>Site Name</th><td>@_detail.SiteName</td></tr>
+			<tr><th>PTA ID</th><td>@_detail.PtaId</td></tr>
 			<tr><th>Hostname</th><td>@_detail.Hostname</td></tr>
+			<tr><th>Custom Domain</th><td>@_detail.Domain</td></tr>
 			<tr><th>Portal Type</th><td>@(_detail.IsAdminPortal ? "Admin" : "Site")</td></tr>
+			<tr><th>City-Wide</th><td>@(_detail.IsCityWide ? "Yes" : "No")</td></tr>
 			<tr><th>Logo URL</th><td>@_detail.LogoUrl</td></tr>
 			<tr><th>Banner URL</th><td>@_detail.BannerUrl</td></tr>
 			<tr><th>Primary Color</th><td>@_detail.PrimaryColor</td></tr>
@@ -97,10 +100,26 @@ else
 		_initialized = true;
 	}
 
-	private string BuildSiteAdminUrl(string targetHostname)
+	private string BuildSiteAdminUrl(SiteEngine.Services.AdminSiteDetail site)
 	{
 		var currentUri = new Uri(NavigationManager.Uri);
-		var builder = new UriBuilder(currentUri.Scheme, targetHostname)
+		var baseHost = currentUri.Host.Replace("admin.", string.Empty, StringComparison.OrdinalIgnoreCase);
+		var targetHost = site.Domain;
+		if (string.IsNullOrWhiteSpace(targetHost))
+		{
+			if (site.IsCityWide || string.IsNullOrWhiteSpace(site.Hostname))
+			{
+				targetHost = baseHost;
+			}
+			else
+			{
+				targetHost = site.Hostname.Contains('.', StringComparison.Ordinal)
+					? site.Hostname
+					: $"{site.Hostname}.{baseHost}";
+			}
+		}
+
+		var builder = new UriBuilder(currentUri.Scheme, targetHost)
 		{
 			Path = "/admin"
 		};

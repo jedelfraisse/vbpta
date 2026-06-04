@@ -3,4 +3,4 @@ using SiteEngine.Entities;
 
 namespace SiteEngine.Sites;
 
-public sealed record SiteResolutionResult(Site Site, SiteConfig SiteConfig, bool IsAdminContext);
+public sealed record SiteResolutionResult(Site Site, SiteConfig SiteConfig, bool IsAdminContext, bool SiteNotFound = false);

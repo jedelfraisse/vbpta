@@ -5,8 +5,16 @@ namespace SiteEngine.Services;
 public sealed class AdminUpdateSiteRequest
 {
 	[Required]
+	[RegularExpression("^\\d{8}$")]
+	public string PtaId { get; set; } = string.Empty;
+
 	[StringLength(255)]
 	public string Hostname { get; set; } = string.Empty;
+
+	[StringLength(255)]
+	public string Domain { get; set; } = string.Empty;
+
+	public bool IsCityWide { get; set; }
 
 	[Required]
 	[StringLength(256)]

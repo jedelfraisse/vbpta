@@ -15,6 +15,7 @@ public class SiteContext(ISiteResolver siteResolver, ISiteUserService siteUserSe
 	public SiteConfig SiteConfig { get; private set; } = SeedData.DefaultAdminSite.ToSiteConfig();
 
 	public bool IsAdminContext { get; private set; }
+	public bool SiteNotFound { get; private set; }
 
 	public async Task InitializeAsync(string host, CancellationToken cancellationToken = default)
 	{
@@ -23,6 +24,7 @@ public class SiteContext(ISiteResolver siteResolver, ISiteUserService siteUserSe
 		CurrentSite = resolved?.Site;
 		IsAdminContext = resolved?.IsAdminContext ?? false;
 		SiteConfig = resolved?.SiteConfig ?? SeedData.DefaultAdminSite.ToSiteConfig();
+		SiteNotFound = resolved?.SiteNotFound ?? false;
 	}
 
 	public async Task<bool> IsUserAuthorizedAtCurrentSiteAsync(string? userId)

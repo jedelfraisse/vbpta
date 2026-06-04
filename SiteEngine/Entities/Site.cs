@@ -3,8 +3,11 @@ namespace SiteEngine.Entities;
 public class Site
 {
 	public Guid Id { get; set; } = Guid.NewGuid();
+	public string PtaId { get; set; } = "00000000";
 	public string Hostname { get; set; } = string.Empty;
+	public string Domain { get; set; } = string.Empty;
 	public bool IsAdminPortal { get; set; }
+	public bool IsCityWide { get; set; }
 	public string SiteName { get; set; } = string.Empty;
 	public string LogoUrl { get; set; } = string.Empty;
 	public string BannerUrl { get; set; } = string.Empty;

@@ -34,8 +34,13 @@ public static class SiteMapping
 			return normalized;
 		}
 
-		var hostSegment = site.Hostname.Trim().ToLowerInvariant();
-		return $"/site-data/{hostSegment}/{normalized.TrimStart('/')}";
+		var assetKey = site.PtaId.Trim().ToLowerInvariant();
+		if (string.IsNullOrWhiteSpace(assetKey))
+		{
+			assetKey = site.Hostname.Trim().ToLowerInvariant();
+		}
+
+		return $"/site-data/{assetKey}/{normalized.TrimStart('/')}";
 	}
 
 	private static bool IsAbsoluteUrl(string value)

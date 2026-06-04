@@ -25,9 +25,10 @@
         </div>
         <nav>
             <a href="/">Dashboard</a>
-            <span> | </span><a href="/admin/sites">Sites</a>
-            <span> | </span><a href="/admin/users">Users</a>
-            <span> | </span><a href="/admin">Admin View</a>
+            <span> | </span><a href="/globaladmin/sites">Sites</a>
+            <span> | </span><a href="/globaladmin/users">Users</a>
+            <span> | </span><a href="/globaladmin/settings">Settings</a>
+            <span> | </span><a href="/">Admin View</a>
             <AuthorizeView>
                 <Authorized>
                     <span> | </span><a href="/logout">Logout</a>
@@ -39,7 +40,32 @@
         </nav>
     </header>
 
-    <img class="banner-image" src="@SiteContext.SiteConfig.BannerUrl" alt="" />
+
+    
+    <nav class="primary-nav" aria-label="Primary">
+        <a href="/globaladmin/sites">Dashboard</a>
+        <a href="#">About</a>
+        <a href="#">Our Local Units</a>
+        <a href="#">Programs</a>
+        <a href="#">Get Involved</a>
+        <a href="#">Events</a>
+        <a href="#">Sponsors</a>
+        <a href="/announcements">News/Announcements</a>
+        <a href="#">Awards</a>
+        @if (ShowAdminLink)
+        {
+            <a href="/admin">Admin</a>
+        }
+        <AuthorizeView>
+            <Authorized>
+                <a href="/logout">Logout</a>
+            </Authorized>
+            <NotAuthorized>
+                <a href="/login">Login</a>
+            </NotAuthorized>
+        </AuthorizeView>
+    </nav>
+
 
     @if (ShowBootstrapReminder)
     {

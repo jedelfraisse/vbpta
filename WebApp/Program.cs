@@ -53,6 +53,7 @@ builder.Services.AddScoped<ISiteUserService, SiteUserService>();
 builder.Services.AddScoped<ISiteContext, SiteContext>();
 builder.Services.AddScoped<IAnnouncementService, AnnouncementService>();
 builder.Services.AddScoped<IAdminDashboardService, AdminDashboardService>();
+builder.Services.AddScoped<IPlatformConfigurationService, PlatformConfigurationService>();
 builder.Services.AddScoped<ISitePublicAssetService, SitePublicAssetService>();
 builder.Services.AddScoped<PasswordlessSignInService>();
 builder.Services.AddScoped<IEmailLoginSender, SmtpEmailLoginSender>();

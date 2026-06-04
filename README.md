@@ -202,6 +202,20 @@ Passwordless sign-in (email code) setup:
 - Configure SMTP in `WebApp/appsettings*.json` under `EmailLogin`.
 - If `EmailLogin:SmtpHost` is empty, sign-in codes are logged locally for development.
 
+Initial platform setup and routing:
+
+- If `Sites` is empty, requests are redirected to `/setup` to bootstrap:
+  - admin email
+  - city-wide site name + PTA ID
+  - root/platform domains
+  - SMTP settings
+- Domain routing now resolves from DB-backed `GlobalConfig` and `Sites`:
+  - `admin.<domain>` → admin site (`PtaId = 00000000`)
+  - `<root domain>` → city-wide site (`IsCityWide = true`)
+  - `<sub>.<platform domain>` → site by `Hostname`
+  - custom host match → site by `Domain`
+  - unknown host → city-wide fallback with not-found state
+
 Per-site public asset folders:
 
 - Site-specific public files are stored under:

@@ -13,8 +13,8 @@ public class AnnouncementServiceTests
 	public async Task NonAdminContext_FiltersAnnouncementsByCurrentSite()
 	{
 		var options = CreateDbContextOptions();
-		var siteA = new Site { Id = Guid.NewGuid(), Hostname = "a.localhost", SiteName = "A", LogoUrl = "/a.png", BannerUrl = "/b.png", PrimaryColor = "#000", AccentColor = "#111", WelcomeText = "a" };
-		var siteB = new Site { Id = Guid.NewGuid(), Hostname = "b.localhost", SiteName = "B", LogoUrl = "/a.png", BannerUrl = "/b.png", PrimaryColor = "#000", AccentColor = "#111", WelcomeText = "b" };
+		var siteA = new Site { Id = Guid.NewGuid(), PtaId = "11111111", Hostname = "a.localhost", SiteName = "A", LogoUrl = "/a.png", BannerUrl = "/b.png", PrimaryColor = "#000", AccentColor = "#111", WelcomeText = "a" };
+		var siteB = new Site { Id = Guid.NewGuid(), PtaId = "22222222", Hostname = "b.localhost", SiteName = "B", LogoUrl = "/a.png", BannerUrl = "/b.png", PrimaryColor = "#000", AccentColor = "#111", WelcomeText = "b" };
 		await using (var seedDb = new AppDbContext(options))
 		{
 			await seedDb.Database.EnsureCreatedAsync();
@@ -39,8 +39,8 @@ public class AnnouncementServiceTests
 	public async Task AdminContext_CanSeeCrossSiteAnnouncements()
 	{
 		var options = CreateDbContextOptions();
-		var siteA = new Site { Id = Guid.NewGuid(), Hostname = "a.localhost", SiteName = "A", LogoUrl = "/a.png", BannerUrl = "/b.png", PrimaryColor = "#000", AccentColor = "#111", WelcomeText = "a" };
-		var siteB = new Site { Id = Guid.NewGuid(), Hostname = "b.localhost", SiteName = "B", LogoUrl = "/a.png", BannerUrl = "/b.png", PrimaryColor = "#000", AccentColor = "#111", WelcomeText = "b" };
+		var siteA = new Site { Id = Guid.NewGuid(), PtaId = "33333333", Hostname = "a.localhost", SiteName = "A", LogoUrl = "/a.png", BannerUrl = "/b.png", PrimaryColor = "#000", AccentColor = "#111", WelcomeText = "a" };
+		var siteB = new Site { Id = Guid.NewGuid(), PtaId = "44444444", Hostname = "b.localhost", SiteName = "B", LogoUrl = "/a.png", BannerUrl = "/b.png", PrimaryColor = "#000", AccentColor = "#111", WelcomeText = "b" };
 		await using (var seedDb = new AppDbContext(options))
 		{
 			await seedDb.Database.EnsureCreatedAsync();

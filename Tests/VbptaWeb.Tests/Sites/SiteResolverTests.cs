@@ -15,12 +15,7 @@ public class SiteResolverTests
 	[Fact]
 	public async Task ResolveAsync_UsesHostMappingAndReturnsAdminContext()
 	{
-		var optionsBuilder = CreateDbContextOptions();
-		await using (var seedDb = new AppDbContext(optionsBuilder.Options))
-		{
-			await seedDb.Database.EnsureCreatedAsync();
-		}
-
+		var optionsBuilder = await CreateInitializedDbContextOptionsAsync();
 		var options = Options.Create(new SiteHostMappingOptions
 		{
 			Hosts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -28,24 +23,134 @@ public class SiteResolverTests
 				["admin.vbpta.delfraisse.com"] = "admin.localhost"
 			}
 		});
-		var resolver = new SiteResolver(
-			new TestDbContextFactory(optionsBuilder.Options),
-			new MemoryCache(new MemoryCacheOptions()),
-			new TestHostEnvironment { EnvironmentName = Environments.Production },
-			options);
+		var resolver = CreateResolver(optionsBuilder, options);
 
 		var result = await resolver.ResolveAsync("admin.vbpta.delfraisse.com");
 
 		Assert.NotNull(result);
 		Assert.True(result!.IsAdminContext);
-		Assert.Equal("admin.localhost", result.Site.Hostname);
+		Assert.Equal("admin", result.Site.Hostname);
 	}
 
-	private static DbContextOptionsBuilder<AppDbContext> CreateDbContextOptions()
+	[Fact]
+	public async Task ResolveAsync_ReturnsCityWideForRootDomain()
+	{
+		var optionsBuilder = await CreateInitializedDbContextOptionsAsync();
+		var resolver = CreateResolver(optionsBuilder, Options.Create(new SiteHostMappingOptions()));
+
+		var result = await resolver.ResolveAsync("localhost");
+
+		Assert.NotNull(result);
+		Assert.True(result!.Site.IsCityWide);
+		Assert.False(result.SiteNotFound);
+	}
+
+	[Fact]
+	public async Task ResolveAsync_ReturnsSubdomainSite_WhenHostnameMatches()
+	{
+		var optionsBuilder = await CreateInitializedDbContextOptionsAsync(async db =>
+		{
+			db.Sites.Add(new Site
+			{
+				Id = Guid.NewGuid(),
+				PtaId = "12345678",
+				Hostname = "luxfordes",
+				Domain = string.Empty,
+				IsAdminPortal = false,
+				IsCityWide = false,
+				SiteName = "Luxford",
+				LogoUrl = "images/logo.png",
+				BannerUrl = "images/banner.png",
+				PrimaryColor = "#003366",
+				AccentColor = "#FFCC00",
+				WelcomeText = "Welcome",
+				CreatedAtUtc = DateTimeOffset.UtcNow,
+				UpdatedAtUtc = DateTimeOffset.UtcNow
+			});
+			await db.SaveChangesAsync();
+		});
+		var resolver = CreateResolver(optionsBuilder, Options.Create(new SiteHostMappingOptions()));
+
+		var result = await resolver.ResolveAsync("luxfordes.localhost");
+
+		Assert.NotNull(result);
+		Assert.Equal("12345678", result!.Site.PtaId);
+		Assert.False(result.SiteNotFound);
+	}
+
+	[Fact]
+	public async Task ResolveAsync_FallsBackToCityWide_WhenSubdomainMissing()
+	{
+		var optionsBuilder = await CreateInitializedDbContextOptionsAsync();
+		var resolver = CreateResolver(optionsBuilder, Options.Create(new SiteHostMappingOptions()));
+
+		var result = await resolver.ResolveAsync("unknown.localhost");
+
+		Assert.NotNull(result);
+		Assert.True(result!.Site.IsCityWide);
+		Assert.True(result.SiteNotFound);
+	}
+
+	[Fact]
+	public async Task ResolveAsync_UsesCustomDomainWhenConfigured()
+	{
+		var optionsBuilder = await CreateInitializedDbContextOptionsAsync(async db =>
+		{
+			db.Sites.Add(new Site
+			{
+				Id = Guid.NewGuid(),
+				PtaId = "87654321",
+				Hostname = "customunit",
+				Domain = "custom.example.org",
+				IsAdminPortal = false,
+				IsCityWide = false,
+				SiteName = "Custom Unit",
+				LogoUrl = "images/logo.png",
+				BannerUrl = "images/banner.png",
+				PrimaryColor = "#003366",
+				AccentColor = "#FFCC00",
+				WelcomeText = "Welcome",
+				CreatedAtUtc = DateTimeOffset.UtcNow,
+				UpdatedAtUtc = DateTimeOffset.UtcNow
+			});
+			await db.SaveChangesAsync();
+		});
+		var resolver = CreateResolver(optionsBuilder, Options.Create(new SiteHostMappingOptions()));
+
+		var result = await resolver.ResolveAsync("custom.example.org");
+
+		Assert.NotNull(result);
+		Assert.Equal("87654321", result!.Site.PtaId);
+		Assert.False(result.SiteNotFound);
+	}
+
+	private static SiteResolver CreateResolver(
+		DbContextOptionsBuilder<AppDbContext> optionsBuilder,
+		IOptions<SiteHostMappingOptions> options)
+	{
+		return new SiteResolver(
+			new TestDbContextFactory(optionsBuilder.Options),
+			new MemoryCache(new MemoryCacheOptions()),
+			new TestHostEnvironment { EnvironmentName = Environments.Development },
+			options);
+	}
+
+	private static async Task<DbContextOptionsBuilder<AppDbContext>> CreateInitializedDbContextOptionsAsync(
+		Func<AppDbContext, Task>? customize = null)
 	{
 		var dbPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.db");
-		return new DbContextOptionsBuilder<AppDbContext>()
+		var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>()
 			.UseSqlite($"Data Source={dbPath}");
+
+		await using var db = new AppDbContext(optionsBuilder.Options);
+		await db.Database.EnsureCreatedAsync();
+
+		if (customize is not null)
+		{
+			await customize(db);
+		}
+
+		return optionsBuilder;
 	}
 
 	private sealed class TestHostEnvironment : IHostEnvironment

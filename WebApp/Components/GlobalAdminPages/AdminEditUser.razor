@@ -1,4 +1,4 @@
-@page "/admin/users/{UserId}/edit"
+@page "/globaladmin/users/{UserId}/edit"
 @inject NavigationManager NavigationManager
 @inject ISiteContext SiteContext
 @inject IAdminDashboardService AdminDashboardService
@@ -31,7 +31,7 @@ else if (!_userLoaded)
 }
 else
 {
-	<p><a href="/admin/users">Back to Users</a></p>
+	<p><a href="/globaladmin/users">Back to Users</a></p>
 
 	<EditForm Model="_request" OnValidSubmit="UpdateUserAsync">
 		<DataAnnotationsValidator />

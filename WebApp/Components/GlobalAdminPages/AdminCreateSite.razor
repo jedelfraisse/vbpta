@@ -1,4 +1,4 @@
-@page "/admin/sites/create"
+@page "/globaladmin/sites/create"
 @inject NavigationManager NavigationManager
 @inject ISiteContext SiteContext
 @inject IAdminDashboardService AdminDashboardService
@@ -27,15 +27,27 @@ else if (!_isAdmin)
 }
 else
 {
-	<p><a href="/admin/sites">Back to Sites</a></p>
+	<p><a href="/globaladmin/sites">Back to Sites</a></p>
 
 	<EditForm Model="_request" OnValidSubmit="CreateSiteAsync">
 		<DataAnnotationsValidator />
 		<ValidationSummary />
 
 		<div>
+			<label for="ptaId">PTA ID (8 digits)</label><br />
+			<InputText id="ptaId" @bind-Value="_request.PtaId" />
+		</div>
+		<div>
 			<label for="hostname">Hostname</label><br />
 			<InputText id="hostname" @bind-Value="_request.Hostname" />
+		</div>
+		<div>
+			<label for="domain">Custom Domain</label><br />
+			<InputText id="domain" @bind-Value="_request.Domain" />
+		</div>
+		<div>
+			<label for="isCityWide">City-Wide Site</label><br />
+			<InputCheckbox id="isCityWide" @bind-Value="_request.IsCityWide" />
 		</div>
 		<div>
 			<label for="siteName">Site Name</label><br />
@@ -106,7 +118,7 @@ else
 		try
 		{
 			var siteId = await AdminDashboardService.CreateSiteAsync(_userId, _request);
-			NavigationManager.NavigateTo($"/admin/sites/{siteId}");
+			NavigationManager.NavigateTo($"/globaladmin/sites/{siteId}");
 		}
 		catch (InvalidOperationException ex)
 		{

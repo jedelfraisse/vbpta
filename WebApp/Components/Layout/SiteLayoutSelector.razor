@@ -1,8 +1,6 @@
 @inject NavigationManager NavigationManager
 @inject ISiteContext SiteContext
 @inherits LayoutComponentBase
-@using SiteEngine.Data
-
 @code {
     private Type _layoutType = typeof(CityWideLayout);
 
@@ -22,13 +20,10 @@
 
         if (SiteContext.CurrentSite is null)
         {
-            return typeof(CityWideLayout);
+            return typeof(AdminLayout);
         }
 
-        return string.Equals(
-            SiteContext.CurrentSite?.Hostname,
-            SeedData.DefaultCityHostname,
-            StringComparison.OrdinalIgnoreCase)
+        return (SiteContext.CurrentSite?.IsCityWide ?? false)
             ? typeof(CityWideLayout)
             : typeof(LocalUnitLayout);
     }

@@ -8,6 +8,7 @@ namespace SiteEngine.Data;
 public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbContext<SiteUser>(options)
 {
 	public DbSet<Site> Sites => Set<Site>();
+	public DbSet<GlobalConfig> GlobalConfigs => Set<GlobalConfig>();
 	public DbSet<Announcement> Announcements => Set<Announcement>();
 	public DbSet<SiteEvent> Events => Set<SiteEvent>();
 	public DbSet<SiteUserRole> SiteUserRoles => Set<SiteUserRole>();
@@ -20,8 +21,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
 		{
 			entity.ToTable("Sites");
 			entity.HasKey(x => x.Id);
+			entity.Property(x => x.PtaId).HasColumnType("char(8)").IsRequired();
 			entity.Property(x => x.Hostname).HasMaxLength(255).IsRequired();
-			entity.HasIndex(x => x.Hostname).IsUnique();
+			entity.Property(x => x.Domain).HasMaxLength(255).IsRequired();
+			entity.HasIndex(x => x.PtaId).IsUnique();
+			entity.HasIndex(x => x.Hostname).IsUnique().HasFilter("[Hostname] <> ''");
+			entity.HasIndex(x => x.Domain).IsUnique().HasFilter("[Domain] <> ''");
 			entity.Property(x => x.SiteName).HasMaxLength(256).IsRequired();
 			entity.Property(x => x.LogoUrl).HasMaxLength(512).IsRequired();
 			entity.Property(x => x.BannerUrl).HasMaxLength(512).IsRequired();
@@ -30,6 +35,21 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
 			entity.Property(x => x.WelcomeText).HasMaxLength(1024).IsRequired();
 
 			entity.HasData(SeedData.DefaultAdminSite, SeedData.DefaultCitySite);
+		});
+
+		modelBuilder.Entity<GlobalConfig>(entity =>
+		{
+			entity.ToTable("GlobalConfig");
+			entity.HasKey(x => x.Id);
+			entity.Property(x => x.RootDomain).HasMaxLength(255).IsRequired();
+			entity.Property(x => x.PlatformDomain).HasMaxLength(255).IsRequired();
+			entity.Property(x => x.SmtpHost).HasMaxLength(255).IsRequired();
+			entity.Property(x => x.SmtpPort).IsRequired();
+			entity.Property(x => x.SmtpFromAddress).HasMaxLength(255).IsRequired();
+			entity.Property(x => x.SmtpUsername).HasMaxLength(255).IsRequired();
+			entity.Property(x => x.SmtpPassword).HasMaxLength(255).IsRequired();
+			entity.Property(x => x.UseSsl).IsRequired();
+			entity.HasData(SeedData.DefaultGlobalConfig);
 		});
 
 		modelBuilder.Entity<Announcement>(entity =>
@@ -75,4 +95,3 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
 		});
 	}
 }
-

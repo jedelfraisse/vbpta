@@ -1,18 +1,22 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using SiteEngine.Data;
 using SiteEngine.Entities;
 using SiteEngine.Sites;
 
 namespace SiteEngine.Services;
 
-public class AnnouncementService(AppDbContext dbContext, ISiteContext siteContext) : IAnnouncementService
+public class AnnouncementService(IServiceScopeFactory scopeFactory, ISiteContext siteContext) : IAnnouncementService
 {
-    private readonly AppDbContext _dbContext = dbContext;
+    private readonly IServiceScopeFactory _scopeFactory = scopeFactory;
     private readonly ISiteContext _siteContext = siteContext;
 
     public async Task<IReadOnlyList<Announcement>> GetVisibleAnnouncementsAsync(CancellationToken cancellationToken = default)
     {
-        var query = _dbContext.Announcements
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var query = dbContext.Announcements
             .AsNoTracking()
             .Include(x => x.Site)
             .AsQueryable();

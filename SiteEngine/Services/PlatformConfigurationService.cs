@@ -4,6 +4,7 @@ using System.Net.Mail;
 using System.Net.Sockets;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using SiteEngine.Data;
 using SiteEngine.Entities;
 using SiteEngine.Identity;
@@ -12,13 +13,13 @@ using SiteEngine.Sites;
 namespace SiteEngine.Services;
 
 public class PlatformConfigurationService(
-    AppDbContext dbContext,
+    IServiceScopeFactory scopeFactory,
     ISiteContext siteContext,
     ISiteResolver siteResolver,
     ISiteUserService siteUserService,
     UserManager<SiteUser> userManager) : IPlatformConfigurationService
 {
-    private readonly AppDbContext _dbContext = dbContext;
+    private readonly IServiceScopeFactory _scopeFactory = scopeFactory;
     private readonly ISiteContext _siteContext = siteContext;
     private readonly ISiteResolver _siteResolver = siteResolver;
     private readonly ISiteUserService _siteUserService = siteUserService;
@@ -26,7 +27,9 @@ public class PlatformConfigurationService(
 
     public async Task<bool> IsInitialSetupRequiredAsync(CancellationToken cancellationToken = default)
     {
-        return !await _dbContext.Sites.AnyAsync(cancellationToken);
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return !await dbContext.Sites.AnyAsync(cancellationToken);
     }
 
     private static string NormalizeAndValidateHexColor(string color, string errorMessage)
@@ -90,6 +93,9 @@ public class PlatformConfigurationService(
 
     public async Task CompleteInitialSetupAsync(InitialSetupRequest request, CancellationToken cancellationToken = default)
     {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
         var adminEmail = NormalizeAndValidateEmail(request.AdminEmail);
         var cityWidePtaId = NormalizeAndValidatePtaId(request.CityWidePtaId);
         var rootDomain = NormalizeAndValidateDomain(request.RootDomain);
@@ -100,12 +106,12 @@ public class PlatformConfigurationService(
         var cityWideWelcomeText = RequireValue(request.CityWideWelcomeText, "City-wide welcome text is required.");
         var smtpFromAddress = NormalizeAndValidateEmail(request.SmtpFromAddress);
 
-        if (await _dbContext.Sites.AnyAsync(cancellationToken))
+        if (await dbContext.Sites.AnyAsync(cancellationToken))
             throw new InvalidOperationException("Initial setup has already been completed.");
 
         var now = DateTimeOffset.UtcNow;
 
-        _dbContext.Sites.Add(new Site
+        dbContext.Sites.Add(new Site
         {
             Id = SeedData.DefaultAdminSiteId,
             PtaId = SeedData.DefaultAdminPtaId,
@@ -123,7 +129,7 @@ public class PlatformConfigurationService(
             UpdatedAtUtc = now
         });
 
-        _dbContext.Sites.Add(new Site
+        dbContext.Sites.Add(new Site
         {
             Id = SeedData.DefaultCitySiteId,
             PtaId = cityWidePtaId,
@@ -141,7 +147,7 @@ public class PlatformConfigurationService(
             UpdatedAtUtc = now
         });
 
-        _dbContext.GlobalConfigs.Add(new GlobalConfig
+        dbContext.GlobalConfigs.Add(new GlobalConfig
         {
             RootDomain = rootDomain,
             PlatformDomain = platformDomain,
@@ -153,7 +159,7 @@ public class PlatformConfigurationService(
             UseSsl = request.UseSsl
         });
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         var user = await _userManager.FindByEmailAsync(adminEmail);
         if (user is null)
@@ -180,15 +186,18 @@ public class PlatformConfigurationService(
 
     public async Task<PlatformSettingsDetail> GetPlatformSettingsAsync(string? currentUserId, CancellationToken cancellationToken = default)
     {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
         await EnsureAuthorizedAsync(currentUserId);
 
-        var globalConfig = await _dbContext.GlobalConfigs
+        var globalConfig = await dbContext.GlobalConfigs
             .AsNoTracking()
             .OrderBy(x => x.Id)
             .FirstOrDefaultAsync(cancellationToken)
             ?? SeedData.DefaultGlobalConfig;
 
-        var cityWideSite = await _dbContext.Sites
+        var cityWideSite = await dbContext.Sites
             .AsNoTracking()
             .SingleOrDefaultAsync(x => x.IsCityWide, cancellationToken)
             ?? throw new InvalidOperationException("No city-wide site exists.");
@@ -211,6 +220,9 @@ public class PlatformConfigurationService(
 
     public async Task UpdatePlatformSettingsAsync(string? currentUserId, PlatformSettingsUpdateRequest request, CancellationToken cancellationToken = default)
     {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
         await EnsureAuthorizedAsync(currentUserId);
 
         var rootDomain = NormalizeAndValidateDomain(request.RootDomain);
@@ -222,17 +234,17 @@ public class PlatformConfigurationService(
         var smtpUser = (request.SmtpUsername ?? string.Empty).Trim();
         var smtpPassword = (request.SmtpPassword ?? string.Empty).Trim();
 
-        var globalConfig = await _dbContext.GlobalConfigs
+        var globalConfig = await dbContext.GlobalConfigs
             .OrderBy(x => x.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
         if (globalConfig is null)
         {
             globalConfig = new GlobalConfig();
-            _dbContext.GlobalConfigs.Add(globalConfig);
+            dbContext.GlobalConfigs.Add(globalConfig);
         }
 
-        var cityWideSite = await _dbContext.Sites.SingleOrDefaultAsync(x => x.IsCityWide, cancellationToken)
+        var cityWideSite = await dbContext.Sites.SingleOrDefaultAsync(x => x.IsCityWide, cancellationToken)
             ?? throw new InvalidOperationException("No city-wide site exists.");
 
         globalConfig.RootDomain = rootDomain;
@@ -248,7 +260,7 @@ public class PlatformConfigurationService(
         cityWideSite.SiteName = cityWideSiteName;
         cityWideSite.UpdatedAtUtc = DateTimeOffset.UtcNow;
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         _siteResolver.InvalidateHost(rootDomain);
         _siteResolver.InvalidateHost($"admin.{rootDomain}");

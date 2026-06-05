@@ -1,0 +1,23 @@
+@* Helper component for {fullbox boardlist} *@
+
+<h2>Our Board</h2>
+
+@foreach (var member in Board)
+{
+    <p><strong>@member.Name</strong> — @member.Role</p>
+}
+
+@code {
+    private List<BoardMember> Board = new()
+    {
+        new BoardMember { Name = "Jane Smith", Role = "President" },
+        new BoardMember { Name = "Mark Johnson", Role = "Vice President" },
+        new BoardMember { Name = "Emily Davis", Role = "Treasurer" }
+    };
+
+    public class BoardMember
+    {
+        public string Name { get; set; }
+        public string Role { get; set; }
+    }
+}

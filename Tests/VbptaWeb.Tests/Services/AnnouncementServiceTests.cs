@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using SiteEngine.Data;
 using SiteEngine.Entities;
 using SiteEngine.Services;
@@ -27,11 +28,12 @@ public class AnnouncementServiceTests
             await seedDb.SaveChangesAsync();
         }
 
-        // Create a fresh context for the service
-        await using var db = new AppDbContext(options);
+        var serviceProvider = new ServiceCollection()
+            .AddScoped(_ => new AppDbContext(options))
+            .BuildServiceProvider();
 
         var service = new AnnouncementService(
-            db,
+            serviceProvider.GetRequiredService<IServiceScopeFactory>(),
             new SiteContextStub { CurrentSite = siteA, IsAdminContext = false, SiteConfig = siteA.ToSiteConfig() });
 
         var results = await service.GetVisibleAnnouncementsAsync();
@@ -58,11 +60,12 @@ public class AnnouncementServiceTests
             await seedDb.SaveChangesAsync();
         }
 
-        // Create a fresh context for the service
-        await using var db = new AppDbContext(options);
+        var serviceProvider = new ServiceCollection()
+            .AddScoped(_ => new AppDbContext(options))
+            .BuildServiceProvider();
 
         var service = new AnnouncementService(
-            db,
+            serviceProvider.GetRequiredService<IServiceScopeFactory>(),
             new SiteContextStub { CurrentSite = siteA, IsAdminContext = true, SiteConfig = siteA.ToSiteConfig() });
 
         var results = await service.GetVisibleAnnouncementsAsync();

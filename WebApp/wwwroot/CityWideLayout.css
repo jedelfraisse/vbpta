@@ -1,0 +1,226 @@
+html, body {
+    background: #fff;
+    margin: 0;
+    padding: 0;
+}
+
+
+
+/* -------------------------------------------------------
+   CITY-WIDE LAYOUT SHELL
+   
+------------------------------------------------------- */
+.city-shell {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    color: #111;
+}
+
+/* -------------------------------------------------------
+   TOP STRIP
+------------------------------------------------------- */
+.top-strip {
+    background: #f8c400;
+    color: #111;
+    text-align: center;
+    font-size: 1rem;
+    padding: 0.35rem 1rem;
+}
+
+/* -------------------------------------------------------
+   MASTHEAD
+------------------------------------------------------- */
+.masthead {
+    padding: 0.75rem 1rem 0.5rem;
+}
+
+.masthead-logos {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.masthead-title {
+    text-align: center;
+    max-width: 400px;
+}
+
+.masthead-title h1 {
+    margin: 0;
+    font-size: clamp(1.1rem, 2vw, 1.7rem);
+    font-weight: 700;
+}
+
+.masthead-title p {
+    margin: 0.35rem 0 0;
+    font-size: 0.95rem;
+}
+
+.site-logo {
+    max-width: 180px;
+    max-height: 100px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+}
+
+/* -------------------------------------------------------
+   PRIMARY NAV
+------------------------------------------------------- */
+.primary-nav {
+    display: flex;
+    justify-content: center;
+    gap: 1.35rem;
+    flex-wrap: wrap;
+    padding: 0.65rem 1rem 0.85rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+    background-image:
+        linear-gradient(rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.5)),
+        url('/images/banner.png');
+    background-repeat: no-repeat, no-repeat;
+    background-position: center center, center center;
+    background-size: 100% 100%, 100% auto;
+}
+
+.primary-nav a,
+.footer-nav a,
+.footer-links a {
+    color: #111;
+    text-decoration: none;
+}
+
+.primary-nav a:hover,
+.footer-nav a:hover,
+.footer-links a:hover {
+    text-decoration: underline;
+}
+
+/* -------------------------------------------------------
+   MODERN SUBNAV TABS (matches card + layout style)
+------------------------------------------------------- */
+
+.city-subnav {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0 1rem;
+    margin: 0 auto 1.5rem;
+    width: min(1120px, 100%);
+    box-sizing: border-box;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.city-subnav::-webkit-scrollbar {
+    display: none;
+}
+
+.city-subnav a {
+    padding: 0.55rem 1rem;
+    background: #f5f5f5;
+    border-radius: 12px;
+    font-weight: 600;
+    color: #111;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 0.2s ease, color 0.2s ease;
+    border: 1px solid rgba(0,0,0,0.08);
+}
+
+.city-subnav a:hover {
+    background: #fff;
+}
+
+.city-subnav a.active {
+    background: var(--primary-color);
+    color: #fff;
+    border-color: var(--primary-color);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.12);
+}
+
+
+
+/* -------------------------------------------------------
+   MAIN CONTENT AREA
+------------------------------------------------------- */
+.city-main {
+    flex: 1 0 auto;
+    display: flex;
+    justify-content: center;
+    
+}
+
+.city-content {
+    width: min(1120px, 100%);
+    box-sizing: border-box;
+}
+
+/* -------------------------------------------------------
+   NOT-FOUND + UNIT-HOME CARDS (moved from Home.razor.css)
+------------------------------------------------------- */
+.site-not-found-message,
+.unit-home-card {
+    max-width: 720px;
+    margin: 0 auto;
+    border: 1px solid #ddd;
+    border-radius: 16px;
+    padding: 1.25rem;
+    background: #fff;
+    text-align: center;
+}
+
+.site-not-found-message h2,
+.unit-home-card h2 {
+    margin-top: 0;
+}
+
+/* -------------------------------------------------------
+   FOOTER
+------------------------------------------------------- */
+.footer-stack {
+    margin-top: auto;
+    width: 100%;
+}
+
+.footer-nav,
+.footer-links,
+.footer-legal {
+    text-align: center;
+    padding: 0.55rem 1rem;
+    font-size: 0.95rem;
+}
+
+.footer-nav {
+    background: #f8c400;
+    display: flex;
+    justify-content: center;
+    gap: 1.25rem;
+    flex-wrap: wrap;
+}
+
+.footer-links {
+    background: #30b13f;
+    color: #111;
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.footer-legal {
+    background: #1999cb;
+    color: #111;
+}
+
+/* -------------------------------------------------------
+   MOBILE ADJUSTMENTS
+------------------------------------------------------- */
+@media (max-width: 900px) {
+    .site-logo {
+        max-width: 140px;
+    }
+}

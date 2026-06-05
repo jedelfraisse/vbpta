@@ -1,0 +1,22 @@
+@* Helper component for {smallbox events} *@
+
+<h2>Upcoming Events</h2>
+
+@foreach (var e in Events)
+{
+    <p>@e.Title - @e.Date.ToString("MM/dd/yy")</p>
+}
+
+@code {
+    private List<EventItem> Events = new()
+    {
+        new EventItem { Title = "PTA Leadership Training", Date = new DateTime(2026, 6, 15) },
+        new EventItem { Title = "General Membership Meeting", Date = new DateTime(2026, 8, 15) }
+    };
+
+    public class EventItem
+    {
+        public string Title { get; set; }
+        public DateTime Date { get; set; }
+    }
+}

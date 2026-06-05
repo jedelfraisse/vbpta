@@ -50,6 +50,11 @@ builder.Services.AddScoped<IPlatformConfigurationService, PlatformConfigurationS
 builder.Services.AddScoped<ISitePublicAssetService, SitePublicAssetService>();
 builder.Services.AddScoped<PasswordlessSignInService>();
 builder.Services.AddScoped<IEmailLoginSender, SmtpEmailLoginSender>();
+builder.Services.AddScoped<IBlockParser, BlockParser>();
+builder.Services.AddScoped<ISiteContentService, SiteContentService>();
+
+
+
 
 var app = builder.Build();
 

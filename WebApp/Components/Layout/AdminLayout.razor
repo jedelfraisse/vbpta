@@ -1,81 +1,69 @@
 @inherits SiteLayoutBase
 @inject NavigationManager Nav
 @inject IHttpContextAccessor Http
+@inject IPlatformConfigurationService PlatformConfigurationService
 
 @using WebApp.Components.SharedPages;
 
 @code {
-	private bool IsSetupMode => Http.HttpContext?.Items.ContainsKey("SetupMode") == true;
+	private bool _isSetupMode;
+
 	protected override async Task OnParametersSetAsync()
 	{
+		_isSetupMode = Http.HttpContext?.Items.ContainsKey("SetupMode") == true
+			|| await PlatformConfigurationService.IsInitialSetupRequiredAsync();
+
+		if (_isSetupMode)
+		{
+			return;
+		}
+
 		await RefreshUserStateAsync();
 	}
 }
 
-Admin Layout Test
-
-@if (IsSetupMode)
+@if (_isSetupMode)
 {
-	<div class="setup-center-box">
-		<InitialSetup />
-	</div>
+	<InitialSetup />
 }
 else
 {
-	<AuthorizeView>
-		<Authorized>
-			<style>
-						:root {
-							--primary-color: @SiteContext.SiteConfig.PrimaryColor;
-							--accent-color: @SiteContext.SiteConfig.AccentColor;
-						}
-			</style>
-			<div class="layout-shell admin-shell">
-				<header class="page-header" role="banner">
-					<div class="brand-block">
-						<img class="site-logo" src="@SiteContext.SiteConfig.LogoUrl" alt="@SiteContext.SiteConfig.SiteName logo" />
-						<div>
-							<div class="site-kicker">Admin Portal</div>
-							<h1>@SiteContext.SiteConfig.SiteName</h1>
-						</div>
+	<style>
+				:root {
+					--primary-color: @SiteContext.SiteConfig.PrimaryColor;
+					--accent-color: @SiteContext.SiteConfig.AccentColor;
+				}
+	</style>
+	<div class="layout-shell admin-shell">
+		<header class="page-header" role="banner">
+			<div class="brand-block">
+				<img class="site-logo" src="@SiteContext.SiteConfig.LogoUrl" alt="@SiteContext.SiteConfig.SiteName logo" />
+				<div>
+					<div class="site-kicker">Admin Portal</div>
+					<h1>@SiteContext.SiteConfig.SiteName</h1>
+				</div>
 
-						<nav class="primary-nav" aria-label="Primary">
-
-							<a href="/">Dashboard</a>
-							<a href="/globaladmin/users">Users</a>
-							<a href="/globaladmin/settings">Settings</a>
-							<a href="/globaladmin/sites">Unit Sites</a>
-							<a href="/logout">Logout</a>
-
-						</nav>
-					</div>
-
-				</header>
-				<main class="layout-body">
-					@Body
-				</main>
-			</div>
-		</Authorized>
-		<NotAuthorized>
-			<div class="setup-center-box">
-				<h2>Welcome to the City Wide PTA Admin Page</h2>
-
-				<p>
-					<a href="/login">Login</a>
-				</p>
-
-				<p>
-					<!-- TODO: Pull city-wide URL from database -->
-					<a href="/"><img src="/images/logo.png" alt="City-wide PTA logo" /></a><br />
-					Please go to the <a href="/">site page</a> to access the public city‑wide PTA website.
-				</p>
+				<nav class="primary-nav" aria-label="Primary">
+					<a href="/">Dashboard</a>
+					@if (IsAuthenticated)
+					{
+						<a href="/globaladmin/users">Users</a>
+						<a href="/globaladmin/settings">Settings</a>
+						<a href="/globaladmin/sites">Unit Sites</a>
+						<a href="/logout">Logout</a>
+					}
+					else
+					{
+						<a href="/login">Login</a>
+					}
+				</nav>
 			</div>
 
-			
-
-		</NotAuthorized>
-	</AuthorizeView>
-
+		</header>
+		<main class="layout-body">
+			@Body
+		</main>
+	</div>
 }
 
 <style>

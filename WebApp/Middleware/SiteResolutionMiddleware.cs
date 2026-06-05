@@ -13,6 +13,7 @@ public class SiteResolutionMiddleware(RequestDelegate next)
 			&& !IsSetupBypassPath(context.Request.Path))
 		{
 			context.Items["SetupMode"] = true;
+			await _next(context);
 			return;
 		}
 

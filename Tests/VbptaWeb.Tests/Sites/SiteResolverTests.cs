@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using SiteEngine.Data;
@@ -15,7 +16,6 @@ public class SiteResolverTests
     public async Task ResolveAsync_UsesHostMappingAndReturnsAdminContext()
     {
         var optionsBuilder = await CreateInitializedDbContextOptionsAsync();
-        await using var db = new AppDbContext(optionsBuilder.Options);
 
         var options = Options.Create(new SiteHostMappingOptions
         {
@@ -25,7 +25,7 @@ public class SiteResolverTests
             }
         });
 
-        var resolver = CreateResolver(db, options);
+        var resolver = CreateResolver(optionsBuilder.Options, options);
 
         var result = await resolver.ResolveAsync("admin.vbpta.delfraisse.com");
 
@@ -38,9 +38,8 @@ public class SiteResolverTests
     public async Task ResolveAsync_ReturnsCityWideForRootDomain()
     {
         var optionsBuilder = await CreateInitializedDbContextOptionsAsync();
-        await using var db = new AppDbContext(optionsBuilder.Options);
 
-        var resolver = CreateResolver(db, Options.Create(new SiteHostMappingOptions()));
+        var resolver = CreateResolver(optionsBuilder.Options, Options.Create(new SiteHostMappingOptions()));
 
         var result = await resolver.ResolveAsync("localhost");
 
@@ -74,8 +73,7 @@ public class SiteResolverTests
             await db.SaveChangesAsync();
         });
 
-        await using var db = new AppDbContext(optionsBuilder.Options);
-        var resolver = CreateResolver(db, Options.Create(new SiteHostMappingOptions()));
+        var resolver = CreateResolver(optionsBuilder.Options, Options.Create(new SiteHostMappingOptions()));
 
         var result = await resolver.ResolveAsync("luxfordes.localhost");
 
@@ -88,9 +86,8 @@ public class SiteResolverTests
     public async Task ResolveAsync_FallsBackToCityWide_WhenSubdomainMissing()
     {
         var optionsBuilder = await CreateInitializedDbContextOptionsAsync();
-        await using var db = new AppDbContext(optionsBuilder.Options);
 
-        var resolver = CreateResolver(db, Options.Create(new SiteHostMappingOptions()));
+        var resolver = CreateResolver(optionsBuilder.Options, Options.Create(new SiteHostMappingOptions()));
 
         var result = await resolver.ResolveAsync("unknown.localhost");
 
@@ -124,8 +121,7 @@ public class SiteResolverTests
             await db.SaveChangesAsync();
         });
 
-        await using var db = new AppDbContext(optionsBuilder.Options);
-        var resolver = CreateResolver(db, Options.Create(new SiteHostMappingOptions()));
+        var resolver = CreateResolver(optionsBuilder.Options, Options.Create(new SiteHostMappingOptions()));
 
         var result = await resolver.ResolveAsync("custom.example.org");
 
@@ -135,11 +131,15 @@ public class SiteResolverTests
     }
 
     private static SiteResolver CreateResolver(
-        AppDbContext db,
+        DbContextOptions<AppDbContext> dbOptions,
         IOptions<SiteHostMappingOptions> options)
     {
+        var serviceProvider = new ServiceCollection()
+            .AddScoped(_ => new AppDbContext(dbOptions))
+            .BuildServiceProvider();
+
         return new SiteResolver(
-            db,
+            serviceProvider.GetRequiredService<IServiceScopeFactory>(),
             new MemoryCache(new MemoryCacheOptions()),
             new TestHostEnvironment { EnvironmentName = Environments.Development },
             options);

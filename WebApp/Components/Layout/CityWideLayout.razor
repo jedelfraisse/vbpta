@@ -6,11 +6,16 @@
         await RefreshUserStateAsync();
     }
 }
+<link href="CityWideLayout.css" rel="stylesheet" />
 
 <style>
     :root {
-        --primary-color: @SiteContext.SiteConfig.PrimaryColor;
-        --accent-color: @SiteContext.SiteConfig.AccentColor;
+        --primary-color:
+            @SiteContext.SiteConfig.PrimaryColor
+        ;
+        --accent-color:
+            @SiteContext.SiteConfig.AccentColor
+        ;
     }
 </style>
 
@@ -27,21 +32,22 @@
                 <p>@SiteContext.SiteConfig.WelcomeText</p>
             </div>
             <img class="city-logo" src="@("/images/city-logo.png")" alt="Virginia Beach City logo" />
-            <img class="schoolsystem-logo" src="@("/images/schoolsystem-logo.png")" alt="Virginia Beach City Public Schools logo" />
+            <img class="schoolsystem-logo" src="@("/images/schoolsystem-logo.png")"
+                 alt="Virginia Beach City Public Schools logo" />
 
         </div>
     </header>
 
     <nav class="primary-nav" aria-label="Primary">
         <a href="/">Home</a>
-            <a href="#">About</a>
-            <a href="#">Our Local Units</a>
-            <a href="#">Programs</a>
-            <a href="#">Get Involved</a>
-            <a href="#">Events</a>
-            <a href="#">Sponsors</a>
-            <a href="/announcements">News/Announcements</a>
-            <a href="#">Awards</a>
+        <a href="#">About</a>
+        <a href="#">Our Local Units</a>
+        <a href="#">Programs</a>
+        <a href="#">Get Involved</a>
+        <a href="#">Events</a>
+        <a href="#">Sponsors</a>
+        <a href="/announcements">News/Announcements</a>
+        <a href="#">Awards</a>
         @if (ShowAdminLink)
         {
             <a href="/admin">Admin</a>
@@ -57,10 +63,11 @@
     </nav>
 
     <main class="city-main">
-        <section class="city-content-frame">
+        <div class="city-content">
             @Body
-        </section>
+        </div>
     </main>
+
 
     <div class="footer-stack">
         <footer class="footer-nav">
@@ -78,15 +85,19 @@
 
         <footer class="footer-links">
             <span>Quick Links:</span>
-            <a href="https://virginiabeachcouncilpta.givebacks.com/" target="_blank" rel="noopener noreferrer">Council GiveBacks</a>
-            <a href="https://www.facebook.com/p/Virginia-Beach-Council-of-PTAs-100064654665299/" target="_blank" rel="noopener noreferrer">Facebook</a>
-            <a href="https://vapta.org/" target="_blank" rel="noopener noreferrer">Virginia PTA</a>
-            <a href="https://www.pta.org/" target="_blank" rel="noopener noreferrer">National PTA</a>
-            <a href="https://www.vbschools.com/" target="_blank" rel="noopener noreferrer">Virginia Beach City Public Schools</a>
-        </footer>
+            <a href="https://virginiabeachcouncilpta.givebacks.com/" target="_blank" rel="noopener noreferrer">Council
+                GiveBacks</a>
+                <a href="https://www.facebook.com/p/Virginia-Beach-Council-of-PTAs-100064654665299/" target="_blank"
+                   rel="noopener noreferrer">Facebook</a>
+                <a href="https://vapta.org/" target="_blank" rel="noopener noreferrer">Virginia PTA</a>
+                <a href="https://www.pta.org/" target="_blank" rel="noopener noreferrer">National PTA</a>
+                <a href="https://www.vbschools.com/" target="_blank" rel="noopener noreferrer">Virginia Beach City Public
+                    Schools</a>
+                </footer>
 
-        <footer class="footer-legal">
-            © Virginia Beach Council of PTAs. PTA ID# 00053175 - PTA and VBCPS trademarks are acknowledged and respected.
-        </footer>
-    </div>
-</div>
+                <footer class="footer-legal">
+                    © Virginia Beach Council of PTAs. PTA ID# 00053175 - PTA and VBCPS trademarks are acknowledged and
+                    respected.
+                </footer>
+            </div>
+        </div>

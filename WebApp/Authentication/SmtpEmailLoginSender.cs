@@ -1,23 +1,27 @@
 using System.Net;
 using System.Net.Mail;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using SiteEngine.Data;
 
 namespace WebApp.Authentication;
 
 public class SmtpEmailLoginSender(
-    AppDbContext dbContext,
+    IServiceScopeFactory scopeFactory,
     IOptions<EmailLoginOptions> options,
     ILogger<SmtpEmailLoginSender> logger) : IEmailLoginSender
 {
-    private readonly AppDbContext _dbContext = dbContext;
+    private readonly IServiceScopeFactory _scopeFactory = scopeFactory;
     private readonly EmailLoginOptions _options = options.Value;
     private readonly ILogger<SmtpEmailLoginSender> _logger = logger;
 
     public async Task SendCodeAsync(string email, string code, CancellationToken cancellationToken = default)
     {
-        var globalConfig = await _dbContext.GlobalConfigs
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var globalConfig = await dbContext.GlobalConfigs
             .AsNoTracking()
             .OrderBy(x => x.Id)
             .FirstOrDefaultAsync(cancellationToken);

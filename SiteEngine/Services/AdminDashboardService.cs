@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using SiteEngine.Data;
 using SiteEngine.Entities;
 using SiteEngine.Identity;
@@ -9,13 +10,13 @@ using System.Text.RegularExpressions;
 namespace SiteEngine.Services;
 
 public class AdminDashboardService(
-    AppDbContext dbContext,
+    IServiceScopeFactory scopeFactory,
     ISiteContext siteContext,
     ISiteResolver siteResolver,
     ISitePublicAssetService sitePublicAssetService,
     UserManager<SiteUser> userManager) : IAdminDashboardService
 {
-    private readonly AppDbContext _dbContext = dbContext;
+    private readonly IServiceScopeFactory _scopeFactory = scopeFactory;
     private readonly ISiteContext _siteContext = siteContext;
     private readonly ISiteResolver _siteResolver = siteResolver;
     private readonly ISitePublicAssetService _sitePublicAssetService = sitePublicAssetService;
@@ -23,15 +24,18 @@ public class AdminDashboardService(
 
     public async Task<AdminDashboardOverview> GetOverviewAsync(string? currentUserId, CancellationToken cancellationToken = default)
     {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
         await EnsureAuthorizedAsync(currentUserId);
 
-        var totalSites = await _dbContext.Sites.CountAsync(cancellationToken);
-        var totalUsers = await _dbContext.Users.CountAsync(cancellationToken);
-        var assignedUsers = await _dbContext.SiteUserRoles
+        var totalSites = await dbContext.Sites.CountAsync(cancellationToken);
+        var totalUsers = await dbContext.Users.CountAsync(cancellationToken);
+        var assignedUsers = await dbContext.SiteUserRoles
             .Select(x => x.UserId)
             .Distinct()
             .CountAsync(cancellationToken);
-        var globalAdmins = await _dbContext.SiteUserRoles
+        var globalAdmins = await dbContext.SiteUserRoles
             .Where(x => x.SiteId == SeedData.DefaultAdminSiteId && x.Role == SiteRole.Admin)
             .Select(x => x.UserId)
             .Distinct()
@@ -48,9 +52,12 @@ public class AdminDashboardService(
 
     public async Task<IReadOnlyList<AdminSiteSummary>> GetSiteSummariesAsync(string? currentUserId, CancellationToken cancellationToken = default)
     {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
         await EnsureAuthorizedAsync(currentUserId);
 
-        return await _dbContext.Sites
+        return await dbContext.Sites
             .AsNoTracking()
             .OrderBy(x => x.SiteName)
             .Select(x => new AdminSiteSummary
@@ -71,31 +78,34 @@ public class AdminDashboardService(
 
     public async Task<AdminSiteDetail?> GetSiteDetailAsync(string? currentUserId, Guid siteId, CancellationToken cancellationToken = default)
     {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
         await EnsureAuthorizedAsync(currentUserId);
 
-        var site = await _dbContext.Sites
+        var site = await dbContext.Sites
             .AsNoTracking()
             .SingleOrDefaultAsync(x => x.Id == siteId, cancellationToken);
 
         if (site is null)
             return null;
 
-        var announcementCount = await _dbContext.Announcements
+        var announcementCount = await dbContext.Announcements
             .AsNoTracking()
             .CountAsync(x => x.SiteId == siteId, cancellationToken);
 
-        var eventCount = await _dbContext.Events
+        var eventCount = await dbContext.Events
             .AsNoTracking()
             .CountAsync(x => x.SiteId == siteId, cancellationToken);
 
-        var assignedUsers = await _dbContext.SiteUserRoles
+        var assignedUsers = await dbContext.SiteUserRoles
             .AsNoTracking()
             .Where(x => x.SiteId == siteId)
             .Select(x => x.UserId)
             .Distinct()
             .CountAsync(cancellationToken);
 
-        var roleCounts = await _dbContext.SiteUserRoles
+        var roleCounts = await dbContext.SiteUserRoles
             .AsNoTracking()
             .Where(x => x.SiteId == siteId)
             .GroupBy(x => x.Role)
@@ -127,6 +137,9 @@ public class AdminDashboardService(
 
     public async Task<Guid> CreateSiteAsync(string? currentUserId, AdminCreateSiteRequest request, CancellationToken cancellationToken = default)
     {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
         await EnsureAuthorizedAsync(currentUserId);
 
         var normalizedPtaId = NormalizeAndValidatePtaId(request.PtaId);
@@ -134,7 +147,7 @@ public class AdminDashboardService(
         var normalizedDomain = NormalizeAndValidateDomain(request.Domain);
         ValidateRoutingInputs(normalizedHostname, normalizedDomain, request.IsCityWide);
 
-        var ptaIdExists = await _dbContext.Sites
+        var ptaIdExists = await dbContext.Sites
             .AsNoTracking()
             .AnyAsync(x => x.PtaId == normalizedPtaId, cancellationToken);
 
@@ -143,7 +156,7 @@ public class AdminDashboardService(
 
         if (!string.IsNullOrWhiteSpace(normalizedHostname))
         {
-            var hostnameExists = await _dbContext.Sites
+            var hostnameExists = await dbContext.Sites
                 .AsNoTracking()
                 .AnyAsync(x => x.Hostname == normalizedHostname, cancellationToken);
 
@@ -153,7 +166,7 @@ public class AdminDashboardService(
 
         if (!string.IsNullOrWhiteSpace(normalizedDomain))
         {
-            var domainExists = await _dbContext.Sites
+            var domainExists = await dbContext.Sites
                 .AsNoTracking()
                 .AnyAsync(x => x.Domain == normalizedDomain, cancellationToken);
 
@@ -163,7 +176,7 @@ public class AdminDashboardService(
 
         if (request.IsCityWide)
         {
-            var cityWideExists = await _dbContext.Sites
+            var cityWideExists = await dbContext.Sites
                 .AsNoTracking()
                 .AnyAsync(x => x.IsCityWide, cancellationToken);
 
@@ -193,8 +206,8 @@ public class AdminDashboardService(
             UpdatedAtUtc = now
         };
 
-        _dbContext.Sites.Add(site);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        dbContext.Sites.Add(site);
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         await _sitePublicAssetService.EnsureSiteFoldersAsync(
             normalizedPtaId,
@@ -212,6 +225,9 @@ public class AdminDashboardService(
 
     public async Task<bool> UpdateSiteAsync(string? currentUserId, Guid siteId, AdminUpdateSiteRequest request, CancellationToken cancellationToken = default)
     {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
         await EnsureAuthorizedAsync(currentUserId);
 
         var normalizedPtaId = NormalizeAndValidatePtaId(request.PtaId);
@@ -219,25 +235,25 @@ public class AdminDashboardService(
         var normalizedDomain = NormalizeAndValidateDomain(request.Domain);
         ValidateRoutingInputs(normalizedHostname, normalizedDomain, request.IsCityWide);
 
-        var site = await _dbContext.Sites.SingleOrDefaultAsync(x => x.Id == siteId, cancellationToken);
+        var site = await dbContext.Sites.SingleOrDefaultAsync(x => x.Id == siteId, cancellationToken);
         if (site is null)
             return false;
 
-        var duplicatePtaId = await _dbContext.Sites
+        var duplicatePtaId = await dbContext.Sites
             .AsNoTracking()
             .AnyAsync(x => x.Id != siteId && x.PtaId == normalizedPtaId, cancellationToken);
 
         if (duplicatePtaId)
             throw new InvalidOperationException($"A site with PTA ID '{normalizedPtaId}' already exists.");
 
-        var duplicateHostname = await _dbContext.Sites
+        var duplicateHostname = await dbContext.Sites
             .AsNoTracking()
             .AnyAsync(x => x.Id != siteId && x.Hostname == normalizedHostname && x.Hostname != string.Empty, cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(normalizedHostname) && duplicateHostname)
             throw new InvalidOperationException($"A site with hostname '{normalizedHostname}' already exists.");
 
-        var duplicateDomain = await _dbContext.Sites
+        var duplicateDomain = await dbContext.Sites
             .AsNoTracking()
             .AnyAsync(x => x.Id != siteId && x.Domain == normalizedDomain && x.Domain != string.Empty, cancellationToken);
 
@@ -246,7 +262,7 @@ public class AdminDashboardService(
 
         if (request.IsCityWide)
         {
-            var duplicateCityWide = await _dbContext.Sites
+            var duplicateCityWide = await dbContext.Sites
                 .AsNoTracking()
                 .AnyAsync(x => x.Id != siteId && x.IsCityWide, cancellationToken);
 
@@ -270,7 +286,7 @@ public class AdminDashboardService(
         site.WelcomeText = GetValueOrDefault(request.WelcomeText, site.WelcomeText);
         site.UpdatedAtUtc = DateTimeOffset.UtcNow;
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         await _sitePublicAssetService.RenameSiteFolderAsync(originalPtaId, normalizedPtaId, cancellationToken);
         await _sitePublicAssetService.EnsureSiteFoldersAsync(normalizedPtaId, seedDefaults: false, cancellationToken);
@@ -292,17 +308,20 @@ public class AdminDashboardService(
 
     public async Task<IReadOnlyList<AdminUserSummary>> GetUserSummariesAsync(string? currentUserId, CancellationToken cancellationToken = default)
     {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
         await EnsureAuthorizedAsync(currentUserId);
 
-        var summaries = await _dbContext.Users
+        var summaries = await dbContext.Users
             .AsNoTracking()
             .OrderBy(x => x.Email)
             .Select(x => new AdminUserSummary
             {
                 UserId = x.Id,
                 Email = x.Email ?? x.UserName ?? string.Empty,
-                IsGlobalAdmin = _dbContext.SiteUserRoles.Any(r => r.UserId == x.Id && r.SiteId == SeedData.DefaultAdminSiteId && r.Role == SiteRole.Admin),
-                AssignedSiteCount = _dbContext.SiteUserRoles
+                IsGlobalAdmin = dbContext.SiteUserRoles.Any(r => r.UserId == x.Id && r.SiteId == SeedData.DefaultAdminSiteId && r.Role == SiteRole.Admin),
+                AssignedSiteCount = dbContext.SiteUserRoles
                     .Where(r => r.UserId == x.Id)
                     .Select(r => r.SiteId)
                     .Distinct()
@@ -315,19 +334,22 @@ public class AdminDashboardService(
 
     public async Task<AdminUserDetail?> GetUserDetailAsync(string? currentUserId, string userId, CancellationToken cancellationToken = default)
     {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
         await EnsureAuthorizedAsync(currentUserId);
 
         if (string.IsNullOrWhiteSpace(userId))
             return null;
 
-        var user = await _dbContext.Users
+        var user = await dbContext.Users
             .AsNoTracking()
             .SingleOrDefaultAsync(x => x.Id == userId, cancellationToken);
 
         if (user is null)
             return null;
 
-        var siteRoles = await _dbContext.SiteUserRoles
+        var siteRoles = await dbContext.SiteUserRoles
             .AsNoTracking()
             .Where(x => x.UserId == userId)
             .Include(x => x.Site)
@@ -417,14 +439,17 @@ public class AdminDashboardService(
 
     private async Task SetGlobalAdminAsync(string userId, bool shouldBeGlobalAdmin, CancellationToken cancellationToken)
     {
-        var existing = await _dbContext.SiteUserRoles
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var existing = await dbContext.SiteUserRoles
             .SingleOrDefaultAsync(
                 x => x.UserId == userId && x.SiteId == SeedData.DefaultAdminSiteId && x.Role == SiteRole.Admin,
                 cancellationToken);
 
         if (shouldBeGlobalAdmin && existing is null)
         {
-            _dbContext.SiteUserRoles.Add(new SiteUserRole
+            dbContext.SiteUserRoles.Add(new SiteUserRole
             {
                 UserId = userId,
                 SiteId = SeedData.DefaultAdminSiteId,
@@ -432,14 +457,14 @@ public class AdminDashboardService(
                 CreatedAt = DateTime.UtcNow
             });
 
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
             return;
         }
 
         if (!shouldBeGlobalAdmin && existing is not null)
         {
-            _dbContext.SiteUserRoles.Remove(existing);
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            dbContext.SiteUserRoles.Remove(existing);
+            await dbContext.SaveChangesAsync(cancellationToken);
         }
     }
 

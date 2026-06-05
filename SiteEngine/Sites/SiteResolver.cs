@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using SiteEngine.Data;
@@ -9,12 +10,12 @@ using SiteEngine.Options;
 namespace SiteEngine.Sites;
 
 public class SiteResolver(
-    AppDbContext dbContext,
+    IServiceScopeFactory scopeFactory,
     IMemoryCache memoryCache,
     IHostEnvironment hostEnvironment,
     IOptions<SiteHostMappingOptions> mappingOptions) : ISiteResolver
 {
-    private readonly AppDbContext _dbContext = dbContext;
+    private readonly IServiceScopeFactory _scopeFactory = scopeFactory;
     private readonly IMemoryCache _memoryCache = memoryCache;
     private readonly IHostEnvironment _hostEnvironment = hostEnvironment;
     private readonly SiteHostMappingOptions _mappingOptions = mappingOptions.Value;
@@ -50,7 +51,8 @@ public class SiteResolver(
 
     private async Task<SiteResolutionResult?> ResolveFromDatabaseAsync(string host, CancellationToken cancellationToken)
     {
-        var dbContext = _dbContext;
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var globalConfig = await dbContext.GlobalConfigs
             .AsNoTracking()

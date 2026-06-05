@@ -5,144 +5,167 @@
 
 <PageTitle>Initial Setup</PageTitle>
 
-<h1>Initial Setup</h1>
-
 @if (!_initialized)
 {
-	<p>Loading setup...</p>
+	<div class="setup-page">
+		<p class="setup-muted">Loading setup...</p>
+	</div>
 }
 else if (!_setupRequired)
 {
-	<p>Initial setup is already complete.</p>
+	<div class="setup-page">
+		<p class="setup-muted">Initial setup is already complete.</p>
+	</div>
 }
 else
 {
-	<EditForm Model="_request" OnValidSubmit="HandleFormSubmitAsync">
-		<DataAnnotationsValidator />
-		<ValidationSummary />
+	<div class="setup-page">
+		<header class="setup-header">
+			<h1>Welcome! Let’s set up your PTA platform</h1>
+			<p class="setup-muted">This one-time setup creates your city-wide site, configures admin access, and enables email-based sign-in.</p>
+		</header>
 
-		<section class="setup-group">
-			<h3>1. Platform & Admin</h3>
-			<div class="group-grid">
-				<div>
-					<label for="adminEmail">Admin Email</label><br />
-					<InputText id="adminEmail" @bind-Value="_request.AdminEmail" />
-				</div>
-				<div>
-					<label for="rootDomain">Root Domain</label><br />
-					<InputText id="rootDomain" @bind-Value="_request.RootDomain" />
-				</div>
-				<div>
-					<label for="platformDomain">Platform Domain</label><br />
-					<InputText id="platformDomain" @bind-Value="_request.PlatformDomain" />
-				</div>
-			</div>
-		</section>
+		<EditForm Model="_request" OnValidSubmit="HandleFormSubmitAsync">
+			<DataAnnotationsValidator />
+			<ValidationSummary class="setup-validation" />
 
-		<section class="setup-group">
-			<h3>2. City-Wide Site Branding</h3>
-			<div class="group-grid">
-				<div>
-					<label for="cityWideSiteName">City-Wide PTA Name</label><br />
-					<InputText id="cityWideSiteName" @bind-Value="_request.CityWideSiteName" />
-				</div>
-				<div>
-					<label for="cityWidePtaId">City-Wide PTA ID (8 digits)</label><br />
-					<InputText id="cityWidePtaId" @bind-Value="_request.CityWidePtaId" />
-				</div>
-				<div>
-					<label for="cityWidePrimaryColor">Primary Color</label><br />
-					<InputText id="cityWidePrimaryColor" @bind-Value="_request.CityWidePrimaryColor" />
-				</div>
-				<div>
-					<label for="cityWideAccentColor">Accent Color</label><br />
-					<InputText id="cityWideAccentColor" @bind-Value="_request.CityWideAccentColor" />
-				</div>
-				<div class="full-width">
-					<label for="cityWideWelcomeText">Welcome Text</label><br />
-					<InputTextArea id="cityWideWelcomeText" @bind-Value="_request.CityWideWelcomeText" />
-				</div>
-				<div class="full-width">
-					<p>Default images for admin and site pages will use: <code>/images/logo.png</code> and <code>/images/banner.png</code>.</p>
-				</div>
-			</div>
-		</section>
-
-		<section class="setup-group">
-			<h3>3. SMTP Configuration <span class="@GetStatusCssClass(GetSmtpSectionStatus())">@GetStatusText(GetSmtpSectionStatus())</span></h3>
-			<div class="group-grid">
-				<div>
-					<label for="smtpHost">SMTP Host</label><br />
-					<InputText id="smtpHost" @bind-Value="_request.SmtpHost" />
-				</div>
-				<div>
-					<label for="smtpPort">SMTP Port</label><br />
-					<InputNumber id="smtpPort" @bind-Value="_request.SmtpPort" />
-				</div>
-				<div>
-					<label for="smtpFromAddress">Default From Email</label><br />
-					<InputText id="smtpFromAddress" @bind-Value="_request.SmtpFromAddress" />
-					<div>Recommended: <code>@GetRecommendedFromAddress()</code></div>
-				</div>
-				<div>
-					<label for="smtpUsername">SMTP Username</label><br />
-					<InputText id="smtpUsername" @bind-Value="_request.SmtpUsername" />
-				</div>
-				<div>
-					<label for="smtpPassword">SMTP Password</label><br />
-					<InputText id="smtpPassword" type="password" @bind-Value="_request.SmtpPassword" />
-				</div>
-				<div>
-					<label for="useSsl">Use SSL</label><br />
-					<InputCheckbox id="useSsl" @bind-Value="_request.UseSsl" />
-				</div>
-			</div>
-
-			@if (!string.IsNullOrWhiteSpace(_verificationCode))
-			{
-				<div class="verification-box">
-					<h4>Email Verification</h4>
-					<p>A verification code has been sent to <strong>@_request.AdminEmail</strong>. Enter it below to confirm delivery:</p>
-					<div class="verification-code-display">
-						<p>Verification Code: <strong style="font-size: 1.5em;">@_verificationCode</strong></p>
+			<section class="setup-group">
+				<h3>1. Platform & Admin</h3>
+				<p class="setup-help">The admin email becomes your first platform administrator. Domains control where your city site and unit sites are hosted.</p>
+				<div class="group-grid">
+					<div>
+						<label for="adminEmail">Admin Email</label>
+						<InputText id="adminEmail" @bind-Value="_request.AdminEmail" />
 					</div>
 					<div>
-						<label for="verificationCode">Enter Verification Code</label><br />
-						<InputText id="verificationCode" @bind-Value="_verificationInput" placeholder="Enter 6-8 digit code" />
-						<button type="button" @onclick="VerifyCode" disabled="@_verificationConfirmed">Verify</button>
+						<label for="rootDomain">Root Domain</label>
+						<InputText id="rootDomain" @bind-Value="_request.RootDomain" />
+						<div class="field-help">Example: <code>vbpta.delfraisse.com</code></div>
 					</div>
-					@if (!string.IsNullOrWhiteSpace(_verificationError))
-					{
-						<p class="error-text">@_verificationError</p>
-					}
-					@if (_verificationConfirmed)
-					{
-						<p class="success-text">✓ Email verification confirmed!</p>
-					}
+					<div class="full-width">
+						<label for="platformDomain">Platform Domain (for unit sites)</label>
+						<InputText id="platformDomain" @bind-Value="_request.PlatformDomain" />
+						<div class="field-help">Example: <code>luxfordes.vbpta.delfraisse.com</code> resolves from this domain.</div>
+					</div>
 				</div>
-			}
-		</section>
+			</section>
 
-		<section class="setup-group">
-			<h3>4. Finalize Setup <span class="@GetStatusCssClass(_steps[2].Status)">@GetStatusText(_steps[2].Status)</span></h3>
-			@if (string.IsNullOrWhiteSpace(_verificationCode))
-			{
-				<button type="submit" disabled="@_isRunning">Send Test Email</button>
-			}
-			else if (!_verificationConfirmed)
-			{
-				<p class="info-text">Please verify the email code above before continuing.</p>
-			}
-			else
-			{
-				<button type="submit" disabled="@_isRunning" @onclick="FinalizeSetupAsync">Complete Setup</button>
-			}
-			@if (!string.IsNullOrWhiteSpace(_statusMessage))
-			{
-				<p class="error-text">@_statusMessage</p>
-			}
-		</section>
-	</EditForm>
+			<section class="setup-group">
+				<h3>2. City-Wide Site Branding</h3>
+				<p class="setup-help">These values define your city-wide homepage and default theme for launch.</p>
+				<div class="group-grid">
+					<div>
+						<label for="cityWideSiteName">City-Wide PTA Name</label>
+						<InputText id="cityWideSiteName" @bind-Value="_request.CityWideSiteName" />
+					</div>
+					<div>
+						<label for="cityWidePtaId">City-Wide PTA ID (8 digits)</label>
+						<InputText id="cityWidePtaId" @bind-Value="_request.CityWidePtaId" />
+					</div>
+					<div>
+						<label for="cityWidePrimaryColor">Primary Color</label>
+						<InputText id="cityWidePrimaryColor" @bind-Value="_request.CityWidePrimaryColor" />
+					</div>
+					<div>
+						<label for="cityWideAccentColor">Accent Color</label>
+						<InputText id="cityWideAccentColor" @bind-Value="_request.CityWideAccentColor" />
+					</div>
+					<div class="full-width">
+						<label for="cityWideWelcomeText">Welcome Text</label>
+						<InputTextArea id="cityWideWelcomeText" @bind-Value="_request.CityWideWelcomeText" />
+					</div>
+					<div class="full-width image-preview-grid">
+						<div class="preview-card">
+							<div class="preview-title">Default Logo</div>
+							<img src="/images/logo.png" alt="Default PTA logo preview" class="preview-logo" />
+							<div class="field-help"><code>/images/logo.png</code></div>
+						</div>
+						<div class="preview-card">
+							<div class="preview-title">Default Banner</div>
+							<img src="/images/banner.png" alt="Default PTA banner preview" class="preview-banner" />
+							<div class="field-help"><code>/images/banner.png</code></div>
+						</div>
+					</div>
+				</div>
+			</section>
+
+			<section class="setup-group">
+				<h3>3. Email Sign-In (SMTP) <span class="@GetStatusCssClass(GetSmtpSectionStatus())">@GetStatusText(GetSmtpSectionStatus())</span></h3>
+				<p class="setup-help">Admins and users receive email codes for login. We’ll test connectivity and delivery before saving setup.</p>
+				<div class="group-grid">
+					<div>
+						<label for="smtpHost">SMTP Host</label>
+						<InputText id="smtpHost" @bind-Value="_request.SmtpHost" />
+					</div>
+					<div>
+						<label for="smtpPort">SMTP Port</label>
+						<InputNumber id="smtpPort" @bind-Value="_request.SmtpPort" />
+					</div>
+					<div>
+						<label for="smtpFromAddress">Default From Email</label>
+						<InputText id="smtpFromAddress" @bind-Value="_request.SmtpFromAddress" />
+						<div class="field-help">Recommended: <code>@GetRecommendedFromAddress()</code></div>
+					</div>
+					<div>
+						<label for="smtpUsername">SMTP Username</label>
+						<InputText id="smtpUsername" @bind-Value="_request.SmtpUsername" />
+					</div>
+					<div>
+						<label for="smtpPassword">SMTP Password</label>
+						<InputText id="smtpPassword" type="password" @bind-Value="_request.SmtpPassword" />
+					</div>
+					<div class="checkbox-field">
+						<label for="useSsl">Use SSL</label>
+						<InputCheckbox id="useSsl" @bind-Value="_request.UseSsl" />
+					</div>
+				</div>
+
+				@if (!string.IsNullOrWhiteSpace(_verificationCode))
+				{
+					<div class="verification-box">
+						<h4>Email Verification</h4>
+						<p>We sent a verification code to <strong>@_request.AdminEmail</strong>. Enter it below to confirm delivery.</p>
+						<div class="verification-input-row">
+							<div>
+								<label for="verificationCode">Enter Verification Code</label>
+								<InputText id="verificationCode" @bind-Value="_verificationInput" placeholder="Enter 6-8 digit code" />
+							</div>
+							<button type="button" @onclick="VerifyCode" disabled="@_verificationConfirmed">Verify</button>
+						</div>
+						@if (!string.IsNullOrWhiteSpace(_verificationError))
+						{
+							<p class="error-text">@_verificationError</p>
+						}
+						@if (_verificationConfirmed)
+						{
+							<p class="success-text">Email verification confirmed.</p>
+						}
+					</div>
+				}
+			</section>
+
+			<section class="setup-group">
+				<h3>4. Finalize Setup <span class="@GetStatusCssClass(_steps[2].Status)">@GetStatusText(_steps[2].Status)</span></h3>
+				<p class="setup-help">After completion, you’ll be redirected to the admin host for ongoing platform management.</p>
+				@if (string.IsNullOrWhiteSpace(_verificationCode))
+				{
+					<button type="submit" disabled="@_isRunning">Send Test Email</button>
+				}
+				else if (!_verificationConfirmed)
+				{
+					<p class="info-text">Please verify the email code before continuing.</p>
+				}
+				else
+				{
+					<button type="submit" disabled="@_isRunning" @onclick="FinalizeSetupAsync">Complete Setup</button>
+				}
+				@if (!string.IsNullOrWhiteSpace(_statusMessage))
+				{
+					<p class="error-text">@_statusMessage</p>
+				}
+			</section>
+		</EditForm>
+	</div>
 }
 
 @code {
@@ -386,22 +409,117 @@ else
 }
 
 <style>
-	.setup-group {
-		border: 1px solid #ddd;
-		border-radius: 8px;
-		padding: 0.9rem;
+	.setup-page {
+		max-width: 980px;
+		margin: 0 auto;
+		padding: 1rem 1rem 2rem;
+	}
+
+	.setup-header {
 		margin-bottom: 1rem;
-		background: #fff;
+	}
+
+	.setup-header h1 {
+		margin: 0 0 0.5rem;
+		font-size: 1.8rem;
+	}
+
+	.setup-muted {
+		color: #4b5563;
+		margin: 0;
+	}
+
+	.setup-help {
+		margin: 0 0 0.8rem;
+		color: #4b5563;
+	}
+
+	.setup-validation {
+		margin-bottom: 1rem;
+	}
+
+	.setup-group {
+		border: 1px solid #d7deea;
+		border-radius: 10px;
+		padding: 1rem;
+		margin-bottom: 1rem;
+		background: #ffffff;
+		box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+	}
+
+	.setup-group h3 {
+		margin: 0 0 0.5rem;
 	}
 
 	.group-grid {
 		display: grid;
 		grid-template-columns: repeat(2, minmax(240px, 1fr));
-		gap: 0.75rem 1rem;
+		gap: 0.85rem 1rem;
+	}
+
+	label {
+		display: inline-block;
+		margin-bottom: 0.3rem;
+		font-weight: 600;
+	}
+
+	input[type="text"],
+	input[type="number"],
+	textarea {
+		width: 100%;
+	}
+
+	.field-help {
+		margin-top: 0.25rem;
+		font-size: 0.9rem;
+		color: #4b5563;
+	}
+
+	.checkbox-field {
+		display: flex;
+		flex-direction: column;
+		gap: 0.45rem;
+		align-items: flex-start;
 	}
 
 	.full-width {
 		grid-column: 1 / -1;
+	}
+
+	.image-preview-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+		gap: 0.85rem;
+	}
+
+	.preview-card {
+		border: 1px solid #d7deea;
+		border-radius: 8px;
+		padding: 0.8rem;
+		background: #f8fafc;
+	}
+
+	.preview-title {
+		font-weight: 600;
+		margin-bottom: 0.45rem;
+	}
+
+	.preview-logo {
+		max-width: 160px;
+		max-height: 80px;
+		width: auto;
+		height: auto;
+		display: block;
+		margin-bottom: 0.35rem;
+	}
+
+	.preview-banner {
+		width: 100%;
+		max-height: 120px;
+		object-fit: cover;
+		border-radius: 6px;
+		border: 1px solid #d7deea;
+		margin-bottom: 0.35rem;
 	}
 
 	.status-pending {
@@ -435,25 +553,21 @@ else
 	}
 
 	.verification-box {
-		background: #f0f8ff;
+		background: #f0f7ff;
 		border: 1px solid #0b5ed7;
 		border-radius: 6px;
 		padding: 1rem;
 		margin-top: 1rem;
 	}
 
-	.verification-code-display {
-		background: #fff;
-		border: 2px solid #0b5ed7;
-		border-radius: 4px;
-		padding: 1rem;
-		text-align: center;
-		margin: 0.75rem 0;
-		font-family: monospace;
+	.verification-input-row {
+		display: flex;
+		gap: 0.75rem;
+		align-items: flex-end;
+		flex-wrap: wrap;
 	}
 
 	.verification-box button {
-		margin-top: 0.5rem;
 		padding: 0.5rem 1rem;
 		background: #0b5ed7;
 		color: white;
@@ -471,5 +585,11 @@ else
 		background: #6c757d;
 		cursor: not-allowed;
 		opacity: 0.65;
+	}
+
+	@@media (max-width: 800px) {
+		.group-grid {
+			grid-template-columns: 1fr;
+		}
 	}
 </style>

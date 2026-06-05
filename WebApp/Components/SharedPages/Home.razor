@@ -11,34 +11,27 @@
 
 <PageTitle>@SiteContext.SiteConfig.SiteName</PageTitle>
 
-<div class="home-container">
-    <h1>@SiteContext.SiteConfig.SiteName</h1>
-    <p>@SiteContext.SiteConfig.WelcomeText</p>
-
-    @if (_siteNotFound)
-    {
+@if (_siteNotFound)
+{
+    <div class="home-container">
         <div class="site-not-found-message">
             <h2>Sorry, I didn’t find that local unit.</h2>
             <p>Please check the URL or contact the council admin for help.</p>
         </div>
-    }
-    else if (_showAdminDashboard)
-    {
-        <AdminHomeComponent />
-    }
-    else if (_showCityWideHome)
-    {
-		<CityWideHomeComponent />
-    }
-	else if (_showLocalUnitHome && SiteContext.CurrentSite is not null)
-	{
-		<UnitHomeComponent SiteName="@SiteContext.CurrentSite.SiteName" />
-	}
-    else if (_showAdminLink)
-    {
-        <p><a href="/admin">Go to Admin Portal</a></p>
-    }
-</div>
+    </div>
+}
+else if (_showAdminDashboard)
+{
+    <AdminHomeComponent />
+}
+else if (_showCityWideHome)
+{
+    <CityWideHomeComponent />
+}
+else if (_showLocalUnitHome && SiteContext.CurrentSite is not null)
+{
+    <UnitHomeComponent SiteName="@SiteContext.CurrentSite.SiteName" />
+}
 
 
 @code {
@@ -57,9 +50,7 @@
 
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         _userId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        _showAdminLink = await SiteContext.UserHasRoleAtCurrentSiteAsync(_userId, SiteRole.Admin);
-        _showAdminDashboard = SiteContext.IsAdminContext && _showAdminLink;
-        _showCityWideHome = !_siteNotFound
+         _showCityWideHome = !_siteNotFound
             && !SiteContext.IsAdminContext
             && (SiteContext.CurrentSite?.IsCityWide ?? false);
         _showLocalUnitHome = !_siteNotFound && !_showAdminDashboard && !_showCityWideHome;

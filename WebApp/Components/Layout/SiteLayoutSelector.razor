@@ -2,16 +2,23 @@
 @inject ISiteContext SiteContext
 @inherits LayoutComponentBase
 @inject IHttpContextAccessor Http
-
-<p style="position:fixed;top:0;left:0;background:black;color:white;z-index:9999;">
-    SiteLayoutSelector LOADED
-</p>
+@inject IPlatformConfigurationService PlatformConfigurationService
 
 @code {
     private Type _layoutType = typeof(CityWideLayout);
+    private bool _isSetupMode;
 
     protected override async Task OnParametersSetAsync()
     {
+        _isSetupMode = Http.HttpContext?.Items.ContainsKey("SetupMode") == true
+            || await PlatformConfigurationService.IsInitialSetupRequiredAsync();
+
+        if (_isSetupMode)
+        {
+            _layoutType = typeof(AdminLayout);
+            return;
+        }
+
         var host = new Uri(NavigationManager.Uri).Host;
         await SiteContext.InitializeAsync(host);
         _layoutType = ResolveLayoutType();
@@ -19,9 +26,7 @@
 
     private Type ResolveLayoutType()
     {
-		Console.WriteLine($"Resolving layout for host: {new Uri(NavigationManager.Uri).Host}");
-
-        if (Http.HttpContext?.Items.ContainsKey("SetupMode") == true)
+        if (_isSetupMode)
         {
             return typeof(AdminLayout);
         }

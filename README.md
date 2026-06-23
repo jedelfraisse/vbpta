@@ -1,313 +1,303 @@
-# Virginia Beach Council of PTAs Website Platform (vbpta.org)
-**Status: Draft / Proposal**
+# PTA Platform — Multi‑Division Website Engine & Public Tool Hub  
+**Status: Active Development (Code Upload Pending)**
 
-This repository contains the proposed new website platform for the **Virginia Beach Council of PTAs (VBCPTA)**.
+This repository contains the next‑generation PTA platform originally created for the **Virginia Beach Council of PTAs (VBCPTA)** and now evolving into a **multi‑division, multi‑unit website engine** with a **public‑facing tool hub**.
 
-The development version is currently hosted at:
+> **Note:**  
+> The repository currently contains only documentation (`README.md`, `.gitignore`, `LICENSE`).  
+> The application code will be uploaded once the core system reaches a stable baseline.
 
-https://vbpta.delfraisse.com
+The platform is designed to support:
 
-Once approved and finalized, the official production site will be published at:
+- **Division PTA councils**  
+- **Local PTA units** under each division  
+- **Independent PTAs** that do not belong to a division  
+- **Public users** who want access to PTA‑friendly tools  
 
-https://vbpta.org
-
-This project is a fresh rebuild, informed by archived versions of vbpta.org but not dependent on them. It includes both the **citywide PTA website** and a **multi‑unit website engine** that allows local PTA units to create customizable, template‑based sites.
-
----
-
-## 🌟 Purpose
-
-This platform provides:
-
-- A modern, unified online home for the Virginia Beach Council of PTAs  
-- A shared district‑wide calendar for school closures, holidays, and major events  
-- A hub for council announcements, awards, and GiveBacks information  
-- A simple, customizable website option for local PTA units  
-- Easy access to Virginia PTA and National PTA resources  
-- A consistent, professional platform for families and volunteers across the city  
-
-### Helping Schools Build and Sustain Strong PTAs
-
-Many schools want an active PTA but don’t know where to start, how to organize, or how to continue year after year.  
-This platform provides a clear, structured foundation that helps new PTAs get started quickly and helps existing PTAs maintain continuity even as volunteers and board members change.
+It is fully open source and will support both self‑hosting and managed SaaS deployments.
 
 ---
 
-## 🏛️ Features for the Council Website
+## 🌟 Overview
 
-- Citywide announcements & updates  
-- Shared district calendar (closures, holidays, council events)  
-- Awards & recognition for local units  
-- GiveBacks integration for membership and fundraising  
+This project is evolving into a **PTA digital infrastructure platform** with three major layers:
+
+### **1. Portal (Top Level)**  
+The main public‑facing site that hosts tools, login, and shared resources.
+
+### **2. Divisions (Middle Level)**  
+Division PTA councils, each with their own site, announcements, and calendar.
+
+### **3. Units (Bottom Level)**  
+Local PTA units under each division, each with their own customizable site.
+
+This structure mirrors how PTAs operate in many states while remaining flexible enough for independent PTAs.
+
+---
+
+## 🎯 Purpose
+
+This platform exists to:
+
+- Strengthen communication across divisions  
+- Provide a consistent, professional web presence for all units  
+- Support independent PTAs that report directly to state or national  
+- Offer tools that any PTA — or even non‑PTA school groups — can use  
+- Help new PTAs get started quickly  
+- Support continuity as board members change  
+- Reduce reliance on expensive third‑party services  
+- Provide a free, open‑source option for PTAs that want to self‑host  
+
+---
+
+## 🔗 Integrating Existing PTA Tools (GiveBacks, SignUpGenius, etc.)
+
+This platform is designed not only to **create new PTA tools**, but also to **integrate and enhance the tools PTAs already use today**.
+
+Many PTAs rely on:
+
+- **GiveBacks** for membership, fundraising, and ticketing  
+- **SignUpGenius** for volunteer coordination  
+- **Google Workspace** for documents and collaboration  
+- **Mailchimp / Canva** for communication and design  
+
+The platform’s mission is to:
+
+- Work *with* these tools, not replace them  
+- Provide a unified place to access them  
+- Offer optional replacements when helpful  
+- Fill the gaps where existing tools fall short  
+
+---
+
+## 🏛️ Features for Divisions (PTA Councils)
+
+- Division‑level announcements  
+- Shared district calendar  
+- Awards & recognition  
+- Document library  
 - Links to state and national PTA resources  
-- Document library for bylaws, forms, guides, and meeting materials  
-- Council‑level event listings  
-- Support for elections, committees, and board transitions  
+- Division‑wide event listings  
+- Multi‑unit management dashboard  
+- Support for elections, committees, and transitions  
 
 ---
 
 ## 🏫 Features for Local PTA Units
 
-Local units can create their own website under the VBCPTA umbrella, such as:
+Each unit (school‑level PTA) will have its own site under its division:
 
 ```
-schoolname.vbpta.org
+division.localhost
+unit.division.localhost
 ```
 
-Each unit site includes:
+or in staging:
 
-- A template‑based design with customizable logo, colors, and branding  
-- A unit‑specific calendar for school events, PTA meetings, and fundraisers  
-- Automatic inclusion of unit events in the district‑wide shared calendar  
-- Announcements, event pages, and document storage  
+```
+division.ptaportal.delfraisse.com
+unit.division.ptaportal.delfraisse.com
+```
+
+Unit sites include:
+
+- Customizable logo, colors, and branding  
+- Unit‑specific announcements  
+- Unit‑level event calendar  
+- Automatic inclusion of unit events in the division calendar  
+- Document storage  
 - Optional election tools  
-- Integration with GiveBacks and SignUpGenius (pending API availability)  
-- A simple admin interface for board members and volunteers  
+- Simple admin interface for board members  
+- Year‑to‑year continuity helpers  
+
+---
+
+## Independent PTAs (No Division)
+
+Some PTAs do not belong to a division and report directly to:
+
+- State PTA  
+- National PTA  
+- Or operate independently  
+
+These PTAs can:
+
+- Use the **public tool hub**  
+- Host their own unit site under the portal  
+- Or use their own custom domain  
+
+This is why the **Portal** hosts the tools — so *any* PTA or school group can benefit, even without a division structure.
+
+---
+
+## Domain Structure and Flexibility
+
+To keep things simple and predictable, the platform uses the following domain model:
+
+### **Development Environment**
+```
+https://localhost
+https://division.localhost
+https://unit.localhost
+```
+
+### **Staging Environment**
+```
+https://ptaportal.delfraisse.com
+https://division.ptaportal.delfraisse.com
+https://unit.ptaportal.delfraisse.com
+```
+
+### **Custom Domains**
+Each site (division or unit) may optionally attach a custom domain:
+
+```
+vbpta.org
+luxfordpta.org
+```
+
+However:
+
+> **All sites will always remain accessible via their platform subdomain**  
+> (e.g., `unit.ptaportal.delfraisse.com`),  
+> even when a custom domain is attached.
+
+This ensures:
+
+- Reliable routing  
+- Consistent admin access  
+- No dependency on external DNS  
+- Easier debugging and support  
+
+---
+
+## 🔧 Public Tool Hub (New)
+
+The main portal includes a login system where users can access PTA‑friendly tools such as:
+
+### Available / Planned Tools
+
+- **Bingo Runner**  
+- **Digital Raffle Picker**  
+  - Includes “last pick wins” animation  
+- **Volunteer / Event Helpers**  
+- **Randomized student or ticket selectors**  
+- **Silent auction helpers**  
+- **Future PTA utilities as they are developed**  
 
 ---
 
 ## 🔐 Roles & Permissions
 
-- **Council Admins** – manage the citywide site and oversee unit sites  
-- **Unit Admins** – manage their school’s website, events, and documents  
-- **Board Members** – access to year‑to‑year transition tools  
-- **Volunteers** – limited access for event or content contributions  
-
-A dedicated **Board Admin Section** helps units transition smoothly between school years.
+- **Portal Admins** — manage the entire platform  
+- **Division Admins** — manage division sites and oversee units  
+- **Unit Admins** — manage their school’s website and events  
+- **Board Members** — access continuity and transition tools  
+- **Public Users** — log in to use helper tools  
 
 ---
 
 ## 🗺️ Roadmap
 
-This project is in active development. The following roadmap outlines the planned phases for the Virginia Beach Council of PTAs website platform.
-
-### Phase 1 — Core Council Website (In Progress)
-- Council homepage and announcements  
-- Shared district‑wide calendar  
-- Links to Virginia PTA and National PTA  
-- Awards and recognition listings  
-- Document library  
-- Development hosting at https://vbpta.delfraisse.com  
-
-### Phase 2 — Multi‑Unit Website Engine
-- Subdomain support (schoolname.vbpta.org)  
-- Template‑based unit websites with customizable branding  
-- Unit‑level announcements and event calendars  
-- Automatic inclusion of unit events in the district calendar  
-- Unit admin dashboard and permissions  
-
-### Phase 3 — Board & Continuity Tools
-- Year‑to‑year transition checklists  
-- Officer role management  
-- Document archiving and rollover helpers  
-- Election tools (optional)  
-
-### Phase 4 — Integrations & Engagement Tools
-- SignUpGenius integration (pending API availability)  
-- GiveBacks integration  
-- Optional volunteer/event helper tools  
-
-### Phase 5 — Public Launch
-- Final deployment to https://vbpta.org  
-- Council approval and onboarding of local units  
-- Documentation and support materials  
-
-### Future Enhancements (Exploratory)
-- PTA health dashboard for units  
-- Optional financial tools to complement or replace MoneyMinder  
-- Mobile‑friendly dashboards for board members  
-- Automated reminders for state‑level deadlines  
+*(Roadmap unchanged — still accurate for pre‑code state.)*
 
 ---
 
-## 🤝 Contributing
+# 🛠️ Development Setup (Pre‑Code Upload)
 
-Contributions are welcome and encouraged — and they are **not limited to code**.
-
-This project supports the Virginia Beach Council of PTAs and its local units, so community input is incredibly valuable. Whether you're a developer, a PTA volunteer, a parent, or someone with ideas to improve the platform, your contributions matter.
-
-### Ways to Contribute
-- **Submit ideas** for new features or improvements  
-- **Report issues** such as bugs, typos, or confusing pages  
-- **Suggest enhancements** to usability, accessibility, or design  
-- **Share feedback** on workflows or user experience  
-- **Help refine documentation**  
-- **Contribute code** (new features, fixes, refactoring, etc.)  
-
-### How to Contribute
-1. Go to the **Issues** tab in GitHub  
-2. Create a new issue for:
-   - Ideas  
-   - Feature requests  
-   - Bug reports  
-   - Questions  
-   - Suggestions  
-3. If you're contributing code:
-   - Fork the repository  
-   - Create a feature branch:  
-     `git checkout -b feature/my-improvement`  
-   - Commit your changes with clear messages  
-   - Push the branch:  
-     `git push origin feature/my-improvement`  
-   - Open a Pull Request describing your changes  
-
-Please keep PRs focused and readable.  
-All contributions — big or small — help make this platform better for every PTA unit in Virginia Beach.
-
----
-
-## 🛠️ Development Setup
+The codebase is currently being prepared for upload.  
+This section describes the **intended development workflow** and the behavior of the platform’s **first‑run setup system**.
 
 This project uses:
 
 - **.NET 9**  
 - **Blazor**  
-- **SQL backend**  
-- **Docker** (managed automatically by Aspire)  
-- **.NET Aspire** for local orchestration and developer onboarding  
+- **SQL Server**  
+- **EF Core**  
+- **Passwordless authentication**  
+- **(Coming Soon) Docker via .NET Aspire**  
 
-### Current local setup (tenant host + EF Core)
+---
 
-The active solution projects are:
+## Local Development (Planned)
 
-- `WebApp` (Blazor host/UI)
-- `SiteEngine` (entities, EF Core DbContext, site resolution, scoped services)
+During development, the solution will include:
 
-Local development uses SQL Server LocalDB by default:
+- **WebApp** — Blazor UI  
+- **SiteEngine** — EF Core models, migrations, and site resolution logic  
 
-- `WebApp/appsettings.Development.json` → `ConnectionStrings:DefaultConnection`
-- default DB name: `VbptaWeb_Dev`
+There is **no default database name** and **no preconfigured connection string**.  
+The application does **not** create or connect to a database until the developer provides the connection details.
 
-Create and apply migrations:
+---
 
-```bash
-dotnet ef migrations add InitialCreate --project SiteEngine\SiteEngine.csproj --startup-project WebApp\WebApp.csproj
-dotnet ef database update --project SiteEngine\SiteEngine.csproj --startup-project WebApp\WebApp.csproj
-```
+## First‑Run Setup (SQL Configuration)
 
-Automatic migration trigger marker:
+When the site is launched for the first time:
 
-- Place `run-migration.txt` at `WebApp/wwwroot/run-migration.txt`
-- On startup, the app applies migrations and renames the marker to:
-  - `run-migration.<timestamp>.done` on success
-  - `run-migration.failed.<timestamp>.txt` on failure
+1. The application checks `appsettings.json`  
+2. If `ConnectionStrings:DefaultConnection` is **blank or missing**  
+3. The **SetupSetup** screen automatically appears  
+4. The developer enters SQL Server connection information  
+5. The connection string is saved to configuration  
+6. The database is created  
+7. EF Core migrations are applied automatically  
 
-Passwordless sign-in (email code) setup:
+This ensures:
 
-- Login page: `/login`
-- Logout page: `/logout`
-- Admin page requires both:
-  - admin hostname context
-  - authenticated user session
-- Configure SMTP in `WebApp/appsettings*.json` under `EmailLogin`.
-- If `EmailLogin:SmtpHost` is empty, sign-in codes are logged locally for development.
+- No accidental connections to the wrong SQL instance  
+- No reliance on LocalDB or hard‑coded defaults  
+- A consistent onboarding experience for all developers  
+- A smooth transition to Aspire‑managed SQL containers later  
 
-Initial platform setup and routing:
+Once Aspire is implemented, it will automatically provision and configure the SQL container, replacing the manual setup step.
 
-- If `Sites` is empty, we will use the Admin layout that will show the setup page and get the following information :
-  - admin email
-  - city-wide site name + PTA ID
-  - root/platform domains
-  - SMTP settings
-- Domain routing now resolves from DB-backed `GlobalConfig` and `Sites`:
-  - `admin.<domain>` → admin site (`PtaId = 00000000`)
-  - `<root domain>` → city-wide site (`IsCityWide = true`)
-  - `<sub>.<platform domain>` → site by `Hostname`
-  - custom host match → site by `Domain`
-  - unknown host → city-wide fallback with not-found state
+---
 
-Per-site public asset folders:
+## SMTP & Developer Login Testing (Recommended)
 
-- Site-specific public files are stored under:
-  - `WebApp/wwwroot/site-data/{hostname}/images/`
-- On startup, the app ensures these folders exist for all sites in the `Sites` table.
-- New site creation also ensures folder creation automatically.
-- If site creation uses default logo/banner values, defaults are copied to:
-  - `logo.png`
-  - `banner.png`
+The platform uses **passwordless authentication**, meaning users log in by receiving a one‑time email link.
 
-### Prerequisites
-- .NET 9 SDK  
-- Docker Desktop  
-- Git  
-- VS Code or Visual Studio 2022+  
-- Node.js (optional frontend tooling)  
+During development, the application behaves exactly as it does in production:
 
-### Clone the Repository
-```
-git clone <repo-url>
-cd vbpta.org
-```
+- It sends real passwordless login emails  
+- It uses the configured SMTP server  
+- It expects the developer to click the login link  
 
-### Running the Development Environment
+To avoid sending real emails, developers can run **smtp4dev**, a lightweight local SMTP server that captures outgoing messages for inspection.
 
-This project uses **.NET Aspire** to orchestrate the entire development environment.
+When smtp4dev is running:
 
-Aspire will automatically:
+- The app “thinks” it is sending real emails  
+- smtp4dev receives them instantly  
+- Developers open the email in smtp4dev’s web UI  
+- Click the login link  
+- And authenticate normally  
 
-- Start the SQL database container  
-- Inject connection strings  
-- Manage environment variables  
-- Provide a dashboard to start/stop services  
-- Show logs and health checks  
+This provides a **realistic login flow** without requiring external email services.
 
-To start the full environment:
+smtp4dev will also be added to the Aspire environment once Aspire is configured.
 
-```
-dotnet run --project VBCPTA.AppHost
-```
+**smtp4dev GitHub:**  
+[https://github.com/rnwood/smtp4dev](https://github.com/rnwood/smtp4dev)
 
-Then open the Aspire dashboard (URL shown in console) to:
+---
 
-- View running services  
-- Start/stop the SQL container  
-- Inspect logs  
-- Manage configuration  
+## Testing the Published Version (No IIS Required)
 
-### Database Setup
+A batch file will be included to:
 
-No manual Docker commands are required.  
-Aspire handles:
+- Publish the site  
+- Run the published output locally  
+- Avoid IIS entirely  
 
-- Container creation  
-- Startup  
-- Shutdown  
-- Networking  
-- Environment variables  
+This allows developers to test the **actual published build** exactly as it will run in production.
 
-EF Core migrations can be applied manually if needed:
+---
 
-```
-dotnet ef database update --project VBCPTA.Data
-```
+## 🤝 Contributing
 
-### Project Structure (Proposed)
-```
-/src
-  /VBCPTA.Web           → Blazor UI
-  /VBCPTA.Api           → API endpoints (if separated)
-  /VBCPTA.Data          → EF Core models & migrations
-  /VBCPTA.Core          → Shared logic & services
-  /VBCPTA.AppHost       → Aspire orchestration
-
-/tests
-  /VBCPTA.Tests
-```
-
-### Environment Variables
-
-Create a `.env` file if needed:
-
-```
-SIGNUPGENIUS_API_KEY=<your-key>
-GIVEBACKS_API_KEY=<your-key>
-```
-
-### Hot Reload
-
-```
-dotnet watch --project VBCPTA.Web
-```
+Contributions are welcome once the initial codebase is uploaded.
 
 ---
 

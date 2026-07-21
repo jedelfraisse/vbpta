@@ -20,45 +20,54 @@
         <!-- DESKTOP NAV                                                   -->
         <!-- ============================================================ -->
         <nav class="nav-desktop" aria-label="Primary">
-            <!-- ALWAYS VISIBLE - every role, including Public -->
+            <!-- ALWAYS VISIBLE - every role, including Anonymous -->
             <a class="nav-link" href="/">Home</a>
             <a class="nav-link" href="/unit-sites">Unit Sites</a>
-            <a class="nav-link" href="/tools">Tools</a>
-            <a class="nav-link" href="/about">About</a>
+            <a class="nav-link" href="/portal-tools">Tools</a>
 
-            @if (CurrentRole is null)
-            {
-                <!-- ROLE: Public / Not logged in -->
-                <a class="nav-link nav-cta" href="/login">Login</a>
-            }
-            else
-            {
-                <!-- ROLE: Local Unit Admin (SiteAdmin), Group Admin (DivisionAdmin),
-                     or Global Portal Admin (SuperAdmin) - same structure, data-driven -->
-                <span class="nav-divider" aria-hidden="true"></span>
+            <AuthorizeView>
+                <Authorized>
+                    <span class="nav-divider" aria-hidden="true"></span>
 
-                <a class="nav-link" href="@DashboardHref">@DashboardLabel</a>
+                    <a class="nav-link" href="/dashboard">Dashboard</a>
 
-                <div class="nav-dropdown @(_adminMenuOpen ? "open" : "")">
-                    <button type="button" class="nav-link dropdown-trigger"
-                            aria-haspopup="true"
-                            aria-expanded="@_adminMenuOpen.ToString().ToLowerInvariant()"
-                            @onclick="ToggleAdminMenu">
-                        @AdminMenuLabel
-                        <svg class="chevron" viewBox="0 0 10 6" width="10" height="6" aria-hidden="true">
-                            <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" fill="none" />
-                        </svg>
-                    </button>
-                    <div class="dropdown-panel">
-                        @foreach (var item in AdminItems)
-                        {
-                            <a class="dropdown-item" href="@item.Href">@item.Label</a>
-                        }
-                    </div>
-                </div>
+                    @if (ShowMySites)
+                    {
+                        <a class="nav-link" href="/my-sites">My Unit(s) / My Division(s)</a>
+                    }
 
-                <a class="nav-link nav-logout" href="/logout">Logout</a>
-            }
+                    @if (ShowPortalAdmin)
+                    {
+                        <a class="nav-link" href="/portaladmin">Portal Admin</a>
+                    }
+
+                    @if (ShowAdminDropdown)
+                    {
+                        <div class="nav-dropdown @(_adminMenuOpen ? "open" : "")">
+                            <button type="button" class="nav-link dropdown-trigger"
+                                    aria-haspopup="true"
+                                    aria-expanded="@_adminMenuOpen.ToString().ToLowerInvariant()"
+                                    @onclick="ToggleAdminMenu">
+                                @AdminMenuLabel
+                                <svg class="chevron" viewBox="0 0 10 6" width="10" height="6" aria-hidden="true">
+                                    <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" fill="none" />
+                                </svg>
+                            </button>
+                            <div class="dropdown-panel">
+                                @foreach (var item in AdminItems)
+                                {
+                                    <a class="dropdown-item" href="@item.Href">@item.Label</a>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    <a class="nav-link nav-logout" href="/logout">Logout</a>
+                </Authorized>
+                <NotAuthorized>
+                    <a class="nav-link nav-cta" href="/login">Login</a>
+                </NotAuthorized>
+            </AuthorizeView>
         </nav>
     </div>
 
@@ -81,41 +90,54 @@
     </div>
 
     <nav class="mobile-nav" aria-label="Primary mobile">
-        <!-- ALWAYS VISIBLE - every role, including Public -->
+        <!-- ALWAYS VISIBLE - every role, including Anonymous -->
         <a class="mobile-link" href="/" @onclick="CloseMenus">Home</a>
         <a class="mobile-link" href="/unit-sites" @onclick="CloseMenus">Unit Sites</a>
         <a class="mobile-link" href="/portal-tools" @onclick="CloseMenus">Tools</a>
 
-        @if (CurrentRole is null)
-        {
-            <a class="mobile-link mobile-cta" href="/login" @onclick="CloseMenus">Login</a>
-        }
-        else
-        {
-            <div class="mobile-divider" aria-hidden="true"></div>
+        <AuthorizeView>
+            <Authorized>
+                <div class="mobile-divider" aria-hidden="true"></div>
 
-            <a class="mobile-link" href="@DashboardHref" @onclick="CloseMenus">@DashboardLabel</a>
+                <a class="mobile-link" href="/dashboard" @onclick="CloseMenus">Dashboard</a>
 
-            <button type="button" class="mobile-link mobile-accordion-trigger"
-                    aria-expanded="@_adminMenuOpen.ToString().ToLowerInvariant()"
-                    @onclick="ToggleAdminMenu">
-                @AdminMenuLabel
-                <svg class="chevron @(_adminMenuOpen ? "rotated" : "")" viewBox="0 0 10 6" width="10" height="6" aria-hidden="true">
-                    <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" fill="none" />
-                </svg>
-            </button>
-            @if (_adminMenuOpen)
-            {
-                <div class="mobile-accordion-panel">
-                    @foreach (var item in AdminItems)
+                @if (ShowMySites)
+                {
+                    <a class="mobile-link" href="/my-sites" @onclick="CloseMenus">My Unit(s) / My Division(s)</a>
+                }
+
+                @if (ShowPortalAdmin)
+                {
+                    <a class="mobile-link" href="/portaladmin" @onclick="CloseMenus">Portal Admin</a>
+                }
+
+                @if (ShowAdminDropdown)
+                {
+                    <button type="button" class="mobile-link mobile-accordion-trigger"
+                            aria-expanded="@_adminMenuOpen.ToString().ToLowerInvariant()"
+                            @onclick="ToggleAdminMenu">
+                        @AdminMenuLabel
+                        <svg class="chevron @(_adminMenuOpen ? "rotated" : "")" viewBox="0 0 10 6" width="10" height="6" aria-hidden="true">
+                            <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" fill="none" />
+                        </svg>
+                    </button>
+                    @if (_adminMenuOpen)
                     {
-                        <a class="mobile-sublink" href="@item.Href" @onclick="CloseMenus">@item.Label</a>
+                        <div class="mobile-accordion-panel">
+                            @foreach (var item in AdminItems)
+                            {
+                                <a class="mobile-sublink" href="@item.Href" @onclick="CloseMenus">@item.Label</a>
+                            }
+                        </div>
                     }
-                </div>
-            }
+                }
 
-            <a class="mobile-link mobile-logout" href="/logout" @onclick="CloseMenus">Logout</a>
-        }
+                <a class="mobile-link mobile-logout" href="/logout" @onclick="CloseMenus">Logout</a>
+            </Authorized>
+            <NotAuthorized>
+                <a class="mobile-link mobile-cta" href="/login" @onclick="CloseMenus">Login</a>
+            </NotAuthorized>
+        </AuthorizeView>
     </nav>
 </aside>
 
@@ -123,7 +145,12 @@
     // ------------------------------------------------------------------
     // ROLE WIRING NOTES
     //
-    // CurrentRole is the signed-in user's role *for the site/scope
+    // <AuthorizeView> drives the Anonymous vs. Authenticated split (Login
+    // vs. Dashboard/Logout), matching the pattern used in UnitLayout and
+    // DivisionLayout.
+    //
+    // CurrentRole is a placeholder signal for which of the finer-grained
+    // modes in CLAUDE.md an authenticated user is in *for the site/scope
     // currently in view*. Roles live per-site (SiteUserRole.SiteId +
     // SiteUserRole.Role), so a single global [Authorize(Roles = "...")]
     // claim can't answer "what should this bar show" on its own - resolve
@@ -133,17 +160,13 @@
     //
     //   <TopNavBar CurrentRole="@CurrentPortalRole" />
     //
-    // Mapping applied in this component:
-    //   null                    -> Public / Not logged in
-    //   SiteRole.SiteAdmin      -> Local Unit Admin
-    //   SiteRole.DivisionAdmin  -> Group Admin (city/council tier, optional)
-    //   SiteRole.SuperAdmin     -> Global Portal Admin
-    //
-    // If you'd rather drive this purely off ASP.NET Core authorization
-    // instead of a parameter, replace the @if (CurrentRole is null) checks
-    // above with nested <AuthorizeView Roles="SiteAdmin"> / "DivisionAdmin"
-    // / "SuperAdmin"> blocks - the markup shape (Dashboard link, dropdown,
-    // Logout) stays identical either way.
+    // Mapping applied in this component (see CLAUDE.md section 3):
+    //   null                    -> Anonymous (handled by AuthorizeView, not CurrentRole)
+    //   SiteRole.Viewer         -> Authenticated, no membership ("Guest")
+    //   SiteRole.Member/Officer -> Member
+    //   SiteRole.SiteAdmin      -> Unit Admin
+    //   SiteRole.DivisionAdmin  -> Division Admin
+    //   SiteRole.SuperAdmin     -> SuperAdmin (Portal Admin + Global Admin)
     // ------------------------------------------------------------------
 
     [Parameter]
@@ -152,58 +175,50 @@
     private bool _mobileMenuOpen;
     private bool _adminMenuOpen;
 
-    private string DashboardLabel => CurrentRole switch
-    {
-        SiteRole.SuperAdmin => "Portal Dashboard",
-        SiteRole.DivisionAdmin => "Group Dashboard",
-        SiteRole.SiteAdmin => "My Unit Dashboard",
-        _ => "Home"
-    };
+    private bool ShowMySites => CurrentRole is SiteRole.Member or SiteRole.Officer
+        or SiteRole.SiteAdmin or SiteRole.DivisionAdmin;
 
-    private string DashboardHref => CurrentRole switch
-    {
-        SiteRole.SuperAdmin => "/globaladmin",
-        SiteRole.DivisionAdmin => "/groupadmin",
-        SiteRole.SiteAdmin => "/unitadmin",
-        _ => "/"
-    };
+    private bool ShowPortalAdmin => CurrentRole == SiteRole.SuperAdmin;
+
+    private bool ShowAdminDropdown => CurrentRole is SiteRole.SiteAdmin
+        or SiteRole.DivisionAdmin or SiteRole.SuperAdmin;
 
     private string AdminMenuLabel => CurrentRole switch
     {
-        SiteRole.SuperAdmin => "Manage Portal",
-        SiteRole.DivisionAdmin => "Manage Group",
-        SiteRole.SiteAdmin => "Manage Unit",
+        SiteRole.SuperAdmin => "Global Admin",
+        SiteRole.DivisionAdmin => "Division Admin",
+        SiteRole.SiteAdmin => "Unit Admin",
         _ => "Manage"
     };
 
-    // Local Unit Admin and Group Admin render through this SAME dropdown
-    // markup - only the item list differs. Group Admin's list is the Local
-    // Unit list's shape plus "Manage Local Units" for its child units.
+    // Unit Admin, Division Admin, and Global Admin render through this SAME
+    // dropdown markup - only the item list differs, and only one of the
+    // three can be active for a given CurrentRole.
     private IReadOnlyList<(string Label, string Href)> AdminItems => CurrentRole switch
     {
-        SiteRole.SiteAdmin => LocalUnitAdminItems,
-        SiteRole.DivisionAdmin => GroupAdminItems,
+        SiteRole.SiteAdmin => UnitAdminItems,
+        SiteRole.DivisionAdmin => DivisionAdminItems,
         SiteRole.SuperAdmin => GlobalAdminItems,
         _ => Array.Empty<(string, string)>()
     };
 
-    private static readonly (string Label, string Href)[] LocalUnitAdminItems =
+    private static readonly (string Label, string Href)[] UnitAdminItems =
     {
         ("Unit Settings", "/unitadmin/settings"),
         ("Unit Admins", "/unitadmin/admins"),
         ("Site Status", "/unitadmin/site-status"),
     };
 
-    private static readonly (string Label, string Href)[] GroupAdminItems =
+    private static readonly (string Label, string Href)[] DivisionAdminItems =
     {
-        ("Manage Local Units", "/groupadmin/units"), // extra item unique to Group Admin
-        ("Group Settings", "/groupadmin/settings"),
-        ("Group Admins", "/groupadmin/admins"),
+        ("Manage Local Units", "/divisionadmin/units"), // extra item unique to Division Admin
+        ("Division Settings", "/divisionadmin/settings"),
+        ("Division Admins", "/divisionadmin/admins"),
     };
 
     private static readonly (string Label, string Href)[] GlobalAdminItems =
     {
-        ("All Groups", "/globaladmin/groups"),
+        ("All Divisions", "/globaladmin/divisions"),
         ("All Units", "/globaladmin/units"),
         ("Users & Roles", "/globaladmin/users"),
         ("Portal Settings", "/globaladmin/settings"),

@@ -1,47 +1,149 @@
-﻿<div class="home-container">
-    <h1>Welcome to the Central Portal</h1>
+@* Loaded by SharedPages/Home.razor when SiteContext.CurrentSite.SiteType == SiteType.Portal *@
 
-    <p>
-        This portal provides a unified place for community groups, councils, and local units 
-        to organize their online presence. Whether you're managing a city-level group or a 
-        single local unit, this system helps you create and maintain your site with ease.
-    </p>
+<div class="home-container container py-4">
 
-    <h2>How This Portal Works</h2>
-    <p>
-        The platform supports three levels of organization:
-    </p>
+    <!-- ============================================================ -->
+    <!-- HERO                                                          -->
+    <!-- ============================================================ -->
+    <section class="hero text-center mb-5">
+        <h1 class="display-5 fw-bold">Welcome to the Central Portal</h1>
+        <p class="lead col-lg-8 mx-auto">
+            A shared home for PTA groups, school organizations, booster clubs, councils,
+            and community groups to build their online presence, connect with the people
+            they serve, and share tools with one another.
+        </p>
 
-    <ul>
-        <li>
-            <strong>Global Portal Level</strong> – Oversees the entire system, manages settings, 
-            and maintains all groups and units.
-        </li>
-        <li>
-            <strong>Group Level (City or Regional Councils)</strong> – Groups can manage their 
-            own site and optionally oversee multiple local units within their area.
-        </li>
-        <li>
-            <strong>Local Unit Level</strong> – Individual units can create and manage their 
-            own site, even if no group exists above them.
-        </li>
-    </ul>
+        <div class="d-flex flex-wrap justify-content-center gap-2 mt-4">
+            <a class="btn btn-primary btn-lg" href="/unit-sites">Browse Unit Sites</a>
+            <a class="btn btn-outline-primary btn-lg" href="/portal-tools">Explore Tools</a>
 
-    <p>
-        This flexible structure allows units to operate independently or as part of a larger group.
-    </p>
+            <AuthorizeView>
+                <Authorized>
+                    <a class="btn btn-success btn-lg" href="/dashboard">Go to Dashboard</a>
+                </Authorized>
+                <NotAuthorized>
+                    <a class="btn btn-outline-secondary btn-lg" href="/login">Login</a>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+    </section>
 
-    <h2>Tools and Resources</h2>
-    <p>
-        The portal includes a collection of helpful tools designed for one-time or casual use. 
-        These tools do not require creating a site or signing in, making them accessible to everyone.
-    </p>
+    <!-- ============================================================ -->
+    <!-- WHAT THIS PLATFORM IS                                         -->
+    <!-- ============================================================ -->
+    <section class="mb-5">
+        <h2>One Platform, Many Communities</h2>
+        <p>
+            Every organization here is different — a citywide council, a single school's
+            booster club, a neighborhood association — but they all need the same basics:
+            a place to share news, welcome new members, and keep their community organized.
+            This portal brings those groups together under one roof, while still giving each
+            one its own space, its own look, and its own voice.
+        </p>
+    </section>
 
-    <h2>Explore the Portal</h2>
-    <p>
-        Use the navigation above to browse unit sites, access tools, learn more about the system, 
-        or sign in to manage your own site.
-    </p>
+    <!-- ============================================================ -->
+    <!-- HOW IT'S ORGANIZED                                            -->
+    <!-- ============================================================ -->
+    <section class="mb-5">
+        <h2>How It's Organized</h2>
+        <p>
+            The portal follows a simple two-level structure. A <strong>Division</strong> is a
+            larger organizing body — often a city, regional, or district-level council — and
+            each Division can be home to many <strong>Local Units</strong>, the individual
+            groups doing the day-to-day work in their own community.
+        </p>
+        <p>
+            Local Units can also stand on their own without belonging to a Division at all.
+            Either way, every site in the portal fits somewhere in this same familiar shape:
+        </p>
+        <p class="fw-semibold text-center">
+            Central Portal &rarr; Divisions &rarr; Local Units
+        </p>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- WHAT VISITORS / REGISTERED USERS CAN DO                       -->
+    <!-- ============================================================ -->
+    <section class="mb-5">
+        <h2>What You Can Do Here</h2>
+
+        <div class="row g-4 mt-1">
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h3 class="h5 card-title">Just Visiting</h3>
+                        <p class="card-text text-muted">
+                            You don't need an account to start exploring:
+                        </p>
+                        <ul>
+                            <li>Browse Divisions and Local Units</li>
+                            <li>Explore each site's public information</li>
+                            <li>Learn about the tools available on the portal</li>
+                            <li>Understand how membership works before you join</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h3 class="h5 card-title">Once You're Signed In</h3>
+                        <p class="card-text text-muted">
+                            Creating an account opens up a lot more:
+                        </p>
+                        <ul>
+                            <li>Apply for a Division or Local Unit site</li>
+                            <li>Access member-only content for your groups</li>
+                            <li>Use tools built for members and admins</li>
+                            <li>Manage your memberships in one place</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- DASHBOARD (AUTHENTICATED ONLY)                                -->
+    <!-- ============================================================ -->
+    <AuthorizeView>
+        <Authorized>
+            <section class="mb-5">
+                <h2>Your Dashboard</h2>
+                <p>
+                    Your Dashboard is your personal starting point on the portal. It brings
+                    together your memberships, any applications you've submitted, and the
+                    unit and Division sites you've recently visited — so you always know
+                    where things stand across every group you're part of.
+                </p>
+                <a class="btn btn-success" href="/dashboard">Go to Dashboard</a>
+            </section>
+        </Authorized>
+    </AuthorizeView>
+
+    <!-- ============================================================ -->
+    <!-- CLOSING CTA                                                   -->
+    <!-- ============================================================ -->
+    <section class="text-center">
+        <h2>Ready to Explore?</h2>
+        <p class="col-lg-6 mx-auto">
+            Start by browsing the Divisions and Local Units already on the portal, or take
+            a look at the tools available to help your own group get organized.
+        </p>
+        <div class="d-flex flex-wrap justify-content-center gap-2">
+            <a class="btn btn-primary" href="/unit-sites">Browse Unit Sites</a>
+            <a class="btn btn-outline-primary" href="/portal-tools">Explore Tools</a>
+
+            <AuthorizeView>
+                <NotAuthorized>
+                    <a class="btn btn-outline-secondary" href="/login">Login</a>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+    </section>
+
 </div>
 
 @code {

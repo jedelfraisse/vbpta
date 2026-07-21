@@ -1,0 +1,37 @@
+@page "/portal-tools"
+
+<div class="container">
+    <h1>Tools</h1>
+    <p class="lead">Tools available in VBPTA Portal</p>
+
+    <div class="row g-3">
+        @foreach (var tool in _placeholderTools)
+        {
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="@tool.IconClass" aria-hidden="true"></i>
+                            @tool.Name
+                        </h5>
+                        <p class="card-text text-muted">@tool.Description</p>
+                        <span class="badge text-bg-secondary">@tool.Scope</span>
+                        <span class="badge text-bg-light border">@tool.AccessLevel</span>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private readonly List<PlaceholderTool> _placeholderTools = new()
+    {
+        new("GiveBacks Membership Import Tool", "Import member emails from a GiveBacks CSV export.", "LocalUnit", "Admin", "fa-solid fa-file-import"),
+        new("Bingo Caller", "Call numbers for in-person bingo events.", "LocalUnit", "Member", "fa-solid fa-dice"),
+        new("Newsletter Builder", "Draft and send unit newsletters.", "Division", "Member", "fa-solid fa-newspaper"),
+        new("Event Calendar", "Browse upcoming portal-wide events.", "Portal", "Public", "fa-solid fa-calendar-days"),
+    };
+
+    private record PlaceholderTool(string Name, string Description, string Scope, string AccessLevel, string IconClass);
+}

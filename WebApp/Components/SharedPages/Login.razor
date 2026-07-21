@@ -4,41 +4,63 @@
 
 <PageTitle>Sign in</PageTitle>
 
-<h1>Sign in</h1>
+<div class="d-flex justify-content-center align-items-center" style="min-height: 70vh;">
+    <div class="card shadow-sm p-4" style="width: 100%; max-width: 420px;">
 
-<div class="home-container">
-    <p>Use your email address and one-time code.</p>
+        <div class="text-center mb-4">
+            <div class="gateway-logo"></div>
 
-    <div>
-        <label for="email">Email</label><br />
-        <input id="email" @bind="_email" />
-    </div>
-
-    @if (!_codeSent)
-    {
-        <button @onclick="SendCodeAsync">Send code</button>
-    }
-    else
-    {
-        <div>
-            <label for="code">Code</label><br />
-            <input id="code" @bind="_code" />
+<style>
+.gateway-logo {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    #ffffff 0%,
+    #a3d5a3 40%,
+    #4caf50 100%);
+  box-shadow: 0 0 8px rgba(0,0,0,0.2);
+}
+</style>
+            <h3 class="mt-3">Sign in</h3>
+            <p class="text-muted">Use your email address to receive a one‑time code.</p>
         </div>
-        <button @onclick="VerifyCodeAsync">Sign in</button>
-    }
 
-    @if (!string.IsNullOrWhiteSpace(_statusMessage))
-    {
-        <p>@_statusMessage</p>
-    }
+        <div class="mb-3">
+            <label for="email" class="form-label">Email address</label>
+            <input id="email" type="email" class="form-control" @bind="_email" placeholder="you@example.com" />
+        </div>
+
+        @if (!_codeSent)
+        {
+            <button class="btn btn-primary w-100" @onclick="SendCodeAsync">
+                Send sign‑in code
+            </button>
+        }
+        else
+        {
+            <div class="mb-3 mt-4">
+                <label for="code" class="form-label">One‑time code</label>
+                <input id="code" type="text" class="form-control" @bind="_code" placeholder="123456" />
+            </div>
+
+            <button class="btn btn-success w-100" @onclick="VerifyCodeAsync">
+                Sign in
+            </button>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(_statusMessage))
+        {
+            <div class="alert alert-info mt-3">
+                @_statusMessage
+            </div>
+        }
+    </div>
 </div>
 
 @code {
-    [SupplyParameterFromQuery]
-    public string? ReturnUrl { get; set; }
-
-    [SupplyParameterFromQuery]
-    public string? Error { get; set; }
+    [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
+    [SupplyParameterFromQuery] public string? Error { get; set; }
 
     private string _email = string.Empty;
     private string _code = string.Empty;
@@ -48,34 +70,35 @@
     protected override void OnParametersSet()
     {
         if (!string.IsNullOrWhiteSpace(Error))
-        {
             _statusMessage = Error;
+    }
+
+    private async Task SendCodeAsync()
+    {
+        try
+        {
+            await PasswordlessSignInService.RequestCodeAsync(_email);
+            _codeSent = true;
+
+            // SAFE, NON‑ENUMERATING MESSAGE
+            _statusMessage = "If your email is in our system, a sign‑in code has been sent.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            _statusMessage = ex.Message;
         }
     }
-
-private async Task SendCodeAsync()
-{
-    try
-    {
-        await PasswordlessSignInService.RequestCodeAsync(_email);
-        _codeSent = true;
-        _statusMessage = "A sign-in code was sent.";
-    }
-    catch (InvalidOperationException ex)
-    {
-        _statusMessage = ex.Message;
-    }
-}
-
 
     private Task VerifyCodeAsync()
     {
         var encodedEmail = Uri.EscapeDataString(_email ?? string.Empty);
         var encodedCode = Uri.EscapeDataString(_code ?? string.Empty);
         var encodedReturnUrl = Uri.EscapeDataString(ReturnUrl ?? "/");
+
         NavigationManager.NavigateTo(
             $"/auth/passwordless/complete?email={encodedEmail}&code={encodedCode}&returnUrl={encodedReturnUrl}",
             forceLoad: true);
+
         return Task.CompletedTask;
     }
 }

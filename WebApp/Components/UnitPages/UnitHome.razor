@@ -1,0 +1,13 @@
+﻿<section class="unit-home-card">
+    <h2>@UnitId</h2>
+    <p>Welcome to your local unit page.</p>
+    <p>Announcements, events, and local details for this unit will appear here.</p>
+</section>
+
+
+
+@code {
+    [Parameter]
+    [EditorRequired]
+    public Guid UnitId { get; set; }
+}

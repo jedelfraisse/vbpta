@@ -1,0 +1,383 @@
+.topbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: #ffffff;
+    border-bottom: 1px solid #e5e7eb;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.topbar-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1.25rem;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+/* ---------- Brand / logo ---------- */
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    text-decoration: none;
+    color: #1f2937;
+    font-weight: 700;
+    font-size: 1.05rem;
+    flex-shrink: 0;
+    margin-right: auto;
+}
+
+.gateway-logo {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #ffffff 0%, #a3d5a3 40%, #4caf50 100%);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.15);
+    transition: width .2s ease, height .2s ease;
+}
+
+.gateway-logo-sm {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+}
+
+.brand-text {
+    white-space: nowrap;
+}
+
+/* ---------- Desktop nav ---------- */
+.nav-desktop {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.6rem 0.85rem;
+    border-radius: 8px;
+    color: #374151;
+    text-decoration: none;
+    font-size: 0.95rem;
+    font-weight: 500;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color .15s ease, color .15s ease;
+}
+
+.nav-link:hover,
+.nav-link:focus-visible {
+    background: #f3f4f6;
+    color: #15803d;
+}
+
+.nav-link:focus-visible {
+    outline: 2px solid #2f9e44;
+    outline-offset: 2px;
+}
+
+.nav-cta {
+    background: #2f9e44;
+    color: #ffffff;
+    margin-left: 0.25rem;
+}
+
+.nav-cta:hover,
+.nav-cta:focus-visible {
+    background: #26833a;
+    color: #ffffff;
+}
+
+.nav-divider {
+    width: 1px;
+    align-self: stretch;
+    margin: 0.5rem 0.35rem;
+    background: #e5e7eb;
+}
+
+.nav-logout {
+    color: #6b7280;
+    border: 1px solid #e5e7eb;
+}
+
+.nav-logout:hover,
+.nav-logout:focus-visible {
+    background: #f9fafb;
+    color: #374151;
+}
+
+.chevron {
+    transition: transform .15s ease;
+}
+
+.nav-dropdown.open .chevron,
+.chevron.rotated {
+    transform: rotate(180deg);
+}
+
+/* ---------- Admin dropdown ---------- */
+.nav-dropdown {
+    position: relative;
+}
+
+.dropdown-panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 240px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.18);
+    padding: 0.4rem;
+    display: none;
+    flex-direction: column;
+    gap: 2px;
+    z-index: 50;
+}
+
+.nav-dropdown.open .dropdown-panel {
+    display: flex;
+}
+
+.dropdown-item {
+    padding: 0.6rem 0.75rem;
+    border-radius: 6px;
+    color: #374151;
+    text-decoration: none;
+    font-size: 0.9rem;
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus-visible {
+    background: #eaf7ec;
+    color: #15803d;
+}
+
+.dropdown-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    background: transparent;
+}
+
+/* ---------- Hamburger (mobile trigger) ---------- */
+.hamburger {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    width: 44px;
+    height: 44px;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.hamburger:hover,
+.hamburger:focus-visible {
+    background: #f3f4f6;
+}
+
+.hamburger span {
+    display: block;
+    height: 2px;
+    width: 22px;
+    margin: 0 auto;
+    background: #374151;
+    border-radius: 2px;
+}
+
+/* ---------- Mobile slide-out panel ---------- */
+.mobile-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s ease;
+    z-index: 45;
+}
+
+.mobile-overlay.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.mobile-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(85vw, 320px);
+    background: #ffffff;
+    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.15);
+    transform: translateX(100%);
+    transition: transform .25s ease;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.mobile-panel.open {
+    transform: translateX(0);
+}
+
+.mobile-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.mobile-panel-header .brand-text {
+    font-weight: 700;
+    color: #1f2937;
+    margin-right: auto;
+}
+
+.mobile-close {
+    border: none;
+    background: transparent;
+    font-size: 1.5rem;
+    line-height: 1;
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+    cursor: pointer;
+    color: #6b7280;
+}
+
+.mobile-close:hover,
+.mobile-close:focus-visible {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.mobile-nav {
+    display: flex;
+    flex-direction: column;
+    padding: 0.75rem;
+    gap: 2px;
+}
+
+.mobile-divider {
+    height: 1px;
+    background: #e5e7eb;
+    margin: 0.5rem 0.25rem;
+}
+
+.mobile-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.9rem 1rem;
+    min-height: 48px;
+    border-radius: 10px;
+    color: #374151;
+    text-decoration: none;
+    font-size: 1rem;
+    font-weight: 500;
+    border: none;
+    background: transparent;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+}
+
+.mobile-link:hover,
+.mobile-link:focus-visible {
+    background: #f3f4f6;
+}
+
+.mobile-cta {
+    background: #2f9e44;
+    color: #ffffff;
+    justify-content: center;
+    margin-top: 0.5rem;
+}
+
+.mobile-cta:hover,
+.mobile-cta:focus-visible {
+    background: #26833a;
+    color: #ffffff;
+}
+
+.mobile-logout {
+    color: #6b7280;
+    border-top: 1px solid #e5e7eb;
+    margin-top: 0.5rem;
+    border-radius: 0;
+    padding-top: 1rem;
+}
+
+.mobile-accordion-panel {
+    display: flex;
+    flex-direction: column;
+    padding-left: 0.75rem;
+    margin: 2px 0 6px;
+    border-left: 2px solid #eaf7ec;
+}
+
+.mobile-sublink {
+    padding: 0.75rem 1rem;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    border-radius: 8px;
+    color: #4b5563;
+    text-decoration: none;
+    font-size: 0.95rem;
+}
+
+.mobile-sublink:hover,
+.mobile-sublink:focus-visible {
+    background: #f3f4f6;
+    color: #15803d;
+}
+
+/* ---------- Breakpoint: collapse to mobile ---------- */
+@media (max-width: 768px) {
+    .nav-desktop {
+        display: none;
+    }
+
+    .hamburger {
+        display: flex;
+    }
+
+    .topbar-inner {
+        padding: 0 1rem;
+        height: 56px;
+    }
+
+    .gateway-logo {
+        width: 34px;
+        height: 34px;
+        min-width: 34px;
+    }
+
+    .brand-text {
+        font-size: 0.95rem;
+    }
+}
+
+@media (min-width: 769px) {
+    .mobile-overlay,
+    .mobile-panel {
+        display: none;
+    }
+}

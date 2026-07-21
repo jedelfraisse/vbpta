@@ -1,0 +1,283 @@
+﻿/* ------------------------------------------------------------
+   Layout
+------------------------------------------------------------ */
+
+.setup-page {
+    max-width: 900px;
+    margin: 3rem auto;
+    padding: 2rem;
+    font-family: system-ui, sans-serif;
+    color: #333;
+}
+
+.setup-header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+}
+
+    .setup-header h1 {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: .5rem;
+    }
+
+.setup-muted {
+    color: #666;
+    font-size: .95rem;
+}
+
+/* ------------------------------------------------------------
+   Step Headings
+------------------------------------------------------------ */
+
+h2 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: #2a3f8f;
+}
+
+/* ------------------------------------------------------------
+   Instructions Box
+------------------------------------------------------------ */
+
+.setup-instructions {
+    background: #f7f9ff;
+    border: 1px solid #d9e2ff;
+    padding: 1.5rem;
+    border-radius: 10px;
+    margin-bottom: 2rem;
+}
+
+    .setup-instructions h2 {
+        margin-top: 0;
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #2a3f8f;
+    }
+
+    .setup-instructions ol {
+        margin: 0;
+        padding-left: 1.25rem;
+        color: #333;
+    }
+
+    .setup-instructions li {
+        margin-bottom: .5rem;
+        line-height: 1.4;
+    }
+
+.setup-note {
+    margin-top: 1rem;
+    font-size: .9rem;
+    color: #555;
+    font-style: italic;
+}
+
+.restart-note {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #fff8e1;
+    border: 1px solid #ffe082;
+    border-radius: 8px;
+    color: #8a6d1d;
+    font-size: .9rem;
+    line-height: 1.4;
+}
+
+/* ------------------------------------------------------------
+   Setup Groups
+------------------------------------------------------------ */
+
+.setup-group {
+    background: #fff;
+    padding: 1.75rem;
+    margin-bottom: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    border: 1px solid #e5e5e5;
+}
+
+    .setup-group h3 {
+        margin-top: 0;
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin-bottom: .5rem;
+    }
+
+.setup-help {
+    margin-top: 0;
+    margin-bottom: 1.25rem;
+    color: #777;
+    font-size: .9rem;
+}
+
+/* ------------------------------------------------------------
+   Form Grid
+------------------------------------------------------------ */
+
+.group-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 1.25rem;
+}
+
+label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: .35rem;
+    font-size: .9rem;
+}
+
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="number"] {
+    width: 100%;
+    padding: .55rem .75rem;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-size: .95rem;
+    transition: border-color .2s;
+}
+
+input:focus {
+    outline: none;
+    border-color: #3366ff;
+    box-shadow: 0 0 0 2px rgba(51,102,255,0.15);
+}
+
+.checkbox-field {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin-top: .5rem;
+}
+
+/* ------------------------------------------------------------
+   Buttons
+------------------------------------------------------------ */
+
+button {
+    background: #3366ff;
+    color: white;
+    padding: .65rem 1.25rem;
+    border: none;
+    border-radius: 8px;
+    font-size: .95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .2s;
+}
+
+    button:hover:not([disabled]) {
+        background: #2554d6;
+    }
+
+    button[disabled] {
+        opacity: .6;
+        cursor: not-allowed;
+    }
+
+.secondary-button {
+    background: transparent;
+    color: #3366ff;
+    border: 1px solid #3366ff;
+    margin-left: .75rem;
+}
+
+    .secondary-button:hover:not([disabled]) {
+        background: #f0f4ff;
+    }
+
+/* ------------------------------------------------------------
+   Final Launch Button (🚀)
+------------------------------------------------------------ */
+
+.launch-button {
+    background: #28a745;
+    padding: 0.85rem 2rem;
+    font-size: 1.1rem;
+    border-radius: 10px;
+    margin-top: 1.5rem;
+}
+
+    .launch-button:hover {
+        background: #1e7e34;
+    }
+
+/* ------------------------------------------------------------
+   Final Launch Section
+------------------------------------------------------------ */
+
+.final-launch {
+    text-align: center;
+    margin-top: 3rem;
+    padding: 2rem;
+    background: #f0f7ff;
+    border: 1px solid #d0e3ff;
+    border-radius: 12px;
+}
+
+    .final-launch h2 {
+        font-size: 1.8rem;
+        margin-bottom: .75rem;
+        color: #1f3d8f;
+    }
+
+    .final-launch p {
+        font-size: 1rem;
+        color: #444;
+    }
+
+/* ------------------------------------------------------------
+   Status Text
+------------------------------------------------------------ */
+
+.success-text {
+    color: #0a7a0a;
+    font-weight: 600;
+    margin-top: .75rem;
+}
+
+.error-text {
+    color: #c62828;
+    font-weight: 600;
+    margin-top: .75rem;
+}
+
+/* ------------------------------------------------------------
+   Spinner
+------------------------------------------------------------ */
+
+.spinner-container,
+.restart-wait {
+    display: flex;
+    justify-content: center;
+    margin-top: 2rem;
+}
+
+.spinner {
+    width: 48px;
+    height: 48px;
+    border: 5px solid #ccc;
+    border-top-color: #3366ff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+
+.group-grid.two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr !important; /* exactly two columns */
+    grid-auto-rows: auto; /* rows grow as needed */
+    gap: 1.25rem 1.5rem;
+    margin-bottom: 1.25rem;
+}

@@ -1,7 +1,5 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
-using SiteEngine.Sites;
-using WebApp.Authentication;
 
 namespace WebApp.Components.Layout;
 
@@ -9,9 +7,6 @@ public abstract class SiteLayoutBase : LayoutComponentBase
 {
     [Inject]
     protected NavigationManager NavigationManager { get; set; } = default!;
-
-    [Inject]
-    protected ISiteContext SiteContext { get; set; } = default!;
 
     [Inject]
     protected AuthenticationStateProvider AuthenticationStateProvider { get; set; } = default!;
@@ -35,8 +30,6 @@ public abstract class SiteLayoutBase : LayoutComponentBase
         }
 
         var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        IsGlobalAdmin = await SiteContext.UserHasGlobalAdminRoleAsync(userId);
-        ShowAdminLink = await SiteContext.UserHasSiteAdminAccessAsync(userId);
 
         var email = user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
             ?? user.Identity?.Name;

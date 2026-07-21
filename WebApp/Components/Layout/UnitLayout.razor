@@ -1,0 +1,42 @@
+@inherits SiteLayoutBase
+
+@code {
+    protected override async Task OnParametersSetAsync()
+    {
+        await RefreshUserStateAsync();
+    }
+}
+
+<div class="layout-shell local-shell">
+    <header class="page-header" role="banner">
+        <div class="brand-block">
+            <img class="site-logo" src="SiteConfig.LogoUrl" alt="SiteConfig.SiteName logo" />
+            <div>
+                <div class="site-kicker">Local Unit</div>
+                <h1>SiteConfig.SiteName</h1>
+            </div>
+        </div>
+        <nav>
+            <a href="/">Home</a>
+            <span> | </span><a href="/announcements">Announcements</a>
+            @if (ShowAdminLink)
+            {
+                <span> | </span><a href="/admin">Admin</a>
+            }
+            <AuthorizeView>
+                <Authorized>
+                    <span> | </span><a href="/logout">Logout</a>
+                </Authorized>
+                <NotAuthorized>
+                    <span> | </span><a href="/login">Login</a>
+                </NotAuthorized>
+            </AuthorizeView>
+        </nav>
+    </header>
+
+    <img class="banner-image" src="SiteConfig.BannerUrl" alt="" />
+
+    <main class="layout-body">
+        @Body
+    </main>
+</div>

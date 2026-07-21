@@ -1,18 +1,40 @@
 @* Helper component for {fullbox boardlist} *@
 
-<h2>Our Board</h2>
-
-@foreach (var member in Board)
+@if (string.IsNullOrWhiteSpace(Title))
 {
-    <p><strong>@member.Name</strong> — @member.Role</p>
+    <h2>Our Board</h2>
+}
+
+@if (!string.IsNullOrWhiteSpace(RawContent))
+{
+    <!-- If content was provided inside the block, show it -->
+    <div class="board-custom-content">
+        @((MarkupString)RawContent)
+    </div>
+}
+else
+{
+    <!-- Default board listing -->
+    @foreach (var member in Board)
+    {
+        <p><strong>@member.Name</strong> — @member.Role</p>
+    }
 }
 
 @code {
+    [Parameter] public string RawContent { get; set; } = "";
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public Dictionary<string, string> Parameters { get; set; } = new();
+
     private List<BoardMember> Board = new()
     {
-        new BoardMember { Name = "Jane Smith", Role = "President" },
-        new BoardMember { Name = "Mark Johnson", Role = "Vice President" },
-        new BoardMember { Name = "Emily Davis", Role = "Treasurer" }
+        new BoardMember { Name = "Jessica B.", Role = "President" },
+        new BoardMember { Name = "Tara C.", Role = "Vice President of Communications" },
+        new BoardMember { Name = "Karen M.", Role = "Vice President of Programs" },
+        new BoardMember { Name = "Jean G.", Role = "Vice President of Compliance" },
+        new BoardMember { Name = "Geraldine E.", Role = "Vice President of Membership" },
+        new BoardMember { Name = "Tamara A.", Role = "Secretary" },
+        new BoardMember { Name = "Myeron S.", Role = "Treasurer" }
     };
 
     public class BoardMember

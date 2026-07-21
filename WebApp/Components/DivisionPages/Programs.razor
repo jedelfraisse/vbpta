@@ -1,0 +1,247 @@
+﻿@page "/cityprograms"
+@page "/cityprograms/{reqprogramFolder}"
+@page "/cityprograms/{reqprogramFolder}/{reqprogramName}"
+@inject NavigationManager NavigationManager
+
+
+<h1 style="text-align: center;">Programs</h1>
+
+@if (!_initialized)
+{
+    <p>Loading...</p>
+}
+@* else if (!SiteContext.IsCityContext)
+{
+    <Only />
+} *@
+else
+{
+    <!-- Tabs Bar (FULL WIDTH background) -->
+    <div class="container-fluid border-bottom position-relative">
+
+        <!-- Centered Tabs -->
+        <div class="d-flex justify-content-center">
+            <ul class="nav nav-tabs pt-2">
+                @foreach (var folder in programFolders)
+                {
+                    var isActive = string.Equals(reqprogramFolder, folder.folderSlug, StringComparison.OrdinalIgnoreCase);
+
+                    <li class="nav-item">
+                        <a class="nav-link @(isActive ? "active" : "")"
+                           href="/cityprograms/@folder.folderSlug">
+                            @folder.folderName
+                        </a>
+                    </li>
+                }
+            </ul>
+        </div>
+
+    </div>
+
+
+    <div class="container-fluid">
+        <div class="row">
+
+            <!-- Sidebar -->
+            <nav class="col-md-3 col-lg-2 bg-light border-end border-top min-vh-100">
+                <ul class="nav flex-column mt-3 px-2">
+                    @if (selectedFolder != null)
+                    {
+                        foreach (var program in selectedFolder.theprograms)
+                        {
+                            var isActiveProgram = string.Equals(reqprogramName, program.programSlug, StringComparison.OrdinalIgnoreCase);
+
+                            <li class="nav-item">
+                                <a class="nav-link @(isActiveProgram ? "active" : "")"
+                                   href="/cityprograms/@selectedFolder.folderSlug/@program.programSlug">
+                                    @program.programName
+                                </a>
+                            </li>
+                        }
+                    }
+                </ul>
+            </nav>
+
+            <!-- Content -->
+            <main class="col-md-9 col-lg-10 p-4 border-top">
+                <BlockRender PageId="@pageRenderID" />
+            </main>
+
+        </div>
+    </div>
+
+
+    <style>
+        /* Tabs container */
+        .nav-tabs {
+            margin-bottom: 0;
+            border-bottom: none;
+        }
+
+            .nav-tabs .nav-link {
+                border: 1px solid #ccc;
+                border-bottom: none;
+                background-color: #dfe3e6;
+                margin-right: 4px;
+                border-radius: 6px 6px 0 0;
+            }
+
+                .nav-tabs .nav-link.active {
+                    background-color: #ffffff;
+                    font-weight: 600;
+                    position: relative;
+                    top: 1px;
+                    margin-bottom: -1px;
+                }
+
+        nav {
+            background-color: #f8f9fa;
+        }
+
+        .nav-link.active {
+            font-weight: 600;
+            background-color: #e2e6ea;
+            border-left: 3px solid #0d6efd;
+        }
+
+        main {
+            background-color: #ffffff;
+            border-top: none;
+        }
+    </style>
+
+}
+
+@code {
+    [Parameter] public string? reqprogramFolder { get; set; }
+    [Parameter] public string? reqprogramName { get; set; }
+
+    private bool _initialized;
+    private string pageRenderID = "404";
+
+    programFolder[] programFolders = Array.Empty<programFolder>();
+    programFolder? selectedFolder;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var host = new Uri(NavigationManager.Uri).Host;
+        //await SiteContext.InitializeAsync(host);
+
+        programFolders = GetProgramFolders();
+
+        _initialized = true;
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (programFolders.Length == 0)
+        {
+            pageRenderID = "404";
+            return;
+        }
+
+        // 1. Determine selected folder
+        selectedFolder =
+            programFolders.FirstOrDefault(f =>
+                string.Equals(f.folderSlug, reqprogramFolder, StringComparison.OrdinalIgnoreCase))
+            ?? programFolders[0];
+
+        // Normalize folder parameter so tabs highlight correctly
+        reqprogramFolder = selectedFolder.folderSlug;
+
+        // 2. Determine selected program
+        programEntry? selectedProgram = null;
+
+        if (!string.IsNullOrEmpty(reqprogramName))
+        {
+            selectedProgram =
+                selectedFolder.theprograms.FirstOrDefault(p =>
+                    string.Equals(p.programSlug, reqprogramName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // If no program found or none provided, default to first
+        selectedProgram ??= selectedFolder.theprograms.FirstOrDefault();
+
+        if (selectedProgram != null)
+        {
+            // Normalize program parameter so sidebar highlights correctly
+            reqprogramName = selectedProgram.programSlug;
+
+            pageRenderID = $"{selectedFolder.folderSlug}/{selectedProgram.programSlug}";
+        }
+        else
+        {
+            pageRenderID = "404";
+        }
+    }
+
+
+    // Data classes
+    public class programFolder
+    {
+        public string folderSlug { get; set; } = string.Empty;
+        public string folderName { get; set; } = string.Empty;
+
+        // Enables dynamic pages under this folder
+        public bool dynamicPages { get; set; } = false;
+
+        // The template used for new dynamic pages
+        public string dynamicPageBase { get; set; } = string.Empty;
+
+        public programEntry[] theprograms { get; set; } = Array.Empty<programEntry>();
+    }
+
+
+    public class programEntry
+    {
+        public string programSlug { get; set; } = string.Empty;
+        public string programName { get; set; } = string.Empty;
+
+        // If true, this program supports dynamic pages
+        public bool dynamicPage { get; set; } = false;
+    }
+
+    public class dynamicPage
+    {
+        public int Id { get; set; }
+        public string folderSlug { get; set; } = string.Empty;
+        public string pageSlug { get; set; } = string.Empty;
+        public string pageTitle { get; set; } = string.Empty;
+        public string pageBody { get; set; } = string.Empty; // BlockRender content
+    }
+
+
+    // Test data
+    public programFolder[] GetProgramFolders()
+    {
+        return new programFolder[]
+        {
+            new programFolder
+        {
+                folderSlug = "contests",
+				folderName = "Contests",
+				theprograms = new programEntry[] {
+					new programEntry { programSlug = "", programName = "All Contests" },
+					new programEntry { programSlug = "reflections", programName = "Reflections National Arts Contest" },
+					new programEntry { programSlug = "culturalarts", programName = "Reflections Cultural Arts Program" },
+					new programEntry { programSlug = "stem", programName = "Reflections STEM Program" }
+				}
+            },
+            new programFolder {
+                folderSlug = "scholarships",
+                folderName = "Virginia PTA Scholarships",
+                theprograms = new programEntry[] {
+                    new programEntry { programSlug = "senior", programName = "Senior Scholarship Program" }
+                }
+            },
+            new programFolder {
+                folderSlug = "schoolprograms",
+                folderName = "School Programs",
+                theprograms = new programEntry[] {
+                    new programEntry { programSlug = "safety", programName = "School Safety Program" },
+                    new programEntry { programSlug = "safety", programName = "School Safety Program" }
+                }
+            }
+        };
+    }
+}

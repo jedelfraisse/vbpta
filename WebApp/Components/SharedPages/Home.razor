@@ -1,58 +1,46 @@
-@inject NavigationManager NavigationManager
-@inject ISiteContext SiteContext
-@inject AuthenticationStateProvider AuthenticationStateProvider
-@using SiteEngine.Data
-@using SiteEngine.Entities
 @page "/"
+@using WebApp.Services
+@using SiteEngine.Enums
+@inject SiteContext SiteContext
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
-@using WebApp.Components.GlobalAdminPages;
-@using WebApp.Components.CityWidePages;
-@using WebApp.Components.UnitPages;
+@using WebApp.Components.DivisionPages
+@using WebApp.Components.UnitPages
+@using WebApp.Components.PortalPages
 
-<PageTitle>@SiteContext.SiteConfig.SiteName</PageTitle>
+<PageTitle>@SiteContext.CurrentSite?.SiteName</PageTitle>
 
-@if (_siteNotFound)
+@if (SiteContext.SiteNotFound)
 {
-    <div class="home-container">
-        <div class="site-not-found-message">
-            <h2>Sorry, I didn’t find that local unit.</h2>
-            <p>Please check the URL or contact the council admin for help.</p>
-        </div>
-    </div>
+    <h2>Sorry, I didn’t find that local unit.</h2>
 }
-else if (_showAdminDashboard)
+else
 {
-    <AdminHomeComponent />
-}
-else if (_showCityWideHome)
-{
-    <CityWideHomeComponent />
-}
-else if (_showLocalUnitHome && SiteContext.CurrentSite is not null)
-{
-    <UnitHomeComponent SiteName="@SiteContext.CurrentSite.SiteName" />
-}
+    @switch (SiteContext.CurrentSite!.SiteType)
+    {
+        case SiteType.Portal:
+            <PortalHome />
+            break;
 
+        case SiteType.Division:
+            <DivisionHome DivisionId="@SiteContext.CurrentSite.Id" />
+            break;
+
+        case SiteType.LocalUnit:
+            <UnitHome UnitId="@SiteContext.CurrentSite.Id" />
+            break;
+
+        default:
+            <h5>No Home Page Available</h5>
+            break;
+    }
+}
 
 @code {
-    private bool _showAdminLink;
-    private bool _showAdminDashboard;
-    private bool _showCityWideHome;
-    private bool _showLocalUnitHome;
-    private bool _siteNotFound;
-    private string? _userId;
-
     protected override async Task OnInitializedAsync()
     {
         var host = new Uri(NavigationManager.Uri).Host;
         await SiteContext.InitializeAsync(host);
-        _siteNotFound = SiteContext.SiteNotFound || SiteContext.CurrentSite is null;
-
-        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-        _userId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-         _showCityWideHome = !_siteNotFound
-            && !SiteContext.IsAdminContext
-            && (SiteContext.CurrentSite?.IsCityWide ?? false);
-        _showLocalUnitHome = !_siteNotFound && !_showAdminDashboard && !_showCityWideHome;
     }
 }

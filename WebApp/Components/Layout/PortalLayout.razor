@@ -1,0 +1,44 @@
+@using WebApp.Services
+@inherits SiteLayoutBase
+@inject SetupStateService SetupState
+@inject NavigationManager Nav
+@inject IHttpContextAccessor Http
+
+@code {
+    protected override async Task OnParametersSetAsync()
+    {
+        await RefreshUserStateAsync();
+    }
+
+    // PortalLayout is the Global Portal Admin / public central-site shell -
+    // Division (city/council) and Unit sites render through their own
+    // DivisionLayout / UnitLayout with their own branded headers, so the
+    // only roles this bar needs to know about are Public and Global Admin.
+    //
+    // NOTE: gated on IsAuthenticated, not IsGlobalAdmin - SiteLayoutBase's
+    // IsGlobalAdmin is currently a stub that's never actually set to true
+    // (see RefreshUserStateAsync), so keying off it here made every signed-in
+    // user look signed-out in the nav. Once real global-admin role lookup is
+    // wired into SiteLayoutBase, switch this back to IsGlobalAdmin.
+    private SiteRole? CurrentPortalRole => IsAuthenticated ? SiteRole.SuperAdmin : (SiteRole?)null;
+}
+
+<div class="d-flex flex-column min-vh-100">
+
+    <TopNavBar CurrentRole="@CurrentPortalRole" />
+
+    <!-- Main Body -->
+    <main class="container my-5 flex-grow-1">
+        @Body
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-white py-4 mt-auto">
+        <div class="container text-center small">
+            © @DateTime.UtcNow.Year Delfraisse.com. All rights reserved.<br />
+            PTA® and National PTA® are registered trademarks of National PTA (pta.org) and are used with respect for their ownership.<br />
+            All other names, logos, and trademarks are the property of their respective owners.
+        </div>
+    </footer>
+
+</div>

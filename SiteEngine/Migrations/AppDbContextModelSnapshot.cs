@@ -155,49 +155,17 @@ namespace SiteEngine.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("SiteEngine.Entities.Announcement", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasMaxLength(4096)
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTimeOffset>("PublishedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<Guid>("SiteId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SiteId");
-
-                    b.ToTable("Announcements", (string)null);
-                });
-
-            modelBuilder.Entity("SiteEngine.Entities.GlobalConfig", b =>
+            modelBuilder.Entity("SiteEngine.Entities.PortalConfig", b =>
                 {
                     b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("PlatformDomain")
+                    b.Property<string>("PortalDomain")
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
-                    b.Property<string>("RootDomain")
+                    b.Property<string>("PortalName")
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
@@ -230,21 +198,7 @@ namespace SiteEngine.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("GlobalConfig", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            PlatformDomain = "localhost",
-                            RootDomain = "localhost",
-                            SmtpFromAddress = "help@localhost",
-                            SmtpHost = "",
-                            SmtpPassword = "",
-                            SmtpPort = 587,
-                            SmtpUsername = "",
-                            UseSsl = true
-                        });
+                    b.ToTable("PortalConfig", (string)null);
                 });
 
             modelBuilder.Entity("SiteEngine.Entities.Site", b =>
@@ -271,21 +225,38 @@ namespace SiteEngine.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
+                    b.Property<string>("FaceBookURL")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("GiveBacksURL")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("HeaderText")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)");
+
                     b.Property<string>("Hostname")
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
-                    b.Property<bool>("IsAdminPortal")
-                        .HasColumnType("bit");
+                    b.Property<string>("InstagramURL")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
-                    b.Property<bool>("IsCityWide")
-                        .HasColumnType("bit");
+                    b.Property<string>("LastActiveYear")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("LogoUrl")
                         .IsRequired()
                         .HasMaxLength(512)
                         .HasColumnType("nvarchar(512)");
+
+                    b.Property<Guid?>("ParentSiteId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("PrimaryColor")
                         .IsRequired()
@@ -296,18 +267,30 @@ namespace SiteEngine.Migrations
                         .IsRequired()
                         .HasColumnType("char(8)");
 
+                    b.Property<string>("SignUpGeniusURL")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid?>("SiteId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("SiteName")
                         .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
+                    b.Property<int>("SiteStatus")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SiteType")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TwitterURL")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTimeOffset>("UpdatedAtUtc")
                         .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("WelcomeText")
-                        .IsRequired()
-                        .HasMaxLength(1024)
-                        .HasColumnType("nvarchar(1024)");
 
                     b.HasKey("Id");
 
@@ -319,116 +302,17 @@ namespace SiteEngine.Migrations
                         .IsUnique()
                         .HasFilter("[Hostname] <> ''");
 
+                    b.HasIndex("ParentSiteId");
+
                     b.HasIndex("PtaId")
                         .IsUnique();
 
+                    b.HasIndex("SiteId");
+
                     b.ToTable("Sites", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = new Guid("0f89ac2b-a0ac-40b8-b886-fd117e35903c"),
-                            AccentColor = "#FFCC00",
-                            BannerUrl = "/images/banner.png",
-                            CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            Domain = "",
-                            Hostname = "admin",
-                            IsAdminPortal = true,
-                            IsCityWide = false,
-                            LogoUrl = "/images/logo.png",
-                            PrimaryColor = "#003366",
-                            PtaId = "00000000",
-                            SiteName = "City Wide PTA Admin",
-                            UpdatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            WelcomeText = "Monitor and manage all PTA sites from the this admin portal."
-                        },
-                        new
-                        {
-                            Id = new Guid("2b30d683-ea4b-4e9e-b616-17a2198e3b79"),
-                            AccentColor = "#FFCC00",
-                            BannerUrl = "/images/banner.png",
-                            CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            Domain = "",
-                            Hostname = "",
-                            IsAdminPortal = false,
-                            IsCityWide = true,
-                            LogoUrl = "/images/logo.png",
-                            PrimaryColor = "#003366",
-                            PtaId = "10000000",
-                            SiteName = "Virginia Beach Council of PTAs",
-                            UpdatedAtUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            WelcomeText = "Welcome to our community! We are dedicated to supporting students, families, and educators."
-                        });
                 });
 
-            modelBuilder.Entity("SiteEngine.Entities.SiteEvent", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(4096)
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTimeOffset?>("EndsAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("Location")
-                        .HasMaxLength(512)
-                        .HasColumnType("nvarchar(512)");
-
-                    b.Property<Guid>("SiteId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTimeOffset>("StartsAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SiteId");
-
-                    b.ToTable("Events", (string)null);
-                });
-
-            modelBuilder.Entity("SiteEngine.Entities.SiteUserRole", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("Role")
-                        .HasColumnType("int");
-
-                    b.Property<Guid>("SiteId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SiteId");
-
-                    b.HasIndex("UserId", "SiteId", "Role")
-                        .IsUnique();
-
-                    b.ToTable("SiteUserRoles", (string)null);
-                });
-
-            modelBuilder.Entity("SiteEngine.Identity.SiteUser", b =>
+            modelBuilder.Entity("SiteEngine.Identity.ApplicationUser", b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("nvarchar(450)");
@@ -493,6 +377,158 @@ namespace SiteEngine.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("SiteEngine.Identity.BoardPosition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("EndUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("PositionName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("SchoolYear")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<Guid>("SiteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("SiteUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("StartUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SiteId");
+
+                    b.HasIndex("SiteUserId");
+
+                    b.ToTable("BoardPositions", (string)null);
+                });
+
+            modelBuilder.Entity("SiteEngine.Identity.CustomRole", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("SchoolYear")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<Guid>("SiteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SiteId");
+
+                    b.ToTable("CustomRoles", (string)null);
+                });
+
+            modelBuilder.Entity("SiteEngine.Identity.SiteUser", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("IdentityUserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("LastName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("PreferredEmail")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdentityUserId");
+
+                    b.ToTable("SiteUsers", (string)null);
+                });
+
+            modelBuilder.Entity("SiteEngine.Identity.SiteUserRole", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("CustomRoleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("EndUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsPrimaryContact")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("Role")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SchoolYear")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<Guid>("SiteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("SiteUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("StartUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomRoleId");
+
+                    b.HasIndex("SiteId");
+
+                    b.HasIndex("SiteUserId");
+
+                    b.ToTable("SiteUserRoles", (string)null);
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
                 {
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole", null)
@@ -504,7 +540,7 @@ namespace SiteEngine.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<string>", b =>
                 {
-                    b.HasOne("SiteEngine.Identity.SiteUser", null)
+                    b.HasOne("SiteEngine.Identity.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -513,7 +549,7 @@ namespace SiteEngine.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<string>", b =>
                 {
-                    b.HasOne("SiteEngine.Identity.SiteUser", null)
+                    b.HasOne("SiteEngine.Identity.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -528,7 +564,7 @@ namespace SiteEngine.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("SiteEngine.Identity.SiteUser", null)
+                    b.HasOne("SiteEngine.Identity.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -537,66 +573,95 @@ namespace SiteEngine.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<string>", b =>
                 {
-                    b.HasOne("SiteEngine.Identity.SiteUser", null)
+                    b.HasOne("SiteEngine.Identity.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("SiteEngine.Entities.Announcement", b =>
-                {
-                    b.HasOne("SiteEngine.Entities.Site", "Site")
-                        .WithMany("Announcements")
-                        .HasForeignKey("SiteId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Site");
-                });
-
-            modelBuilder.Entity("SiteEngine.Entities.SiteEvent", b =>
-                {
-                    b.HasOne("SiteEngine.Entities.Site", "Site")
-                        .WithMany("Events")
-                        .HasForeignKey("SiteId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Site");
-                });
-
-            modelBuilder.Entity("SiteEngine.Entities.SiteUserRole", b =>
-                {
-                    b.HasOne("SiteEngine.Entities.Site", "Site")
-                        .WithMany("UserRoles")
-                        .HasForeignKey("SiteId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("SiteEngine.Identity.SiteUser", "User")
-                        .WithMany("SiteRoles")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Site");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("SiteEngine.Entities.Site", b =>
                 {
-                    b.Navigation("Announcements");
+                    b.HasOne("SiteEngine.Entities.Site", "ParentSite")
+                        .WithMany()
+                        .HasForeignKey("ParentSiteId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
-                    b.Navigation("Events");
+                    b.HasOne("SiteEngine.Entities.Site", null)
+                        .WithMany("ChildSites")
+                        .HasForeignKey("SiteId");
 
-                    b.Navigation("UserRoles");
+                    b.Navigation("ParentSite");
+                });
+
+            modelBuilder.Entity("SiteEngine.Identity.BoardPosition", b =>
+                {
+                    b.HasOne("SiteEngine.Entities.Site", "Site")
+                        .WithMany()
+                        .HasForeignKey("SiteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SiteEngine.Identity.SiteUser", "SiteUser")
+                        .WithMany()
+                        .HasForeignKey("SiteUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Site");
+
+                    b.Navigation("SiteUser");
+                });
+
+            modelBuilder.Entity("SiteEngine.Identity.CustomRole", b =>
+                {
+                    b.HasOne("SiteEngine.Entities.Site", null)
+                        .WithMany()
+                        .HasForeignKey("SiteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("SiteEngine.Identity.SiteUser", b =>
                 {
-                    b.Navigation("SiteRoles");
+                    b.HasOne("SiteEngine.Identity.ApplicationUser", "IdentityUser")
+                        .WithMany()
+                        .HasForeignKey("IdentityUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("IdentityUser");
+                });
+
+            modelBuilder.Entity("SiteEngine.Identity.SiteUserRole", b =>
+                {
+                    b.HasOne("SiteEngine.Identity.CustomRole", "CustomRole")
+                        .WithMany()
+                        .HasForeignKey("CustomRoleId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SiteEngine.Entities.Site", "Site")
+                        .WithMany()
+                        .HasForeignKey("SiteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SiteEngine.Identity.SiteUser", "SiteUser")
+                        .WithMany()
+                        .HasForeignKey("SiteUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CustomRole");
+
+                    b.Navigation("Site");
+
+                    b.Navigation("SiteUser");
+                });
+
+            modelBuilder.Entity("SiteEngine.Entities.Site", b =>
+                {
+                    b.Navigation("ChildSites");
                 });
 #pragma warning restore 612, 618
         }

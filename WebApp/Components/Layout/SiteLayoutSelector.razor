@@ -1,51 +1,66 @@
-@inject NavigationManager NavigationManager
-@inject ISiteContext SiteContext
+@using SiteEngine.Enums
+@using WebApp.Services
+@using WebApp.Models
 @inherits LayoutComponentBase
-@inject IHttpContextAccessor Http
-@inject IPlatformConfigurationService PlatformConfigurationService
+
+@inject NavigationManager Nav
+@inject SetupStateService SetupState
+@inject SiteContextResolver ContextResolver
 
 @code {
-    private Type _layoutType = typeof(CityWideLayout);
-    private bool _isSetupMode;
+    private Type _layoutType = typeof(PortalLayout);
+    private bool _initialized = false;
 
     protected override async Task OnParametersSetAsync()
     {
-        _isSetupMode = Http.HttpContext?.Items.ContainsKey("SetupMode") == true
-            || await PlatformConfigurationService.IsInitialSetupRequiredAsync();
+        var status = SetupState.GetStatus();
 
-        if (_isSetupMode)
+        // Setup mode should never hit this selector
+        if (!status.IsFullyConfigured)
         {
-            _layoutType = typeof(AdminLayout);
+            _layoutType = typeof(BasicLayout);
             return;
         }
-
-        var host = new Uri(NavigationManager.Uri).Host;
-        await SiteContext.InitializeAsync(host);
-        _layoutType = ResolveLayoutType();
     }
 
-    private Type ResolveLayoutType()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_isSetupMode)
-        {
-            return typeof(AdminLayout);
-        }
+        if (!firstRender || _initialized)
+            return;
 
-        if (SiteContext.IsAdminContext)
-        {
-            return typeof(AdminLayout);
-        }
+        _initialized = true;
 
-        if (SiteContext.CurrentSite is null)
-        {
-            return typeof(AdminLayout);
-        }
+        var ctx = ContextResolver.GetContext();
 
-        return (SiteContext.CurrentSite?.IsCityWide ?? false)
-            ? typeof(CityWideLayout)
-            : typeof(LocalUnitLayout);
+        if (ctx is RuntimeSiteContext runtime)
+        {
+            var host = new Uri(Nav.Uri).Host;
+
+            // Initialize AFTER first render to avoid EF reader issues
+            await runtime.InitializeAsync(host);
+
+            _layoutType = ResolveLayoutType(runtime);
+            StateHasChanged(); // Re-render with correct layout
+        }
     }
 
+    private Type ResolveLayoutType(RuntimeSiteContext runtime)
+    {
+        var site = runtime.CurrentSite;
+
+        if (site is null)
+            return typeof(PortalLayout);
+
+        return site.SiteType switch
+        {
+            SiteType.Portal => typeof(PortalLayout),
+            SiteType.Division => typeof(DivisionLayout),
+            SiteType.LocalUnit => typeof(UnitLayout),
+            _ => typeof(PortalLayout)
+        };
+    }
 }
 
-<LayoutView Layout="_layoutType" ChildContent="@Body" />
+<LayoutView Layout="_layoutType">
+    @Body
+</LayoutView>

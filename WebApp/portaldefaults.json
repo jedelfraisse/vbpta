@@ -1,0 +1,23 @@
+{
+    "PortalConfig": {
+        "PortalName": "",
+        "PortalDomain": "",
+        "SmtpHost": "",
+        "SmtpPort": 587,
+        "SmtpFromAddress": "",
+        "SmtpUsername": "",
+        "SmtpPassword": "",
+        "UseSsl": true
+    },
+    "PortalSite": {
+        "PtaId": "00000000",
+        "Hostname": "",
+        "Domain": "",
+        "SiteName": "PTA Portal",
+        "LogoUrl": "/images/logo.png",
+        "BannerUrl": "/images/banner.png",
+        "PrimaryColor": "#003366",
+        "AccentColor": "#FFCC00",
+        "HeaderText": "Welcome to the PTA Portal."
+    }
+}

@@ -10,6 +10,5 @@
     <File Path=".github/workflows/stage.yml" />
   </Folder>
   <Project Path="SiteEngine/SiteEngine.csproj" Id="456872e5-2bb0-4e4d-bc42-56bbc3d6769d" />
-  <Project Path="Tests/VbptaWeb.Tests/VbptaWeb.Tests.csproj" />
   <Project Path="WebApp/WebApp.csproj" />
 </Solution>

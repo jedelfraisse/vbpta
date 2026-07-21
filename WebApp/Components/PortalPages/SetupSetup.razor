@@ -1,0 +1,211 @@
+﻿@page "/setup"
+@using WebApp.Models
+
+<PageTitle>PTA Platform Setup</PageTitle>
+
+<div class="setup-page">
+
+    <header class="setup-header">
+        <h1>PTA Platform Setup</h1>
+        <p class="setup-muted">Complete each step in order. Each step unlocks the next.</p>
+    </header>
+
+    @if (_finalReady)
+    {
+        <div class="final-launch">
+            <h2>Setup Complete!</h2>
+            <p>Your PTA Platform is fully configured and ready to launch.</p>
+
+            <button class="launch-button" @onclick="RestartNow">Launch Platform 🚀</button>
+
+            @if (_isRestarting)
+            {
+                <div class="restart-wait">
+                    <p class="setup-muted">Restarting… please wait.</p>
+                    <div class="spinner"></div>
+                </div>
+            }
+        </div>
+    }
+    else if (_isFinishing)
+    {
+        <div class="final-launch">
+            <h2>Setup Complete!</h2>
+            <p>@_finishMessage</p>
+
+            <div class="restart-wait">
+                <p class="setup-muted">Restarting… please wait.</p>
+                <div class="spinner"></div>
+            </div>
+
+            <p class="setup-muted" style="margin-top:20px;">
+                If the platform does not restart within 90 seconds, please restart the application manually.
+            </p>
+        </div>
+    }
+    else
+    {
+        @* STEP 1 — SQL *@
+        @if (!_status.HasConnectionString || !_status.CanConnectToDatabase)
+        {
+            <h2>Step 1 of 4 — Database Configuration</h2>
+            <p class="setup-help">Enter your SQL Server connection details.</p>
+
+            <div class="group-grid two-col">
+                <div>
+                    <label for="sqlServer">SQL Server</label>
+                    <InputText id="sqlServer" @bind-Value="_model.SqlServer" />
+                </div>
+
+                <div>
+                    <label for="dbName">Database Name</label>
+                    <InputText id="dbName" @bind-Value="_model.DatabaseName" />
+                </div>
+
+                <div>
+                    <label for="sqlUser">SQL Username</label>
+                    <InputText id="sqlUser" @bind-Value="_model.SqlUsername" />
+                </div>
+
+                <div>
+                    <label for="sqlPass">SQL Password</label>
+                    <InputText id="sqlPass" type="password" @bind-Value="_model.SqlPassword" />
+                </div>
+            </div>
+
+
+            <button disabled="@_isWorking" @onclick="TestSqlAndContinueAsync">
+                Test & Continue
+            </button>
+        }
+
+        @* STEP 2 — SMTP *@
+        else if (!_status.HasEmailSettings)
+        {
+            <h2>Step 2 of 4 — Email (SMTP) Configuration</h2>
+            <p class="setup-help">Used to send login codes and system notifications.</p>
+
+            <div class="group-grid two-col">
+                <div>
+                    <label for="smtpHost">SMTP Host</label>
+                    <InputText id="smtpHost" @bind-Value="_model.SmtpHost" />
+                </div>
+
+                <div>
+                    <label for="smtpPort">SMTP Port</label>
+                    <InputNumber id="smtpPort" @bind-Value="_model.SmtpPort" />
+                </div>
+
+                <div>
+                    <label for="smtpUser">SMTP Username</label>
+                    <InputText id="smtpUser" @bind-Value="_model.SmtpUsername" />
+                </div>
+
+                <div>
+                    <label for="smtpPass">SMTP Password</label>
+                    <InputText id="smtpPass" type="password" @bind-Value="_model.SmtpPassword" />
+                </div>
+
+                <div>
+                    <label for="smtpFrom">From Email</label>
+                    <InputText id="smtpFrom" @bind-Value="_model.SmtpFrom" />
+                </div>
+
+                <div class="checkbox-field">
+                    <InputCheckbox id="smtpSsl" @bind-Value="_model.SmtpUseSsl" />
+                    <label for="smtpSsl">Use SSL</label>
+                </div>
+            </div>
+
+
+
+            <button disabled="@_isWorking" @onclick="TestSmtpAndContinueAsync">Test & Continue</button>
+        }
+        @* STEP 3 — ADMIN *@
+        else if (!_status.HasAdminUser)
+        {
+            <h2>Step 3 of 4 — Administrator Account</h2>
+            <p class="setup-help">This will be your first platform administrator.</p>
+
+            <div class="group-grid two-col">
+                <div>
+                    <label for="adminEmail">Admin Email</label>
+                    <InputText id="adminEmail" @bind-Value="_model.AdminEmail" />
+                </div>
+
+                <div>
+                    <label for="adminName">Admin Name</label>
+                    <InputText id="adminName" @bind-Value="_model.AdminName" />
+                </div>
+            </div>
+
+            @if (_adminCodeSent)
+            {
+                <div class="group-grid two-col">
+                    <div>
+                        <label for="adminCode">Verification Code</label>
+                        <InputText id="adminCode" @bind-Value="_adminCodeInput" />
+                    </div>
+                </div>
+
+                <p class="setup-help">
+                    Sent to @_lastCodeSentToEmail. Didn't get it, or need to fix the address above?
+                </p>
+
+                <button disabled="@_isWorking" @onclick="VerifyAdminCodeAsync">Verify & Continue</button>
+                <button disabled="@_isWorking" class="secondary-button" @onclick="ResendAdminCodeAsync">
+                    Resend Code
+                </button>
+            }
+            else
+            {
+                <button disabled="@_isWorking" @onclick="SendAdminCodeAsync">Send Verification Code</button>
+            }
+        }
+        @* STEP 4 — PORTAL INFO *@
+        else if (!_status.HasPortalInfo)
+        {
+            <h2>Step 4 of 4 — Portal Information</h2>
+            <p class="setup-help">Basic information about your PTA portal.</p>
+
+            <div class="group-grid two-col">
+                <div>
+                    <label for="portalName">Portal Name</label>
+                    <InputText id="portalName" @bind-Value="_model.PortalName" />
+                </div>
+
+                <div>
+                    <label for="portalDomain">Portal Domain</label>
+                    <InputText id="portalDomain" @bind-Value="_model.PortalDomain" />
+                </div>
+            </div>
+
+
+            <button disabled="@_isWorking" @onclick="SavePortalInfoAsync">Save & Finish</button>
+        }
+    }
+
+    @if (!string.IsNullOrWhiteSpace(_message))
+    {
+        <p class="@_messageClass">@_message</p>
+    }
+
+</div>
+
+@code {
+    private SetupStatus _status = new();
+    private SetupSetupModel _model = new();
+
+    private string _message = "";
+    private string _messageClass = "";
+
+    private bool _isWorking;
+    private bool _isRestarting;
+    private bool _finalReady;
+    private bool _isFinishing;
+    private string _finishMessage = "";
+
+    private bool _adminCodeSent;
+    private string _adminCodeInput = "";
+    private string? _lastCodeSentToEmail;
+}

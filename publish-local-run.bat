@@ -29,6 +29,6 @@ popd
 
 echo Running WebApp from .\publish-local ...
 cd .\publish-local
-.\WebApp.exe
+.\WebApp.exe --urls "https://localhost:5001;http://localhost:5000"
 
 exit /b 0

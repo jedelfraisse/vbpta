@@ -1,5 +1,5 @@
 @using System.Security.Claims
-@inject ISiteContext SiteContext
+
 @inject NavigationManager Navigation
 
 <div class="no-access-container">
@@ -27,7 +27,7 @@
 
 	protected override async Task OnInitializedAsync()
 	{
-		AdminEmail = await SiteContext.GetCurrentSiteAdminEmailAsync();
+		AdminEmail = "tw.ringo@gmail.com";
 	}
 
 	private void GoHome()

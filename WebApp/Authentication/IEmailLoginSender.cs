@@ -2,5 +2,5 @@ namespace WebApp.Authentication;
 
 public interface IEmailLoginSender
 {
-	Task SendCodeAsync(string email, string code, CancellationToken cancellationToken = default);
+	Task SendLoginCodeAsync(string email, string code, CancellationToken cancellationToken = default);
 }

@@ -1,63 +1,118 @@
+using System.Text.Json.Nodes;
 using SiteEngine.Entities;
+using SiteEngine.Enums;
 
 namespace SiteEngine.Data;
 
 public static class SeedData
 {
-	public static readonly Guid DefaultAdminSiteId = Guid.Parse("0F89AC2B-A0AC-40B8-B886-FD117E35903C");
-	public const string DefaultAdminPtaId = "00000000";
-	public const string DefaultAdminHostname = "admin";
-	public static readonly Guid DefaultCitySiteId = Guid.Parse("2B30D683-EA4B-4E9E-B616-17A2198E3B79");
-	public const string DefaultCityPtaId = "10000000";
-	public const string DefaultCityHostname = "";
+	// Stable IDs
 	public const int DefaultGlobalConfigId = 1;
+	public static readonly Guid DefaultPortalSiteId =
+		Guid.Parse("0F89AC2B-A0AC-40B8-B886-FD117E35903C");
 
-	public static readonly Site DefaultAdminSite = new()
+	// Static fallback defaults (used if JSON missing)
+	public static readonly PortalConfig DefaultGlobalConfig = new()
 	{
-		Id = DefaultAdminSiteId,
-		PtaId = DefaultAdminPtaId,
-		Hostname = DefaultAdminHostname,
-		Domain = string.Empty,
-		IsAdminPortal = true,
-		IsCityWide = false,
-		SiteName = "City Wide PTA Admin",
-		LogoUrl = "/images/logo.png",
-		BannerUrl = "/images/banner.png",
-		PrimaryColor = "#003366",
-		AccentColor = "#FFCC00",
-		WelcomeText = "Monitor and manage all PTA sites from the this admin portal.",
-		CreatedAtUtc = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
-		UpdatedAtUtc = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
-	};
-
-	public static readonly Site DefaultCitySite = new()
-	{
-		Id = DefaultCitySiteId,
-		PtaId = DefaultCityPtaId,
-		Hostname = DefaultCityHostname,
-		Domain = string.Empty,
-		IsAdminPortal = false,
-		IsCityWide = true,
-		SiteName = "Virginia Beach Council of PTAs",
-		LogoUrl = "/images/logo.png",
-		BannerUrl = "/images/banner.png",
-		PrimaryColor = "#003366",
-		AccentColor = "#FFCC00",
-		WelcomeText = "Welcome to our community! We are dedicated to supporting students, families, and educators.",
-		CreatedAtUtc = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
-		UpdatedAtUtc = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
-	};
-
-	public static readonly GlobalConfig DefaultGlobalConfig = new()
-	{
-		Id = DefaultGlobalConfigId,
-		RootDomain = "localhost",
-		PlatformDomain = "localhost",
-		SmtpHost = string.Empty,
+		PortalName = "",
+		PortalDomain = "",
+		SmtpHost = "",
 		SmtpPort = 587,
-		SmtpFromAddress = "help@localhost",
-		SmtpUsername = string.Empty,
-		SmtpPassword = string.Empty,
+		SmtpFromAddress = "",
+		SmtpUsername = "",
+		SmtpPassword = "",
 		UseSsl = true
 	};
+
+	public static readonly Site DefaultPortalSite = new()
+	{
+		SiteType = SiteType.Portal,
+		PtaId = "00000000",
+		Hostname = "",
+		Domain = "",
+		SiteName = "PTA Portal",
+		LogoUrl = "/images/logo.png",
+		BannerUrl = "/images/banner.png",
+		PrimaryColor = "#003366",
+		AccentColor = "#FFCC00",
+		HeaderText = "Welcome to the PTA Portal.",
+		CreatedAtUtc = DateTimeOffset.UtcNow,
+		UpdatedAtUtc = DateTimeOffset.UtcNow
+	};
+
+	// ------------------------------------------------------------
+	// Load defaults from portaldefaults.json (if present)
+	// ------------------------------------------------------------
+	private static JsonNode? LoadDefaultsJson()
+	{
+		var path = Path.Combine(AppContext.BaseDirectory, "portaldefaults.json");
+		if (!File.Exists(path))
+			return null;
+
+		return JsonNode.Parse(File.ReadAllText(path));
+	}
+
+	// ------------------------------------------------------------
+	// Main seeding method
+	// ------------------------------------------------------------
+	public static void EnsureSeedData(AppDbContext db)
+	{
+		var json = LoadDefaultsJson();
+
+		// ------------------------------------------------------------
+		// 1. PortalConfig
+		// ------------------------------------------------------------
+		var config = db.PortalConfigs.FirstOrDefault(c => c.Id == DefaultGlobalConfigId);
+		if (config == null)
+		{
+			var cfgJson = json?["PortalConfig"];
+
+			var newConfig = new PortalConfig
+			{
+				Id = DefaultGlobalConfigId,
+				PortalName = cfgJson?["PortalName"]?.ToString() ?? DefaultGlobalConfig.PortalName,
+				PortalDomain = cfgJson?["PortalDomain"]?.ToString() ?? DefaultGlobalConfig.PortalDomain,
+				SmtpHost = cfgJson?["SmtpHost"]?.ToString() ?? DefaultGlobalConfig.SmtpHost,
+				SmtpPort = int.TryParse(cfgJson?["SmtpPort"]?.ToString(), out var port)
+					? port : DefaultGlobalConfig.SmtpPort,
+				SmtpFromAddress = cfgJson?["SmtpFromAddress"]?.ToString() ?? DefaultGlobalConfig.SmtpFromAddress,
+				SmtpUsername = cfgJson?["SmtpUsername"]?.ToString() ?? DefaultGlobalConfig.SmtpUsername,
+				SmtpPassword = cfgJson?["SmtpPassword"]?.ToString() ?? DefaultGlobalConfig.SmtpPassword,
+				UseSsl = bool.TryParse(cfgJson?["UseSsl"]?.ToString(), out var ssl)
+					? ssl : DefaultGlobalConfig.UseSsl
+			};
+
+			db.PortalConfigs.Add(newConfig);
+		}
+
+		// ------------------------------------------------------------
+		// 2. Portal Site
+		// ------------------------------------------------------------
+		var site = db.Sites.FirstOrDefault(s => s.Id == DefaultPortalSiteId);
+		if (site == null)
+		{
+			var siteJson = json?["PortalSite"];
+
+			var newSite = new Site
+			{
+				Id = DefaultPortalSiteId,
+				SiteType = SiteType.Portal,
+				PtaId = siteJson?["PtaId"]?.ToString() ?? DefaultPortalSite.PtaId,
+				Hostname = siteJson?["Hostname"]?.ToString() ?? DefaultPortalSite.Hostname,
+				Domain = siteJson?["Domain"]?.ToString() ?? DefaultPortalSite.Domain,
+				SiteName = siteJson?["SiteName"]?.ToString() ?? DefaultPortalSite.SiteName,
+				LogoUrl = siteJson?["LogoUrl"]?.ToString() ?? DefaultPortalSite.LogoUrl,
+				BannerUrl = siteJson?["BannerUrl"]?.ToString() ?? DefaultPortalSite.BannerUrl,
+				PrimaryColor = siteJson?["PrimaryColor"]?.ToString() ?? DefaultPortalSite.PrimaryColor,
+				AccentColor = siteJson?["AccentColor"]?.ToString() ?? DefaultPortalSite.AccentColor,
+				HeaderText = siteJson?["HeaderText"]?.ToString() ?? DefaultPortalSite.HeaderText,
+				CreatedAtUtc = DateTimeOffset.UtcNow,
+				UpdatedAtUtc = DateTimeOffset.UtcNow
+			};
+
+			db.Sites.Add(newSite);
+		}
+
+		db.SaveChanges();
+	}
 }

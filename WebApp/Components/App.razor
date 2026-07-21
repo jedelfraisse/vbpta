@@ -5,15 +5,26 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
-    <link rel="stylesheet" href="@Assets["app.css"]" />
-    <link rel="stylesheet" href="@Assets["WebApp.styles.css"]" />
+    <link rel="stylesheet" href="bootstrap.css" />
+    <link rel="stylesheet" href="@Assets["app.css"]?v=@CacheBustToken" />
+    <link rel="stylesheet" href="@Assets["WebApp.styles.css"]?v=@CacheBustToken" />
+
+
     <ImportMap />
-    <HeadOutlet @rendermode="InteractiveServer" />
+    <HeadOutlet />
 </head>
 
 <body>
-    <Routes @rendermode="InteractiveServer" />
+    <Routes @rendermode="RenderMode.InteractiveServer" />
     <script src="_framework/blazor.web.js"></script>
 </body>
 
 </html>
+
+@code {
+    // ModuleVersionId changes on every single compile, so this query string
+    // forces browsers to fetch fresh CSS after every rebuild/republish instead
+    // of silently reusing a cached copy served under the same unversioned URL.
+    private static readonly string CacheBustToken =
+        typeof(App).Assembly.ManifestModule.ModuleVersionId.ToString("N");
+}

@@ -1,13 +1,31 @@
 @* Helper component for {smallbox events} *@
 
-<h2>Upcoming Events</h2>
-
-@foreach (var e in Events)
+@if (string.IsNullOrWhiteSpace(Title))
 {
-    <p>@e.Title - @e.Date.ToString("MM/dd/yy")</p>
+    <h2>Upcoming Events</h2>
+}
+
+@if (!string.IsNullOrWhiteSpace(RawContent))
+{
+    <!-- If content was provided inside the block, show it -->
+    <div class="events-custom-content">
+        @((MarkupString)RawContent)
+    </div>
+}
+else
+{
+    <!-- Default event listing -->
+    @foreach (var e in Events)
+    {
+        <p>@e.Title - @e.Date.ToString("MM/dd/yy")</p>
+    }
 }
 
 @code {
+    [Parameter] public string RawContent { get; set; } = "";
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public Dictionary<string, string> Parameters { get; set; } = new();
+
     private List<EventItem> Events = new()
     {
         new EventItem { Title = "PTA Leadership Training", Date = new DateTime(2026, 6, 15) },

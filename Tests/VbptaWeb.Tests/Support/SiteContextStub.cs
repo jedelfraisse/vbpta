@@ -9,6 +9,7 @@ internal sealed class SiteContextStub : ISiteContext
 	public Site? CurrentSite { get; init; }
 	public SiteConfig SiteConfig { get; init; } = new();
 	public bool IsAdminContext { get; init; }
+	public bool IsCityContext { get; init; }
 	public bool SiteNotFound { get; init; }
 
 	public Task InitializeAsync(string host, CancellationToken cancellationToken = default)

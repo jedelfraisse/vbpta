@@ -1,94 +1,106 @@
 using Microsoft.AspNetCore.Identity;
 using SiteEngine.Entities;
 using SiteEngine.Identity;
-using SiteEngine.Services;
-using SiteEngine.Sites;
+using WebApp.Services;
 
 namespace WebApp.Authentication;
 
 public class PasswordlessSignInService(
-    UserManager<SiteUser> userManager,
-    SignInManager<SiteUser> signInManager,
-    IEmailLoginSender emailLoginSender,
-    ISiteResolver siteResolver,
-    ISiteUserService siteUserService)
+	UserManager<ApplicationUser> userManager,
+	SignInManager<ApplicationUser> signInManager,
+	IEmailLoginSender emailLoginSender,
+	SiteContext siteContext,
+	PasswordlessCodeStore codeStore
+)
 {
-    private readonly UserManager<SiteUser> _userManager = userManager;
-    private readonly SignInManager<SiteUser> _signInManager = signInManager;
-    private readonly IEmailLoginSender _emailLoginSender = emailLoginSender;
-    private readonly ISiteResolver _siteResolver = siteResolver;
-    private readonly ISiteUserService _siteUserService = siteUserService;
+	private readonly UserManager<ApplicationUser> _userManager = userManager;
+	private readonly SignInManager<ApplicationUser> _signInManager = signInManager;
+	private readonly IEmailLoginSender _emailLoginSender = emailLoginSender;
+	private readonly SiteContext _siteContext = siteContext;
+	private readonly PasswordlessCodeStore _codeStore = codeStore;
 
-    public async Task RequestCodeAsync(string email, CancellationToken cancellationToken = default)
-    {
-        var normalizedEmail = NormalizeEmail(email);
+	// -----------------------------
+	// SEND CODE
+	// -----------------------------
+	public async Task RequestCodeAsync(string email)
+	{
+		var normalizedEmail = NormalizeEmail(email);
 
-        // Ensure user exists
-        var user = await EnsureUserAsync(normalizedEmail);
+		// PORTAL: only existing users can log in. Stay silent for unknown
+		// addresses (no code generated, no email sent) so the response can't
+		// be used to enumerate accounts.
+		if (_siteContext.IsAdminContext)
+		{
+			var existingUser = await _userManager.FindByEmailAsync(normalizedEmail);
+			if (existingUser is not null)
+			{
+				var code = _codeStore.GenerateCode(normalizedEmail);
+				await _emailLoginSender.SendLoginCodeAsync(normalizedEmail, code);
+			}
 
-        // Generate and send code
-        var code = await _userManager.GenerateTwoFactorTokenAsync(user, TokenOptions.DefaultEmailProvider);
-        await _emailLoginSender.SendCodeAsync(normalizedEmail, code, cancellationToken);
-    }
+			return;
+		}
 
-    public async Task<bool> SignInWithCodeAsync(string email, string code, string host)
-    {
-        var normalizedEmail = NormalizeEmail(email);
-        var normalizedCode = code?.Trim() ?? string.Empty;
+		// DIVISION / UNIT: send a code regardless of whether the account exists
+		// yet — it's created at verification time, once the code is proven valid.
+		var freshCode = _codeStore.GenerateCode(normalizedEmail);
+		await _emailLoginSender.SendLoginCodeAsync(normalizedEmail, freshCode);
+	}
 
-        if (string.IsNullOrWhiteSpace(normalizedCode))
-            return false;
+	// -----------------------------
+	// VERIFY CODE
+	// -----------------------------
+	public async Task<bool> SignInWithCodeAsync(string email, string code, string host)
+	{
+		var normalizedEmail = NormalizeEmail(email);
+		var normalizedCode = code?.Trim() ?? string.Empty;
 
-        var user = await _userManager.FindByEmailAsync(normalizedEmail);
-        if (user is null)
-            return false;
+		if (string.IsNullOrWhiteSpace(normalizedCode))
+			return false;
 
-        var valid = await _userManager.VerifyTwoFactorTokenAsync(
-            user,
-            TokenOptions.DefaultEmailProvider,
-            normalizedCode);
+		if (!_codeStore.Validate(normalizedEmail, normalizedCode))
+			return false;
 
-        if (!valid)
-            return false;
+		var user = await _userManager.FindByEmailAsync(normalizedEmail);
 
-        await _signInManager.SignInAsync(user, isPersistent: false);
-        return true;
-    }
+		// PORTAL: must already exist
+		if (_siteContext.IsAdminContext && user is null)
+			return false;
 
-    public async Task SignOutAsync()
-    {
-        await _signInManager.SignOutAsync();
-    }
+		if (user is null)
+		{
+			// DIVISION / UNIT: create the account now that the code is verified
+			user = new ApplicationUser
+			{
+				UserName = normalizedEmail,
+				Email = normalizedEmail,
+				EmailConfirmed = true
+			};
 
-    private async Task<SiteUser> EnsureUserAsync(string email)
-    {
-        var existingUser = await _userManager.FindByEmailAsync(email);
-        if (existingUser is not null)
-            return existingUser;
+			var result = await _userManager.CreateAsync(user);
+			if (!result.Succeeded)
+				return false;
+		}
 
-        var user = new SiteUser
-        {
-            UserName = email,
-            Email = email,
-            EmailConfirmed = true
-        };
+		// Single-use: burn the code only once sign-in is actually going to happen,
+		// so a transient failure above still leaves it retryable.
+		_codeStore.Consume(normalizedEmail);
 
-        var result = await _userManager.CreateAsync(user);
-        if (!result.Succeeded)
-        {
-            var errors = string.Join("; ", result.Errors.Select(x => x.Description));
-            throw new InvalidOperationException($"Unable to create user for passwordless login: {errors}");
-        }
+		await _signInManager.SignInAsync(user, isPersistent: false);
+		return true;
+	}
 
-        return user;
-    }
+	public async Task SignOutAsync()
+	{
+		await _signInManager.SignOutAsync();
+	}
 
-    private static string NormalizeEmail(string email)
-    {
-        var normalized = email?.Trim().ToLowerInvariant() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(normalized))
-            throw new InvalidOperationException("Email is required.");
+	private static string NormalizeEmail(string email)
+	{
+		var normalized = email?.Trim().ToLowerInvariant() ?? string.Empty;
+		if (string.IsNullOrWhiteSpace(normalized))
+			throw new InvalidOperationException("Email is required.");
 
-        return normalized;
-    }
+		return normalized;
+	}
 }

@@ -1,6 +1,35 @@
+@using Services
+@inject SetupStateService SetupState
+
 <Router AppAssembly="@typeof(Program).Assembly">
-    <Found Context="routeData">
-        <RouteView RouteData="@routeData" DefaultLayout="@typeof(Layout.SiteLayoutSelector)" />
-        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
-    </Found>
+	<Found Context="routeData">
+
+		@if (!SetupState.GetStatus().IsFullyConfigured)
+		{
+			<!-- Setup Mode -->
+			<WebApp.Components.PortalPages.SetupSetup />
+		}
+		else
+		{
+			<!-- Runtime Mode -->
+			<RouteView RouteData="@routeData" DefaultLayout="@GetLayoutBasedOnSetupState()" />
+		}
+
+		<FocusOnNavigate RouteData="@routeData" Selector="h1" />
+	</Found>
 </Router>
+
+@code
+{
+
+	private Type GetLayoutBasedOnSetupState()
+	{
+		var status = SetupState.GetStatus();
+
+		return status.IsFullyConfigured
+			? typeof(WebApp.Components.Layout.SiteLayoutSelector)
+			: typeof(WebApp.Components.Layout.BasicLayout);
+	}
+
+	
+}

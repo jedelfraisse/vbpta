@@ -78,6 +78,10 @@ builder.Services.AddDataProtection();
 
 builder.Services.AddSingleton<PasswordlessCodeStore>();
 builder.Services.AddScoped<IEmailLoginSender, EmailLoginSender>();
+builder.Services.AddScoped<ProfileService>();
+builder.Services.AddScoped<MembershipLookupService>();
+builder.Services.AddScoped<LoginTrackingService>();
+builder.Services.AddScoped<LoginAnalyticsService>();
 builder.Services.AddScoped<PasswordlessSignInService>();
 
 // ------------------------------------------------------------
@@ -129,24 +133,25 @@ app.MapGet("/auth/passwordless/complete", async (
 	HttpContext context,
 	PasswordlessSignInService signInService) =>
 {
-	var success = await signInService.SignInWithCodeAsync(email, code, context.Request.Host.Host);
+	var ipAddress = context.Connection.RemoteIpAddress?.ToString();
+	var result = await signInService.SignInWithCodeAsync(email, code, context.Request.Host.Host, ipAddress);
 
-	if (!success)
+	if (!result.Succeeded)
 	{
 		var error = Uri.EscapeDataString("That code is invalid or has expired. Please request a new one.");
 		return Results.Redirect($"/login?Error={error}");
 	}
 
-	return Results.Redirect(IsLocalUrl(returnUrl) ? returnUrl! : "/");
-});
+	var target = LocalUrlGuard.IsLocalUrl(returnUrl) ? returnUrl! : "/";
 
-// Prevents the returnUrl query parameter (attacker-controlled) from being used
-// for an open redirect — only same-origin, root-relative paths are allowed.
-static bool IsLocalUrl(string? url) =>
-	!string.IsNullOrWhiteSpace(url) &&
-	url.StartsWith('/') &&
-	!url.StartsWith("//") &&
-	!url.StartsWith("/\\");
+	if (result.RequiresProfileCompletion)
+	{
+		var encodedReturnUrl = Uri.EscapeDataString(target);
+		return Results.Redirect($"/complete-profile?returnUrl={encodedReturnUrl}");
+	}
+
+	return Results.Redirect(target);
+});
 
 // ------------------------------------------------------------
 // Sign-out completion. Logout.razor does a full-page NavigateTo(forceLoad: true)

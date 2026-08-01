@@ -1,0 +1,94 @@
+@page "/complete-profile"
+@using System.Security.Claims
+@using WebApp.Services
+@inject NavigationManager NavigationManager
+@inject ProfileService ProfileService
+
+<PageTitle>Complete your profile</PageTitle>
+
+<div class="d-flex justify-content-center align-items-center" style="min-height: 70vh;">
+    <div class="card shadow-sm p-4" style="width: 100%; max-width: 420px;">
+
+        <div class="text-center mb-4">
+            <h3>Complete your profile</h3>
+            <p class="text-muted">Just a couple of details before you continue.</p>
+        </div>
+
+        @if (_loaded)
+        {
+            <div class="mb-3">
+                <label for="firstName" class="form-label">First name</label>
+                <input id="firstName" type="text" class="form-control" @bind="_firstName" />
+            </div>
+
+            <div class="mb-3">
+                <label for="lastName" class="form-label">Last name</label>
+                <input id="lastName" type="text" class="form-control" @bind="_lastName" />
+            </div>
+
+            <div class="mb-3">
+                <label for="displayName" class="form-label">Display name</label>
+                <input id="displayName" type="text" class="form-control" @bind="_displayName" placeholder="How other members will see you" />
+            </div>
+
+            <button class="btn btn-primary w-100" @onclick="SaveAsync">
+                Continue
+            </button>
+
+            @if (!string.IsNullOrWhiteSpace(_statusMessage))
+            {
+                <div class="alert alert-info mt-3">
+                    @_statusMessage
+                </div>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+    [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
+
+    private string _identityUserId = string.Empty;
+    private string _firstName = string.Empty;
+    private string _lastName = string.Empty;
+    private string _displayName = string.Empty;
+    private string _statusMessage = string.Empty;
+    private bool _loaded;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthState is null ? null : (await AuthState).User;
+        _identityUserId = user?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+
+        if (string.IsNullOrEmpty(_identityUserId))
+        {
+            NavigationManager.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        var siteUser = await ProfileService.GetByIdentityUserIdAsync(_identityUserId);
+        if (siteUser is not null)
+        {
+            _firstName = siteUser.FirstName;
+            _lastName = siteUser.LastName;
+            _displayName = siteUser.DisplayName;
+        }
+
+        _loaded = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_firstName) || string.IsNullOrWhiteSpace(_displayName))
+        {
+            _statusMessage = "First name and display name are required.";
+            return;
+        }
+
+        await ProfileService.UpdateAsync(_identityUserId, _firstName, _lastName, _displayName);
+
+        var target = LocalUrlGuard.IsLocalUrl(ReturnUrl) ? ReturnUrl! : "/";
+        NavigationManager.NavigateTo(target);
+    }
+}

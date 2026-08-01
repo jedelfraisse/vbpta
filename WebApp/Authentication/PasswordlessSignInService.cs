@@ -1,5 +1,8 @@
 using Microsoft.AspNetCore.Identity;
-using SiteEngine.Entities;
+using Microsoft.EntityFrameworkCore;
+using SiteEngine;
+using SiteEngine.Data;
+using SiteEngine.Enums;
 using SiteEngine.Identity;
 using WebApp.Services;
 
@@ -10,7 +13,11 @@ public class PasswordlessSignInService(
 	SignInManager<ApplicationUser> signInManager,
 	IEmailLoginSender emailLoginSender,
 	SiteContext siteContext,
-	PasswordlessCodeStore codeStore
+	PasswordlessCodeStore codeStore,
+	IDbContextFactory<AppDbContext> dbFactory,
+	ProfileService profileService,
+	MembershipLookupService membershipLookup,
+	LoginTrackingService loginTracking
 )
 {
 	private readonly UserManager<ApplicationUser> _userManager = userManager;
@@ -18,76 +25,119 @@ public class PasswordlessSignInService(
 	private readonly IEmailLoginSender _emailLoginSender = emailLoginSender;
 	private readonly SiteContext _siteContext = siteContext;
 	private readonly PasswordlessCodeStore _codeStore = codeStore;
+	private readonly IDbContextFactory<AppDbContext> _dbFactory = dbFactory;
+	private readonly ProfileService _profileService = profileService;
+	private readonly MembershipLookupService _membershipLookup = membershipLookup;
+	private readonly LoginTrackingService _loginTracking = loginTracking;
 
 	// -----------------------------
 	// SEND CODE
 	// -----------------------------
+	// Any email may request a code — existence is decided here, not at
+	// verification. An unknown email gets an account right now (no elevated
+	// permissions, EmailConfirmed = false) so "does this user exist" always
+	// has a single, consistent answer from this point forward. Either way a
+	// code is generated and sent, and the caller-facing behavior is identical
+	// for new vs. existing emails, so the response never reveals which one it was.
 	public async Task RequestCodeAsync(string email)
 	{
 		var normalizedEmail = NormalizeEmail(email);
 
-		// PORTAL: only existing users can log in. Stay silent for unknown
-		// addresses (no code generated, no email sent) so the response can't
-		// be used to enumerate accounts.
-		if (_siteContext.IsAdminContext)
-		{
-			var existingUser = await _userManager.FindByEmailAsync(normalizedEmail);
-			if (existingUser is not null)
-			{
-				var code = _codeStore.GenerateCode(normalizedEmail);
-				await _emailLoginSender.SendLoginCodeAsync(normalizedEmail, code);
-			}
+		var user = await _userManager.FindByEmailAsync(normalizedEmail);
+		var isFirstLogin = user is null || user.IsFirstLogin;
 
-			return;
+		if (user is null)
+		{
+			user = new ApplicationUser
+			{
+				UserName = normalizedEmail,
+				Email = normalizedEmail,
+				EmailConfirmed = false,
+				IsFirstLogin = true
+			};
+
+			var createResult = await _userManager.CreateAsync(user);
+			if (!createResult.Succeeded)
+				return;
+
+			// Separate DbContext instance from the one behind UserManager's
+			// store (see SetupService for the same pattern) — set only the FK
+			// scalar, never the IdentityUser navigation, or the change tracker
+			// will try to re-insert the ApplicationUser row that CreateAsync
+			// just committed.
+			await using var db = await _dbFactory.CreateDbContextAsync();
+			db.SiteUsers.Add(new SiteUser
+			{
+				IdentityUserId = user.Id,
+				PreferredEmail = normalizedEmail
+			});
+			await db.SaveChangesAsync();
 		}
 
-		// DIVISION / UNIT: send a code regardless of whether the account exists
-		// yet — it's created at verification time, once the code is proven valid.
-		var freshCode = _codeStore.GenerateCode(normalizedEmail);
-		await _emailLoginSender.SendLoginCodeAsync(normalizedEmail, freshCode);
+		var code = _codeStore.GenerateCode(normalizedEmail);
+		var template = isFirstLogin ? LoginEmailTemplate.Welcome : LoginEmailTemplate.WelcomeBack;
+		await _emailLoginSender.SendLoginCodeAsync(normalizedEmail, code, template);
 	}
 
 	// -----------------------------
 	// VERIFY CODE
 	// -----------------------------
-	public async Task<bool> SignInWithCodeAsync(string email, string code, string host)
+	public async Task<PasswordlessSignInResult> SignInWithCodeAsync(string email, string code, string host, string? ipAddress = null)
 	{
 		var normalizedEmail = NormalizeEmail(email);
 		var normalizedCode = code?.Trim() ?? string.Empty;
 
 		if (string.IsNullOrWhiteSpace(normalizedCode))
-			return false;
+			return PasswordlessSignInResult.Failed;
 
 		if (!_codeStore.Validate(normalizedEmail, normalizedCode))
-			return false;
+			return PasswordlessSignInResult.Failed;
 
+		// Accounts are created in RequestCodeAsync now, so a validated code
+		// with no matching user shouldn't happen — treat it as failure rather
+		// than creating an account here too.
 		var user = await _userManager.FindByEmailAsync(normalizedEmail);
-
-		// PORTAL: must already exist
-		if (_siteContext.IsAdminContext && user is null)
-			return false;
-
 		if (user is null)
-		{
-			// DIVISION / UNIT: create the account now that the code is verified
-			user = new ApplicationUser
-			{
-				UserName = normalizedEmail,
-				Email = normalizedEmail,
-				EmailConfirmed = true
-			};
-
-			var result = await _userManager.CreateAsync(user);
-			if (!result.Succeeded)
-				return false;
-		}
+			return PasswordlessSignInResult.Failed;
 
 		// Single-use: burn the code only once sign-in is actually going to happen,
 		// so a transient failure above still leaves it retryable.
 		_codeStore.Consume(normalizedEmail);
 
+		user.EmailConfirmed = true;
+		user.IsFirstLogin = false;
+		await _userManager.UpdateAsync(user);
+
 		await _signInManager.SignInAsync(user, isPersistent: false);
-		return true;
+
+		// This runs from the /auth/passwordless/complete minimal API endpoint,
+		// which gets its own DI scope per request — SiteContext here has never
+		// had InitializeAsync(host) called against it the way a Blazor circuit
+		// does in SiteLayoutSelector/Home.razor, so resolve it now.
+		if (_siteContext.CurrentSite is null)
+			await _siteContext.InitializeAsync(host);
+
+		await _loginTracking.RecordLoginAsync(user.Id, _siteContext.CurrentSite?.Id, ipAddress);
+
+		var siteUser = await _profileService.GetByIdentityUserIdAsync(user.Id);
+		var requiresProfileCompletion = !ProfileService.IsComplete(siteUser);
+
+		SiteRole? membershipRole = null;
+		if (siteUser is not null && _siteContext.CurrentSite is not null &&
+			(_siteContext.IsDivisionContext || _siteContext.IsUnitContext))
+		{
+			var schoolYear = SchoolYear.Current();
+			var membership = await _membershipLookup.FindCurrentMembershipAsync(
+				_siteContext.CurrentSite.Id, siteUser.Id, schoolYear);
+
+			if (membership is not null)
+				membershipRole = membership.Role ?? SiteRole.Member;
+		}
+
+		return new PasswordlessSignInResult(
+			Succeeded: true,
+			RequiresProfileCompletion: requiresProfileCompletion,
+			MembershipRole: membershipRole);
 	}
 
 	public async Task SignOutAsync()

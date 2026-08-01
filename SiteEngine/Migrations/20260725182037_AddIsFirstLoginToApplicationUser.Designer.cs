@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SiteEngine.Data;
 
@@ -11,9 +12,11 @@ using SiteEngine.Data;
 namespace SiteEngine.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260725182037_AddIsFirstLoginToApplicationUser")]
+    partial class AddIsFirstLoginToApplicationUser
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -153,96 +156,6 @@ namespace SiteEngine.Migrations
                     b.HasKey("UserId", "LoginProvider", "Name");
 
                     b.ToTable("AspNetUserTokens", (string)null);
-                });
-
-            modelBuilder.Entity("SiteEngine.Entities.LoginHistory", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("IpAddress")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<DateTimeOffset>("LoginUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<int>("NetworkType")
-                        .HasColumnType("int");
-
-                    b.Property<Guid?>("SiteId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("LoginUtc");
-
-                    b.HasIndex("SiteId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("LoginHistory", (string)null);
-                });
-
-            modelBuilder.Entity("SiteEngine.Entities.LoginHistorySummary", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTimeOffset>("FirstLoginUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<int>("HomeNetworkLogins")
-                        .HasColumnType("int");
-
-                    b.Property<DateTimeOffset>("LastLoginUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<int>("MobileNetworkLogins")
-                        .HasColumnType("int");
-
-                    b.Property<int>("SchoolNetworkLogins")
-                        .HasColumnType("int");
-
-                    b.Property<string>("SchoolYear")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("nvarchar(16)");
-
-                    b.Property<Guid?>("SiteId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("TotalLogins")
-                        .HasColumnType("int");
-
-                    b.Property<int>("UniqueSites")
-                        .HasColumnType("int");
-
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SiteId");
-
-                    b.HasIndex("UserId", "SchoolYear")
-                        .IsUnique();
-
-                    b.ToTable("LoginHistorySummaries", (string)null);
                 });
 
             modelBuilder.Entity("SiteEngine.Entities.PortalConfig", b =>
@@ -557,26 +470,14 @@ namespace SiteEngine.Migrations
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("bit");
 
-                    b.Property<DateTimeOffset?>("FirstLoginUtc")
-                        .HasColumnType("datetimeoffset");
-
                     b.Property<bool>("IsFirstLogin")
                         .HasColumnType("bit");
-
-                    b.Property<Guid?>("LastLoginSiteId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTimeOffset?>("LastLoginUtc")
-                        .HasColumnType("datetimeoffset");
 
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("bit");
 
                     b.Property<DateTimeOffset?>("LockoutEnd")
                         .HasColumnType("datetimeoffset");
-
-                    b.Property<int>("LoginCount")
-                        .HasColumnType("int");
 
                     b.Property<string>("NormalizedEmail")
                         .HasMaxLength(256)
@@ -606,8 +507,6 @@ namespace SiteEngine.Migrations
                         .HasColumnType("nvarchar(256)");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("LastLoginSiteId");
 
                     b.HasIndex("NormalizedEmail")
                         .HasDatabaseName("EmailIndex");
@@ -823,38 +722,6 @@ namespace SiteEngine.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("SiteEngine.Entities.LoginHistory", b =>
-                {
-                    b.HasOne("SiteEngine.Entities.Site", "Site")
-                        .WithMany()
-                        .HasForeignKey("SiteId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("SiteEngine.Identity.ApplicationUser", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Site");
-                });
-
-            modelBuilder.Entity("SiteEngine.Entities.LoginHistorySummary", b =>
-                {
-                    b.HasOne("SiteEngine.Entities.Site", "Site")
-                        .WithMany()
-                        .HasForeignKey("SiteId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("SiteEngine.Identity.ApplicationUser", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Site");
-                });
-
             modelBuilder.Entity("SiteEngine.Entities.Site", b =>
                 {
                     b.HasOne("SiteEngine.Entities.Site", "ParentSite")
@@ -889,14 +756,6 @@ namespace SiteEngine.Migrations
                         .IsRequired();
 
                     b.Navigation("Tool");
-                });
-
-            modelBuilder.Entity("SiteEngine.Identity.ApplicationUser", b =>
-                {
-                    b.HasOne("SiteEngine.Entities.Site", null)
-                        .WithMany()
-                        .HasForeignKey("LastLoginSiteId")
-                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("SiteEngine.Identity.BoardPosition", b =>

@@ -25,11 +25,73 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
 public DbSet<PortalTools> PortalTools { get; set; }
 public DbSet<ToolRule> ToolRules { get; set; }
 public DbSet<ToolPermission> ToolPermissions { get; set; }
+public DbSet<LoginHistory> LoginHistories => Set<LoginHistory>();
+public DbSet<LoginHistorySummary> LoginHistorySummaries => Set<LoginHistorySummary>();
 
 
 	protected override void OnModelCreating(ModelBuilder modelBuilder)
 	{
 		base.OnModelCreating(modelBuilder);
+
+		// ---------------------------
+		// ApplicationUser (login analytics)
+		// ---------------------------
+		modelBuilder.Entity<ApplicationUser>(entity =>
+		{
+			entity.HasOne<Site>()
+				.WithMany()
+				.HasForeignKey(x => x.LastLoginSiteId)
+				.OnDelete(DeleteBehavior.SetNull);
+		});
+
+		// ---------------------------
+		// LoginHistory
+		// ---------------------------
+		modelBuilder.Entity<LoginHistory>(entity =>
+		{
+			entity.ToTable("LoginHistory");
+			entity.HasKey(x => x.Id);
+
+			entity.Property(x => x.UserId).HasMaxLength(450).IsRequired();
+			entity.Property(x => x.IpAddress).HasMaxLength(64).IsRequired();
+
+			entity.HasOne<ApplicationUser>()
+				.WithMany()
+				.HasForeignKey(x => x.UserId)
+				.OnDelete(DeleteBehavior.Cascade);
+
+			entity.HasOne(x => x.Site)
+				.WithMany()
+				.HasForeignKey(x => x.SiteId)
+				.OnDelete(DeleteBehavior.SetNull);
+
+			entity.HasIndex(x => x.UserId);
+			entity.HasIndex(x => x.LoginUtc);
+		});
+
+		// ---------------------------
+		// LoginHistorySummary
+		// ---------------------------
+		modelBuilder.Entity<LoginHistorySummary>(entity =>
+		{
+			entity.ToTable("LoginHistorySummaries");
+			entity.HasKey(x => x.Id);
+
+			entity.Property(x => x.UserId).HasMaxLength(450).IsRequired();
+			entity.Property(x => x.SchoolYear).HasMaxLength(16).IsRequired();
+
+			entity.HasOne<ApplicationUser>()
+				.WithMany()
+				.HasForeignKey(x => x.UserId)
+				.OnDelete(DeleteBehavior.Cascade);
+
+			entity.HasOne(x => x.Site)
+				.WithMany()
+				.HasForeignKey(x => x.SiteId)
+				.OnDelete(DeleteBehavior.SetNull);
+
+			entity.HasIndex(x => new { x.UserId, x.SchoolYear }).IsUnique();
+		});
 
 		// ---------------------------
 		// PortalConfig

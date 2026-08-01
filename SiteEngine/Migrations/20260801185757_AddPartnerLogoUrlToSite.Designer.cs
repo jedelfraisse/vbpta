@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SiteEngine.Data;
 
@@ -11,9 +12,11 @@ using SiteEngine.Data;
 namespace SiteEngine.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260801185757_AddPartnerLogoUrlToSite")]
+    partial class AddPartnerLogoUrlToSite
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -355,8 +358,9 @@ namespace SiteEngine.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("AccentColor")
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
 
                     b.Property<string>("BannerUrl")
                         .IsRequired()
@@ -374,22 +378,6 @@ namespace SiteEngine.Migrations
                     b.Property<string>("FaceBookURL")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("FooterColor1")
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
-
-                    b.Property<string>("FooterColor2")
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
-
-                    b.Property<string>("FooterColor3")
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
-
-                    b.Property<string>("FooterColor4")
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
 
                     b.Property<string>("GiveBacksURL")
                         .IsRequired()
@@ -417,14 +405,6 @@ namespace SiteEngine.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("nvarchar(512)");
 
-                    b.Property<string>("MenuBackgroundImageUrl")
-                        .HasMaxLength(512)
-                        .HasColumnType("nvarchar(512)");
-
-                    b.Property<string>("PageBackgroundImageUrl")
-                        .HasMaxLength(512)
-                        .HasColumnType("nvarchar(512)");
-
                     b.Property<Guid?>("ParentSiteId")
                         .HasColumnType("uniqueidentifier");
 
@@ -434,8 +414,9 @@ namespace SiteEngine.Migrations
                         .HasColumnType("nvarchar(512)");
 
                     b.Property<string>("PrimaryColor")
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
 
                     b.Property<string>("PtaId")
                         .IsRequired()
@@ -458,10 +439,6 @@ namespace SiteEngine.Migrations
 
                     b.Property<int>("SiteType")
                         .HasColumnType("int");
-
-                    b.Property<string>("TopBarColor")
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
 
                     b.Property<string>("TwitterURL")
                         .IsRequired()

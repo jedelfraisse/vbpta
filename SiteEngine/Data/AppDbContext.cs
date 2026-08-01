@@ -128,9 +128,19 @@ public DbSet<LoginHistorySummary> LoginHistorySummaries => Set<LoginHistorySumma
 			entity.Property(x => x.SiteName).HasMaxLength(256).IsRequired();
 			entity.Property(x => x.LogoUrl).HasMaxLength(512).IsRequired();
 			entity.Property(x => x.BannerUrl).HasMaxLength(512).IsRequired();
-			entity.Property(x => x.PrimaryColor).HasMaxLength(16).IsRequired();
-			entity.Property(x => x.AccentColor).HasMaxLength(16).IsRequired();
+			entity.Property(x => x.PartnerLogoUrl).HasMaxLength(512).IsRequired();
 			entity.Property(x => x.HeaderText).HasMaxLength(1024).IsRequired();
+
+			entity.Property(x => x.PrimaryColor).HasMaxLength(32);
+			entity.Property(x => x.AccentColor).HasMaxLength(32);
+			entity.Property(x => x.TopBarColor).HasMaxLength(32);
+			entity.Property(x => x.FooterColor1).HasMaxLength(32);
+			entity.Property(x => x.FooterColor2).HasMaxLength(32);
+			entity.Property(x => x.FooterColor3).HasMaxLength(32);
+			entity.Property(x => x.FooterColor4).HasMaxLength(32);
+
+			entity.Property(x => x.MenuBackgroundImageUrl).HasMaxLength(512);
+			entity.Property(x => x.PageBackgroundImageUrl).HasMaxLength(512);
 
 			entity.HasIndex(x => x.PtaId).IsUnique();
 			entity.HasIndex(x => x.Hostname).IsUnique().HasFilter("[Hostname] <> ''");

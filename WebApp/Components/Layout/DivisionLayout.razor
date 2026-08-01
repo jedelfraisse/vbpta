@@ -1,35 +1,38 @@
+@using SiteEngine.Entities
 @using WebApp.Services
 @inherits SiteLayoutBase
 @inject SiteContext SiteContext
 
 @code {
+    private Site? Site => SiteContext.CurrentSite;
+
     protected override async Task OnParametersSetAsync()
     {
         // Resolve the current Division site the same way Home.razor does, so
         // the role check below is scoped to it rather than defaulting to
         // Viewer (see SiteLayoutBase.RefreshUserStateAsync).
         await SiteContext.InitializeAsync(new Uri(NavigationManager.Uri).Host);
-        await RefreshUserStateAsync(SiteContext.CurrentSite?.Id);
+        await RefreshUserStateAsync(Site?.Id);
     }
 }
 <link href="CityWideLayout.css" rel="stylesheet" />
 
-<div class="city-shell">
-    <div class="top-strip">
-        Division Layout
-    </div>
+<div class="city-shell" style="@ThemeStyle(Site)">
+    <div class="theme-topbar"></div>
 
     <header class="masthead" role="banner">
         <div class="masthead-logos">
-            <img class="site-logo" src="SiteConfig.LogoUrl" alt="SiteConfig.SiteName logo" />
+            @if (!string.IsNullOrWhiteSpace(Site?.LogoUrl))
+            {
+                <img class="site-logo" src="@Site.LogoUrl" alt="@Site.SiteName logo" />
+            }
             <div class="masthead-title">
-                <h1>SiteConfig.SiteName</h1>
-                <p>SiteConfig.WelcomeText</p>
+                <h1>@Site?.SiteName</h1>
             </div>
-            <img class="city-logo" src="@("/images/city-logo.png")" alt="Virginia Beach City logo" />
-            <img class="schoolsystem-logo" src="@("/images/schoolsystem-logo.png")"
-                 alt="Virginia Beach City Public Schools logo" />
-
+            @if (!string.IsNullOrWhiteSpace(Site?.PartnerLogoUrl))
+            {
+                <img class="partner-logo" src="@Site.PartnerLogoUrl" alt="@Site.SiteName partner logo" />
+            }
         </div>
     </header>
 
@@ -79,19 +82,39 @@
 
         <footer class="footer-links">
             <span>Quick Links:</span>
-            <a href="https://virginiabeachcouncilpta.givebacks.com/" target="_blank" rel="noopener noreferrer">Council
-                GiveBacks</a>
-                <a href="https://www.facebook.com/p/Virginia-Beach-Council-of-PTAs-100064654665299/" target="_blank"
-                   rel="noopener noreferrer">Facebook</a>
-                <a href="https://vapta.org/" target="_blank" rel="noopener noreferrer">Virginia PTA</a>
-                <a href="https://www.pta.org/" target="_blank" rel="noopener noreferrer">National PTA</a>
-                <a href="https://www.vbschools.com/" target="_blank" rel="noopener noreferrer">Virginia Beach City Public
-                    Schools</a>
-                </footer>
+            @if (!string.IsNullOrWhiteSpace(Site?.GiveBacksURL))
+            {
+                <a href="@Site.GiveBacksURL" target="_blank" rel="noopener noreferrer">GiveBacks</a>
+            }
+            @if (!string.IsNullOrWhiteSpace(Site?.FaceBookURL))
+            {
+                <a href="@Site.FaceBookURL" target="_blank" rel="noopener noreferrer">Facebook</a>
+            }
+            @if (!string.IsNullOrWhiteSpace(Site?.TwitterURL))
+            {
+                <a href="@Site.TwitterURL" target="_blank" rel="noopener noreferrer">Twitter</a>
+            }
+            @if (!string.IsNullOrWhiteSpace(Site?.InstagramURL))
+            {
+                <a href="@Site.InstagramURL" target="_blank" rel="noopener noreferrer">Instagram</a>
+            }
+            @if (!string.IsNullOrWhiteSpace(Site?.SignUpGeniusURL))
+            {
+                <a href="@Site.SignUpGeniusURL" target="_blank" rel="noopener noreferrer">Sign Up Genius</a>
+            }
+            <a href="https://vapta.org/" target="_blank" rel="noopener noreferrer">State PTA</a>
+            <a href="https://www.pta.org/" target="_blank" rel="noopener noreferrer">National PTA</a>
+        </footer>
 
-                <footer class="footer-legal">
-                    © Virginia Beach Council of PTAs. PTA ID# 00053175 - PTA and VBCPS trademarks are acknowledged and
-                    respected.
-                </footer>
+        <footer class="footer-legal">
+            © @Site?.SiteName
+            @if (!string.IsNullOrWhiteSpace(Site?.PtaId) && Site.PtaId != "00000000")
+            {
+                <text>. PTA ID# @Site.PtaId</text>
+            }
+            - PTA trademarks are acknowledged and respected.
+        </footer>
+
+        <div class="footer-bottom"></div>
             </div>
         </div>

@@ -59,9 +59,12 @@ public class SiteContext
 		// in full.
 		var subdomain = host.Split('.')[0];
 
+		// ParentSite is included so Local Unit sites can resolve their theme
+		// (colors/background images) by falling back to their parent
+		// Division — see SiteThemeExtensions.
 		CurrentSite =
-			await db.Sites.FirstOrDefaultAsync(s => s.Domain != "" && s.Domain.ToLower() == host)
-			?? await db.Sites.FirstOrDefaultAsync(s => s.SiteType != SiteType.Portal && s.Hostname.ToLower() == subdomain);
+			await db.Sites.Include(s => s.ParentSite).FirstOrDefaultAsync(s => s.Domain != "" && s.Domain.ToLower() == host)
+			?? await db.Sites.Include(s => s.ParentSite).FirstOrDefaultAsync(s => s.SiteType != SiteType.Portal && s.Hostname.ToLower() == subdomain);
 
 		if (CurrentSite is not null)
 		{

@@ -20,9 +20,28 @@ public class Site
 	public string SiteName { get; set; } = string.Empty;
 	public string LogoUrl { get; set; } = string.Empty;
 	public string BannerUrl { get; set; } = string.Empty;
-	public string PrimaryColor { get; set; } = string.Empty;
-	public string AccentColor { get; set; } = string.Empty;
+
+	// City/school-district partner logo shown alongside the Division's own
+	// logo (e.g. a city or school system seal). Optional — Divisions without
+	// one configured simply don't render a partner logo slot.
+	public string PartnerLogoUrl { get; set; } = string.Empty;
 	public string HeaderText { get; set; } = string.Empty;
+
+	// Color theme. Nullable — an unset value falls through to the parent
+	// Division (Local Unit sites only), then to a global default. See
+	// SiteThemeExtensions for the resolution chain.
+	public string? PrimaryColor { get; set; }
+	public string? AccentColor { get; set; }
+	public string? TopBarColor { get; set; }
+	public string? FooterColor1 { get; set; }
+	public string? FooterColor2 { get; set; }
+	public string? FooterColor3 { get; set; }
+	public string? FooterColor4 { get; set; }
+
+	// Background images. Nullable, same inheritance chain as the theme
+	// colors above but with no global default — unset means no image.
+	public string? MenuBackgroundImageUrl { get; set; }
+	public string? PageBackgroundImageUrl { get; set; }
 
 	public string GiveBacksURL { get; set; } = string.Empty;
 	public string FaceBookURL { get; set; } = string.Empty;

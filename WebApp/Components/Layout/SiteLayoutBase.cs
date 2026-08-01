@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
+using SiteEngine.Entities;
 using SiteEngine.Enums;
 using WebApp.Services;
 
@@ -48,5 +49,24 @@ public abstract class SiteLayoutBase : LayoutComponentBase
 			: SiteRole.Viewer;
 
 		ShowAdminLink = CurrentRole is SiteRole.SiteAdmin or SiteRole.DivisionAdmin or SiteRole.SuperAdmin;
+	}
+
+	// CSS custom properties consumed by CityWideLayout.css / UnitLayout.razor.css
+	// (--primary-color, --accent-color, --top-bar-color, --footer-color-1..4).
+	// Centralized here so Division and Local Unit layouts resolve/name the
+	// same theme variables identically. Returns "" (no inline style) while
+	// site is still null/loading — CSS var() fallbacks cover that gap.
+	protected static string ThemeStyle(Site? site)
+	{
+		if (site is null)
+			return string.Empty;
+
+		return $"--primary-color:{site.ResolvedPrimaryColor()};" +
+			$"--accent-color:{site.ResolvedAccentColor()};" +
+			$"--top-bar-color:{site.ResolvedTopBarColor()};" +
+			$"--footer-color-1:{site.ResolvedFooterColor1()};" +
+			$"--footer-color-2:{site.ResolvedFooterColor2()};" +
+			$"--footer-color-3:{site.ResolvedFooterColor3()};" +
+			$"--footer-color-4:{site.ResolvedFooterColor4()};";
 	}
 }

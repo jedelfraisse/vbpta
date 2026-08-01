@@ -1,25 +1,33 @@
+@using SiteEngine.Entities
 @using WebApp.Services
 @inherits SiteLayoutBase
 @inject SiteContext SiteContext
 
 @code {
+    private Site? Site => SiteContext.CurrentSite;
+
     protected override async Task OnParametersSetAsync()
     {
         // Resolve the current Local Unit site the same way Home.razor does, so
         // the role check below is scoped to it rather than defaulting to
         // Viewer (see SiteLayoutBase.RefreshUserStateAsync).
         await SiteContext.InitializeAsync(new Uri(NavigationManager.Uri).Host);
-        await RefreshUserStateAsync(SiteContext.CurrentSite?.Id);
+        await RefreshUserStateAsync(Site?.Id);
     }
 }
 
-<div class="layout-shell local-shell">
+<div class="layout-shell local-shell" style="@ThemeStyle(Site)">
+    <div class="theme-topbar"></div>
+
     <header class="page-header" role="banner">
         <div class="brand-block">
-            <img class="site-logo" src="SiteConfig.LogoUrl" alt="SiteConfig.SiteName logo" />
+            @if (!string.IsNullOrWhiteSpace(Site?.LogoUrl))
+            {
+                <img class="site-logo" src="@Site.LogoUrl" alt="@Site.SiteName logo" />
+            }
             <div>
                 <div class="site-kicker">Local Unit</div>
-                <h1>SiteConfig.SiteName</h1>
+                <h1>@Site?.SiteName</h1>
             </div>
         </div>
         <nav>
@@ -41,9 +49,57 @@
         </nav>
     </header>
 
-    <img class="banner-image" src="SiteConfig.BannerUrl" alt="" />
+    @if (!string.IsNullOrWhiteSpace(Site?.BannerUrl))
+    {
+        <img class="banner-image" src="@Site.BannerUrl" alt="" />
+    }
 
     <main class="layout-body">
         @Body
     </main>
+
+    <div class="unit-footer-stack">
+        <footer class="unit-footer-nav">
+            <a href="/">Home</a>
+            <a href="/announcements">Announcements</a>
+            @if (ShowAdminLink)
+            {
+                <a href="/admin">Admin</a>
+            }
+        </footer>
+
+        <footer class="unit-footer-links">
+            <span>Quick Links:</span>
+            @if (!string.IsNullOrWhiteSpace(Site?.GiveBacksURL))
+            {
+                <a href="@Site.GiveBacksURL" target="_blank" rel="noopener noreferrer">GiveBacks</a>
+            }
+            @if (!string.IsNullOrWhiteSpace(Site?.FaceBookURL))
+            {
+                <a href="@Site.FaceBookURL" target="_blank" rel="noopener noreferrer">Facebook</a>
+            }
+            @if (!string.IsNullOrWhiteSpace(Site?.TwitterURL))
+            {
+                <a href="@Site.TwitterURL" target="_blank" rel="noopener noreferrer">Twitter</a>
+            }
+            @if (!string.IsNullOrWhiteSpace(Site?.InstagramURL))
+            {
+                <a href="@Site.InstagramURL" target="_blank" rel="noopener noreferrer">Instagram</a>
+            }
+            @if (!string.IsNullOrWhiteSpace(Site?.SignUpGeniusURL))
+            {
+                <a href="@Site.SignUpGeniusURL" target="_blank" rel="noopener noreferrer">Sign Up Genius</a>
+            }
+        </footer>
+
+        <footer class="unit-footer-legal">
+            © @Site?.SiteName
+            @if (!string.IsNullOrWhiteSpace(Site?.PtaId) && Site.PtaId != "00000000")
+            {
+                <text>. PTA ID# @Site.PtaId</text>
+            }
+        </footer>
+
+        <div class="unit-footer-bottom"></div>
+    </div>
 </div>

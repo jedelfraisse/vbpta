@@ -19,14 +19,11 @@ html, body {
 }
 
 /* -------------------------------------------------------
-   TOP STRIP
+   THEME TOP BAR
 ------------------------------------------------------- */
-.top-strip {
-    background: #f8c400;
-    color: #111;
-    text-align: center;
-    font-size: 1rem;
-    padding: 0.35rem 1rem;
+.theme-topbar {
+    height: 6px;
+    background: var(--top-bar-color, #0F2440);
 }
 
 /* -------------------------------------------------------
@@ -34,6 +31,9 @@ html, body {
 ------------------------------------------------------- */
 .masthead {
     padding: 0.75rem 1rem 0.5rem;
+    background: var(--primary-color, #1F3A5F);
+    border-bottom: 3px solid var(--accent-color, #2E86AB);
+    color: #fff;
 }
 
 .masthead-logos {
@@ -79,18 +79,13 @@ html, body {
     padding: 0.65rem 1rem 0.85rem;
     font-size: 1.05rem;
     font-weight: 700;
-    background-image:
-        linear-gradient(rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.5)),
-        url('/images/banner.png');
-    background-repeat: no-repeat, no-repeat;
-    background-position: center center, center center;
-    background-size: 100% 100%, 100% auto;
+    background: var(--accent-color, #2E86AB);
 }
 
 .primary-nav a,
 .footer-nav a,
 .footer-links a {
-    color: #111;
+    color: #fff;
     text-decoration: none;
 }
 
@@ -192,10 +187,11 @@ html, body {
     text-align: center;
     padding: 0.55rem 1rem;
     font-size: 0.95rem;
+    color: #fff;
 }
 
 .footer-nav {
-    background: #f8c400;
+    background: var(--footer-color-1, #1F3A5F);
     display: flex;
     justify-content: center;
     gap: 1.25rem;
@@ -203,8 +199,7 @@ html, body {
 }
 
 .footer-links {
-    background: #30b13f;
-    color: #111;
+    background: var(--footer-color-2, #173252);
     display: flex;
     justify-content: center;
     gap: 1rem;
@@ -212,8 +207,12 @@ html, body {
 }
 
 .footer-legal {
-    background: #1999cb;
-    color: #111;
+    background: var(--footer-color-3, #102540);
+}
+
+.footer-bottom {
+    height: 6px;
+    background: var(--footer-color-4, #0A1930);
 }
 
 /* -------------------------------------------------------

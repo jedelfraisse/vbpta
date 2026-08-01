@@ -1,0 +1,30 @@
+@using SiteEngine.Entities
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Tools Available to You</h5>
+
+        @if (Tools.Count == 0)
+        {
+            <p class="text-muted mb-0">No tools are enabled yet.</p>
+        }
+        else
+        {
+            <div class="row g-2">
+                @foreach (var tool in Tools)
+                {
+                    <div class="col-md-6">
+                        <div class="border rounded p-2 h-100">
+                            <div class="fw-semibold"><i class="@tool.IconClass" aria-hidden="true"></i> @tool.ToolName</div>
+                            <div class="text-muted small">@tool.ToolDescription</div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public List<PortalTools> Tools { get; set; } = new();
+}

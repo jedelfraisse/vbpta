@@ -1,16 +1,22 @@
+@using WebApp.Services
 @inherits SiteLayoutBase
+@inject SiteContext SiteContext
 
 @code {
     protected override async Task OnParametersSetAsync()
     {
-        await RefreshUserStateAsync();
+        // Resolve the current Division site the same way Home.razor does, so
+        // the role check below is scoped to it rather than defaulting to
+        // Viewer (see SiteLayoutBase.RefreshUserStateAsync).
+        await SiteContext.InitializeAsync(new Uri(NavigationManager.Uri).Host);
+        await RefreshUserStateAsync(SiteContext.CurrentSite?.Id);
     }
 }
 <link href="CityWideLayout.css" rel="stylesheet" />
 
 <div class="city-shell">
     <div class="top-strip">
-        Virginia Congress Of Parents And Teachers - SiteName
+        Division Layout
     </div>
 
     <header class="masthead" role="banner">
@@ -42,6 +48,7 @@
         }
         <AuthorizeView>
             <Authorized>
+                <a href="/dashboard">Dashboard</a>
                 <a href="/logout">Logout</a>
             </Authorized>
             <NotAuthorized>

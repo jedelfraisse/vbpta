@@ -1,0 +1,43 @@
+@using SiteEngine.Entities
+@using SiteEngine.Enums
+@using WebApp.Services
+
+<div class="small">
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <a href="@($"/globaladmin/sites/{Division.Id}")" class="fw-semibold text-decoration-none">@Division.SiteName</a>
+        <span class="badge @StatusBadgeClass(Division.SiteStatus)">@Division.SiteStatus</span>
+        <span class="text-muted">(Local Units: @Division.ChildSites.Count)</span>
+    </div>
+    <div class="d-flex flex-wrap gap-2 mt-1">
+        <FieldBox Label="Internal" Value="@InternalDisplay" Href="@HomePageUrl" />
+        <FieldBox Label="Domain" Value="@DomainDisplay" />
+        <FieldBox Label="Contact" Value="@ContactAdminDisplay" />
+        <FieldBox Label="Last Admin Login" Value="@LastAdminLoginDisplay" />
+        <FieldBox Label="Last Login" Value="@LastLoginDisplay" />
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Site Division { get; set; } = null!;
+    [Parameter] public string PortalDomain { get; set; } = string.Empty;
+
+    private string HomePageUrl => SiteUrlHelper.BuildPublicUrl(Division, PortalDomain);
+    private string InternalDisplay => string.IsNullOrEmpty(HomePageUrl) ? "---" : HomePageUrl;
+    private string DomainDisplay => string.IsNullOrWhiteSpace(Division.Domain) ? "---" : Division.Domain;
+
+    // No data source exists yet for contact-admin/login tracking per site — these
+    // stay as placeholders until that's wired up (see SitesTab.razor conversation).
+    private string ContactAdminDisplay => "---";
+    private string LastAdminLoginDisplay => "---";
+    private string LastLoginDisplay => "---";
+
+    private static string StatusBadgeClass(SiteStatus status) => status switch
+    {
+        SiteStatus.Pending => "text-bg-warning",
+        SiteStatus.MembersOnly => "text-bg-info",
+        SiteStatus.Active => "text-bg-success",
+        SiteStatus.Inactive => "text-bg-secondary",
+        SiteStatus.Archived => "text-bg-dark",
+        _ => "text-bg-secondary"
+    };
+}

@@ -1,0 +1,114 @@
+@using SiteEngine.Entities
+@using SiteEngine.Enums
+@using WebApp.Services
+@inject SiteAdminService SiteAdminService
+
+@if (_visible)
+{
+    <div class="modal d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Local Unit</h5>
+                    <button type="button" class="btn-close" @onclick="Close"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(_error))
+                    {
+                        <div class="alert alert-danger">@_error</div>
+                    }
+                    <div class="mb-3">
+                        <label class="form-label">Site Name</label>
+                        <input class="form-control" value="@_siteName" @oninput="OnSiteNameChanged" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Division</label>
+                        <select class="form-select" @bind="_parentSiteIdText">
+                            <option value="">Independent (no Division)</option>
+                            @foreach (var division in Divisions)
+                            {
+                                <option value="@division.Id">@division.SiteName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Hostname (subdomain)</label>
+                        <input class="form-control" @bind="_hostname" />
+                        <div class="form-text">Auto-generated from Site Name; edit if needed.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Domain (optional)</label>
+                        <input class="form-control" @bind="_domain" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Status</label>
+                        <select class="form-select" @bind="_status">
+                            @foreach (var status in Enum.GetValues<SiteStatus>())
+                            {
+                                <option value="@status">@status</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="Close">Cancel</button>
+                    <button type="button" class="btn btn-primary" disabled="@_saving" @onclick="SubmitAsync">Add Local Unit</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public List<Site> Divisions { get; set; } = new();
+    [Parameter] public EventCallback OnCreated { get; set; }
+
+    private bool _visible;
+    private bool _saving;
+    private string? _error;
+    private string _siteName = "";
+    private string _hostname = "";
+    private string _domain = "";
+    private string _parentSiteIdText = "";
+    private SiteStatus _status = SiteStatus.Pending;
+
+    public void Open(Guid? preselectedParentId)
+    {
+        _siteName = "";
+        _hostname = "";
+        _domain = "";
+        _parentSiteIdText = preselectedParentId?.ToString() ?? "";
+        _status = SiteStatus.Pending;
+        _error = null;
+        _visible = true;
+    }
+
+    private void Close() => _visible = false;
+
+    private void OnSiteNameChanged(ChangeEventArgs e)
+    {
+        _siteName = e.Value?.ToString() ?? "";
+        _hostname = SiteAdminService.SlugifyHostname(_siteName);
+    }
+
+    private async Task SubmitAsync()
+    {
+        _saving = true;
+        _error = null;
+
+        Guid? parentSiteId = Guid.TryParse(_parentSiteIdText, out var parsed) ? parsed : null;
+
+        var result = await SiteAdminService.CreateLocalUnitAsync(_siteName, parentSiteId, _hostname, _domain, _status);
+
+        _saving = false;
+
+        if (!result.Success)
+        {
+            _error = result.Error;
+            return;
+        }
+
+        _visible = false;
+        await OnCreated.InvokeAsync();
+    }
+}

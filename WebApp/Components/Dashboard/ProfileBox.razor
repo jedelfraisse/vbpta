@@ -1,0 +1,95 @@
+@using System.Security.Claims
+@using WebApp.Services
+@inject ProfileService ProfileService
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <div class="d-flex align-items-center gap-3 mb-3">
+            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold"
+                 style="width:48px;height:48px;flex:0 0 auto;" aria-hidden="true">
+                @Initials
+            </div>
+            <div>
+                <h5 class="mb-0">@(string.IsNullOrWhiteSpace(_displayName) ? "Your profile" : _displayName)</h5>
+                <div class="text-muted small">@_email</div>
+            </div>
+        </div>
+
+        @if (_loaded)
+        {
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label for="firstName" class="form-label">First name</label>
+                    <input id="firstName" type="text" class="form-control" @bind="_firstName" />
+                </div>
+                <div class="col-md-4">
+                    <label for="lastName" class="form-label">Last name</label>
+                    <input id="lastName" type="text" class="form-control" @bind="_lastName" />
+                </div>
+                <div class="col-md-4">
+                    <label for="displayName" class="form-label">Display name</label>
+                    <input id="displayName" type="text" class="form-control" @bind="_displayName" />
+                </div>
+            </div>
+
+            <button class="btn btn-primary btn-sm mt-3" @onclick="SaveAsync">Save changes</button>
+
+            @if (!string.IsNullOrWhiteSpace(_statusMessage))
+            {
+                <div class="alert alert-info mt-3 mb-0 py-2">@_statusMessage</div>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private string _identityUserId = string.Empty;
+    private string _email = string.Empty;
+    private string _firstName = string.Empty;
+    private string _lastName = string.Empty;
+    private string _displayName = string.Empty;
+    private string _statusMessage = string.Empty;
+    private bool _loaded;
+
+    private string Initials =>
+        string.IsNullOrWhiteSpace(_displayName)
+            ? "?"
+            : string.Concat(_displayName
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Take(2)
+                .Select(p => char.ToUpperInvariant(p[0])));
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthState is null ? null : (await AuthState).User;
+        _identityUserId = user?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+        _email = user?.Identity?.Name ?? string.Empty;
+
+        if (string.IsNullOrEmpty(_identityUserId))
+            return;
+
+        var siteUser = await ProfileService.GetByIdentityUserIdAsync(_identityUserId);
+        if (siteUser is not null)
+        {
+            _firstName = siteUser.FirstName;
+            _lastName = siteUser.LastName;
+            _displayName = siteUser.DisplayName;
+        }
+
+        _loaded = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_firstName) || string.IsNullOrWhiteSpace(_displayName))
+        {
+            _statusMessage = "First name and display name are required.";
+            return;
+        }
+
+        await ProfileService.UpdateAsync(_identityUserId, _firstName, _lastName, _displayName);
+        _statusMessage = "Profile updated.";
+    }
+}

@@ -1,0 +1,84 @@
+@page "/dashboard"
+@using System.Security.Claims
+@using SiteEngine.Data
+@using SiteEngine.Entities
+@using SiteEngine.Enums
+@using WebApp.Components.Dashboard
+@using WebApp.Services
+@inject NavigationManager NavigationManager
+@inject SiteRoleResolver SiteRoleResolver
+@inject DashboardService DashboardService
+
+<PageTitle>Dashboard</PageTitle>
+
+@if (_loaded)
+{
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="mb-0">Dashboard</h1>
+            @if (CurrentRole is not null)
+            {
+                <span class="badge text-bg-primary">@EffectiveRole</span>
+            }
+        </div>
+
+        <ProfileBox />
+
+        @if (EffectiveRole == SiteRole.SuperAdmin)
+        {
+            <GlobalAdminBox />
+        }
+
+        <MembershipsBox Memberships="_memberships" />
+        <ToolsBox Tools="_tools" />
+
+        <ComingSoonBox Title="Forms" Description="Submit new requests to Divisions and Local Units and track your past submissions." />
+        <ComingSoonBox Title="Request Statistics" Description="See counts and status breakdowns for requests you've submitted." />
+        <ComingSoonBox Title="Current Unit" Description="Pick which of your Units or Divisions you're actively working in." />
+        <ComingSoonBox Title="Per-Unit Profile" Description="Set a different nickname or avatar for each Unit or Division you belong to." />
+
+        @if (EffectiveRole >= SiteRole.SiteAdmin)
+        {
+            <SiteAdminBox Memberships="_memberships" />
+        }
+
+
+    </div>
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private string _identityUserId = string.Empty;
+    private SiteRole? CurrentRole;
+    private List<MembershipSummary> _memberships = new();
+    private List<PortalTools> _tools = new();
+    private bool _loaded;
+
+    // The Portal-scoped CurrentRole misses privilege a user holds only on a
+    // Division/Unit site (e.g. a Local Unit's Site Admin). Admin sections gate
+    // on this instead so they show up regardless of which site granted the role.
+    private SiteRole EffectiveRole => WebApp.Services.SiteRoleResolver.HighestRole(CurrentRole ?? SiteRole.Viewer, _memberships.Select(m => m.Role));
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthState is null ? null : (await AuthState).User;
+        _identityUserId = user?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+
+        if (string.IsNullOrEmpty(_identityUserId))
+        {
+            NavigationManager.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        // CurrentRole is resolved at the Portal site specifically, since
+        // SuperAdmin only means anything at the Portal level in this schema.
+        // Section gating uses EffectiveRole (below), which also folds in
+        // Division/Unit-scoped roles from _memberships.
+        CurrentRole = await SiteRoleResolver.ResolveAsync(_identityUserId, SeedData.DefaultPortalSiteId);
+        _memberships = await DashboardService.GetMembershipsAsync(_identityUserId);
+        _tools = await DashboardService.GetEnabledToolsAsync();
+
+        _loaded = true;
+    }
+}

@@ -1,0 +1,32 @@
+@using WebApp.Services
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Units &amp; Divisions</h5>
+
+        @if (Memberships.Count == 0)
+        {
+            <p class="text-muted mb-0">You're not a member of any Division or Local Unit yet.</p>
+        }
+        else
+        {
+            <ul class="list-group list-group-flush">
+                @foreach (var m in Memberships)
+                {
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <div>
+                            <div class="fw-semibold">@m.SiteName</div>
+                            <span class="badge text-bg-secondary">@m.SiteType</span>
+                            <span class="text-muted small">@m.SchoolYear</span>
+                        </div>
+                        <span class="badge text-bg-info">@(m.CustomRoleName ?? m.Role?.ToString() ?? "Member")</span>
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public List<MembershipSummary> Memberships { get; set; } = new();
+}

@@ -1,9 +1,15 @@
+@using WebApp.Services
 @inherits SiteLayoutBase
+@inject SiteContext SiteContext
 
 @code {
     protected override async Task OnParametersSetAsync()
     {
-        await RefreshUserStateAsync();
+        // Resolve the current Local Unit site the same way Home.razor does, so
+        // the role check below is scoped to it rather than defaulting to
+        // Viewer (see SiteLayoutBase.RefreshUserStateAsync).
+        await SiteContext.InitializeAsync(new Uri(NavigationManager.Uri).Host);
+        await RefreshUserStateAsync(SiteContext.CurrentSite?.Id);
     }
 }
 
@@ -25,6 +31,7 @@
             }
             <AuthorizeView>
                 <Authorized>
+                    <span> | </span><a href="/dashboard">Dashboard</a>
                     <span> | </span><a href="/logout">Logout</a>
                 </Authorized>
                 <NotAuthorized>

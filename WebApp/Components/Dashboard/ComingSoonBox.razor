@@ -1,0 +1,14 @@
+<div class="card shadow-sm mb-4 border-dashed">
+    <div class="card-body">
+        <h6 class="card-title d-flex align-items-center gap-2">
+            @Title
+            <span class="badge text-bg-light border">Coming soon</span>
+        </h6>
+        <p class="card-text text-muted mb-0">@Description</p>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Description { get; set; } = string.Empty;
+}

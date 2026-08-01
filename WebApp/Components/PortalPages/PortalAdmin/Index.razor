@@ -1,0 +1,97 @@
+@page "/portaladmin"
+@using System.Security.Claims
+@using SiteEngine.Data
+@using SiteEngine.Enums
+@using WebApp.Components.Dashboard
+@using WebApp.Components.SharedPages
+@using WebApp.Services
+@inject NavigationManager NavigationManager
+@inject SiteRoleResolver SiteRoleResolver
+@inject DashboardService DashboardService
+
+<PageTitle>Site Admin</PageTitle>
+
+@if (_loaded)
+{
+    @if (!_hasAccess)
+    {
+        <NoAccess />
+    }
+    else
+    {
+        <div class="container">
+            <h1 class="mb-4">Site Admin</h1>
+            <p class="text-muted">Sites where you hold the Site Admin role, and their current status.</p>
+
+            @if (_adminSites.Count == 0)
+            {
+                <p class="text-muted">You don't administer any sites yet.</p>
+            }
+            else
+            {
+                <ul class="list-group mb-4">
+                    @foreach (var m in _adminSites)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="fw-semibold">@m.SiteName</div>
+                                <span class="badge text-bg-secondary">@m.SiteType</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                @if (_status.TryGetValue(m.SiteId, out var status))
+                                {
+                                    <span class="badge @(status == SiteStatus.Active ? "text-bg-success" : "text-bg-secondary")">@status</span>
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleAsync(m.SiteId, status)">
+                                        @(status == SiteStatus.Active ? "Deactivate" : "Activate")
+                                    </button>
+                                }
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+
+            <ComingSoonBox Title="Site Settings" Description="Per-site configuration such as branding, contact info, and school year defaults." />
+        </div>
+    }
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private bool _loaded;
+    private bool _hasAccess;
+    private List<MembershipSummary> _adminSites = new();
+    private readonly Dictionary<Guid, SiteStatus> _status = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthState is null ? null : (await AuthState).User;
+        var identityUserId = user?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+
+        if (string.IsNullOrEmpty(identityUserId))
+        {
+            NavigationManager.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        var portalRole = await SiteRoleResolver.ResolveAsync(identityUserId, SeedData.DefaultPortalSiteId);
+        var memberships = await DashboardService.GetMembershipsAsync(identityUserId);
+        var effectiveRole = WebApp.Services.SiteRoleResolver.HighestRole(portalRole, memberships.Select(m => m.Role));
+
+        _hasAccess = effectiveRole >= SiteRole.SiteAdmin;
+        _adminSites = memberships.Where(m => m.Role >= SiteRole.SiteAdmin).ToList();
+
+        foreach (var site in _adminSites)
+            _status[site.SiteId] = await DashboardService.GetSiteStatusAsync(site.SiteId);
+
+        _loaded = true;
+    }
+
+    private async Task ToggleAsync(Guid siteId, SiteStatus current)
+    {
+        var next = current == SiteStatus.Active ? SiteStatus.Inactive : SiteStatus.Active;
+        await DashboardService.SetSiteStatusAsync(siteId, next);
+        _status[siteId] = next;
+    }
+}

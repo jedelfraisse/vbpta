@@ -1,0 +1,380 @@
+@page "/globaladmin/sites/{SiteId:guid}"
+@using System.Security.Claims
+@using SiteEngine.Data
+@using SiteEngine.Entities
+@using SiteEngine.Enums
+@using WebApp.Components.SharedPages
+@using WebApp.Services
+@inject NavigationManager NavigationManager
+@inject SiteRoleResolver SiteRoleResolver
+@inject SiteAdminService SiteAdminService
+@inject DashboardService DashboardService
+
+<PageTitle>Site Details</PageTitle>
+
+@if (_loaded)
+{
+    @if (!_hasAccess)
+    {
+        <NoAccess />
+    }
+    else if (_site is null)
+    {
+        <div class="container">
+            <p class="text-muted">That site could not be found.</p>
+            <a href="/globaladmin/sites">Back to Global Admin</a>
+        </div>
+    }
+    else
+    {
+        <div class="container">
+            <a href="/globaladmin/sites">&laquo; Back to Global Admin</a>
+
+            <div class="d-flex justify-content-between align-items-start mt-3 mb-4">
+                <div>
+                    <h1 class="mb-1">@_site.SiteName</h1>
+                    <span class="badge text-bg-secondary">@_site.SiteType</span>
+                    <span class="badge @StatusBadgeClass(_site.SiteStatus)">@_site.SiteStatus</span>
+                </div>
+                <div class="d-flex gap-2">
+                    @if (!string.IsNullOrEmpty(_publicUrl))
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" href="@_publicUrl" target="_blank" rel="noopener noreferrer">Home Page</a>
+                    }
+                    @if (!string.IsNullOrEmpty(_adminUrl))
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" href="@_adminUrl" target="_blank" rel="noopener noreferrer">Admin Portal</a>
+                    }
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h6 class="card-title">Summary</h6>
+                    <div class="row text-center g-3">
+                        <div class="col-6 col-md-3">
+                            <div class="fs-4 fw-bold">@(_summary?.UserCount ?? 0)</div>
+                            <div class="text-muted small">Users</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="fs-4 fw-bold">@(_summary?.ChildSiteCount ?? 0)</div>
+                            <div class="text-muted small">Child Sites</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="fs-6 fw-semibold">@_site.SiteStatus</div>
+                            <div class="text-muted small">Status</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="fs-6 fw-semibold">@(string.IsNullOrWhiteSpace(_site.LastActiveYear) ? "—" : _site.LastActiveYear)</div>
+                            <div class="text-muted small">Last Active Year</div>
+                        </div>
+                    </div>
+                    <div class="text-muted small mt-3">Created @FormatDate(_site.CreatedAtUtc)</div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h6 class="card-title">Site Information</h6>
+
+                    @if (!string.IsNullOrEmpty(_statusError))
+                    {
+                        <div class="alert alert-danger">@_statusError</div>
+                    }
+                    @if (!string.IsNullOrEmpty(_statusSuccessMessage))
+                    {
+                        <div class="alert alert-success">@_statusSuccessMessage</div>
+                    }
+
+                    <div class="row mb-3 align-items-center">
+                        <label class="col-sm-3 col-form-label">Status</label>
+                        <div class="col-sm-9 d-flex gap-2">
+                            <select class="form-select" style="max-width: 220px;" @bind="_status">
+                                @foreach (var status in Enum.GetValues<SiteStatus>())
+                                {
+                                    <option value="@status">@status</option>
+                                }
+                            </select>
+                            <button type="button" class="btn btn-sm btn-outline-primary" disabled="@_savingStatus" @onclick="SaveStatusAsync">Save</button>
+                        </div>
+                    </div>
+
+                    <hr />
+
+                    @if (!string.IsNullOrEmpty(_domainError))
+                    {
+                        <div class="alert alert-danger">@_domainError</div>
+                    }
+                    @if (!string.IsNullOrEmpty(_domainSuccessMessage))
+                    {
+                        <div class="alert alert-success">@_domainSuccessMessage</div>
+                    }
+
+                    <div class="row mb-3">
+                        <label class="col-sm-3 col-form-label">Hostname</label>
+                        <div class="col-sm-9">
+                            <input class="form-control" @bind="_hostname" />
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <label class="col-sm-3 col-form-label">Domain</label>
+                        <div class="col-sm-9">
+                            <input class="form-control" @bind="_domain" placeholder="(optional)" />
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-9 offset-sm-3">
+                            <button type="button" class="btn btn-sm btn-primary" disabled="@_savingDomain" @onclick="SaveDomainAsync">Save Domain Settings</button>
+                        </div>
+                    </div>
+
+                    <dl class="row mb-0">
+                        <dt class="col-sm-3">Public Home Page</dt>
+                        <dd class="col-sm-9">
+                            @if (string.IsNullOrEmpty(_publicUrl))
+                            {
+                                @:—
+                            }
+                            else
+                            {
+                                <a href="@_publicUrl" target="_blank" rel="noopener noreferrer">@_publicUrl/</a>
+                            }
+                        </dd>
+
+                        @if (_site.ParentSite is not null)
+                        {
+                            <dt class="col-sm-3">Parent Division</dt>
+                            <dd class="col-sm-9"><a href="@($"/globaladmin/sites/{_site.ParentSite.Id}")">@_site.ParentSite.SiteName</a></dd>
+                        }
+
+                        <dt class="col-sm-3">Created</dt>
+                        <dd class="col-sm-9">@FormatDate(_site.CreatedAtUtc)</dd>
+
+                        <dt class="col-sm-3">Last Updated</dt>
+                        <dd class="col-sm-9">@FormatDate(_site.UpdatedAtUtc)</dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h6 class="card-title">All Fields (Read-Only)</h6>
+                    <dl class="row mb-0">
+                        <dt class="col-sm-3">Name</dt>
+                        <dd class="col-sm-9">@_site.SiteName</dd>
+
+                        <dt class="col-sm-3">Status</dt>
+                        <dd class="col-sm-9">@_site.SiteStatus</dd>
+
+                        <dt class="col-sm-3">Hostname</dt>
+                        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.Hostname) ? "---" : _site.Hostname)</dd>
+
+                        <dt class="col-sm-3">Domain</dt>
+                        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.Domain) ? "---" : _site.Domain)</dd>
+
+                        <dt class="col-sm-3">Internal URL</dt>
+                        <dd class="col-sm-9">@(string.IsNullOrEmpty(_publicUrl) ? "---" : _publicUrl)</dd>
+
+                        <dt class="col-sm-3">Admin URL</dt>
+                        <dd class="col-sm-9">@(string.IsNullOrEmpty(_adminUrl) ? "---" : _adminUrl)</dd>
+
+                        <dt class="col-sm-3">Contact Admin</dt>
+                        <dd class="col-sm-9">---</dd>
+
+                        <dt class="col-sm-3">Last Admin Login</dt>
+                        <dd class="col-sm-9">---</dd>
+
+                        <dt class="col-sm-3">Last Login</dt>
+                        <dd class="col-sm-9">---</dd>
+
+                        <dt class="col-sm-3">Facebook URL</dt>
+                        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.FaceBookURL) ? "---" : _site.FaceBookURL)</dd>
+
+                        <dt class="col-sm-3">GiveBack URL</dt>
+                        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.GiveBacksURL) ? "---" : _site.GiveBacksURL)</dd>
+
+                        <dt class="col-sm-3">Instagram URL</dt>
+                        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.InstagramURL) ? "---" : _site.InstagramURL)</dd>
+
+                        <dt class="col-sm-3">Twitter/X URL</dt>
+                        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.TwitterURL) ? "---" : _site.TwitterURL)</dd>
+
+                        <dt class="col-sm-3">Sign Up Genius URL</dt>
+                        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.SignUpGeniusURL) ? "---" : _site.SignUpGeniusURL)</dd>
+
+                        <dt class="col-sm-3">MemberHub URL</dt>
+                        <dd class="col-sm-9">---</dd>
+
+                        <dt class="col-sm-3">Store URL</dt>
+                        <dd class="col-sm-9">---</dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h6 class="card-title">Branding</h6>
+                    <dl class="row mb-0">
+                        <dt class="col-sm-3">Logo URL</dt>
+                        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.LogoUrl) ? "—" : _site.LogoUrl)</dd>
+
+                        <dt class="col-sm-3">Banner URL</dt>
+                        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.BannerUrl) ? "—" : _site.BannerUrl)</dd>
+
+                        <dt class="col-sm-3">Primary Color</dt>
+                        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.PrimaryColor) ? "—" : _site.PrimaryColor)</dd>
+
+                        <dt class="col-sm-3">Accent Color</dt>
+                        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.AccentColor) ? "—" : _site.AccentColor)</dd>
+
+                        <dt class="col-sm-3">Header Text</dt>
+                        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.HeaderText) ? "—" : _site.HeaderText)</dd>
+                    </dl>
+                </div>
+            </div>
+
+            @if (_site.SiteType == SiteType.Division)
+            {
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body">
+                        <h6 class="card-title">Local Units</h6>
+                        <ul class="list-group list-group-flush">
+                            @foreach (var unit in _site.ChildSites)
+                            {
+                                <li class="list-group-item">
+                                    <LocalUnitRow Unit="unit" PortalDomain="_portalDomain" />
+                                </li>
+                            }
+                            @if (_site.ChildSites.Count == 0)
+                            {
+                                <li class="list-group-item text-muted">No Local Units yet.</li>
+                            }
+                        </ul>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public Guid SiteId { get; set; }
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private bool _loaded;
+    private bool _hasAccess;
+    private Site? _site;
+    private string _adminUrl = string.Empty;
+    private string _publicUrl = string.Empty;
+    private string _portalDomain = string.Empty;
+    private SiteSummary? _summary;
+
+    private SiteStatus _status;
+    private bool _savingStatus;
+    private string? _statusError;
+    private string? _statusSuccessMessage;
+
+    private string _hostname = string.Empty;
+    private string _domain = string.Empty;
+    private bool _savingDomain;
+    private string? _domainError;
+    private string? _domainSuccessMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var user = AuthState is null ? null : (await AuthState).User;
+        var identityUserId = user?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+
+        if (string.IsNullOrEmpty(identityUserId))
+        {
+            NavigationManager.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        var portalRole = await SiteRoleResolver.ResolveAsync(identityUserId, SeedData.DefaultPortalSiteId);
+        _hasAccess = portalRole == SiteRole.SuperAdmin;
+
+        if (_hasAccess)
+        {
+            var config = await DashboardService.GetPortalConfigAsync();
+            _portalDomain = config?.PortalDomain?.Trim() ?? string.Empty;
+
+            _site = await SiteAdminService.GetSiteDetailAsync(SiteId);
+            if (_site is not null)
+            {
+                _adminUrl = SiteUrlHelper.BuildAdminUrl(_site, _portalDomain);
+                _publicUrl = SiteUrlHelper.BuildPublicUrl(_site, _portalDomain);
+                _summary = await SiteAdminService.GetSiteSummaryAsync(_site.Id);
+                _status = _site.SiteStatus;
+                _hostname = _site.Hostname;
+                _domain = _site.Domain;
+            }
+        }
+
+        _loaded = true;
+    }
+
+    private async Task SaveStatusAsync()
+    {
+        if (_site is null)
+            return;
+
+        _savingStatus = true;
+        _statusError = null;
+        _statusSuccessMessage = null;
+
+        var result = await SiteAdminService.UpdateSiteStatusAsync(_site.Id, _status);
+
+        _savingStatus = false;
+
+        if (!result.Success)
+        {
+            _statusError = result.Error;
+            return;
+        }
+
+        _site.SiteStatus = result.Site!.SiteStatus;
+        _statusSuccessMessage = "Status saved.";
+    }
+
+    private async Task SaveDomainAsync()
+    {
+        if (_site is null)
+            return;
+
+        _savingDomain = true;
+        _domainError = null;
+        _domainSuccessMessage = null;
+
+        var result = await SiteAdminService.UpdateDomainSettingsAsync(_site.Id, _hostname, _domain);
+
+        _savingDomain = false;
+
+        if (!result.Success)
+        {
+            _domainError = result.Error;
+            return;
+        }
+
+        _hostname = result.Site!.Hostname;
+        _domain = result.Site.Domain;
+        _site.Hostname = _hostname;
+        _site.Domain = _domain;
+        _adminUrl = SiteUrlHelper.BuildAdminUrl(_site, _portalDomain);
+        _publicUrl = SiteUrlHelper.BuildPublicUrl(_site, _portalDomain);
+        _domainSuccessMessage = "Domain settings saved.";
+    }
+
+    private static string FormatDate(DateTimeOffset value) =>
+        value.ToLocalTime().ToString("MMM d, yyyy h:mm tt");
+
+    private static string StatusBadgeClass(SiteStatus status) => status switch
+    {
+        SiteStatus.Pending => "text-bg-warning",
+        SiteStatus.MembersOnly => "text-bg-info",
+        SiteStatus.Active => "text-bg-success",
+        SiteStatus.Inactive => "text-bg-secondary",
+        SiteStatus.Archived => "text-bg-dark",
+        _ => "text-bg-secondary"
+    };
+}

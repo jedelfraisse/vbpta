@@ -1,0 +1,17 @@
+<div class="field-box">
+    <span class="field-box-label">@Label:</span>
+    @if (!string.IsNullOrEmpty(Href))
+    {
+        <a href="@Href" target="_blank" rel="noopener noreferrer" class="field-box-value">@Value</a>
+    }
+    else
+    {
+        <span class="field-box-value">@Value</span>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Value { get; set; } = string.Empty;
+    [Parameter] public string? Href { get; set; }
+}

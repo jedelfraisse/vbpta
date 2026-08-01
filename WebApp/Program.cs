@@ -80,6 +80,8 @@ builder.Services.AddSingleton<PasswordlessCodeStore>();
 builder.Services.AddScoped<IEmailLoginSender, EmailLoginSender>();
 builder.Services.AddScoped<ProfileService>();
 builder.Services.AddScoped<MembershipLookupService>();
+builder.Services.AddScoped<DashboardService>();
+builder.Services.AddScoped<SiteAdminService>();
 builder.Services.AddScoped<LoginTrackingService>();
 builder.Services.AddScoped<LoginAnalyticsService>();
 builder.Services.AddScoped<PasswordlessSignInService>();
@@ -92,6 +94,7 @@ builder.Services.AddScoped<SiteContextResolver>();
 builder.Services.AddScoped<RuntimeSiteContext>();
 builder.Services.AddScoped<SetupSiteContext>();
 builder.Services.AddScoped<SiteContext>();
+builder.Services.AddScoped<SiteRoleResolver>();
 
 // ------------------------------------------------------------
 // Build the app

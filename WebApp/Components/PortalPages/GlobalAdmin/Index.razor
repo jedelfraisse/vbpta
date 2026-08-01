@@ -1,0 +1,404 @@
+@page "/globaladmin"
+@page "/globaladmin/sites"
+@using System.Security.Claims
+@using SiteEngine.Data
+@using SiteEngine.Entities
+@using SiteEngine.Enums
+@using WebApp.Components.Dashboard
+@using WebApp.Components.SharedPages
+@using WebApp.Services
+@inject NavigationManager NavigationManager
+@inject SiteRoleResolver SiteRoleResolver
+@inject DashboardService DashboardService
+@inject LoginAnalyticsService LoginAnalyticsService
+
+<PageTitle>Global Admin</PageTitle>
+
+@if (_loaded)
+{
+    @if (!_hasAccess)
+    {
+        <NoAccess />
+    }
+    else
+    {
+        <div class="container">
+            <h1 class="mb-4">Global Admin</h1>
+
+            <ul class="nav nav-tabs mb-4">
+                @foreach (var tab in _tabs)
+                {
+                    <li class="nav-item">
+                        <a class="nav-link @(_activeTab == tab ? "active" : "")" role="button" @onclick="() => SetTab(tab)">@tab</a>
+                    </li>
+                }
+            </ul>
+
+            @if (_activeTab == "Overview")
+            {
+                @if (_stats is not null)
+                {
+                    <div class="row text-center g-3 mb-4">
+                        <div class="col-3">
+                            <div class="fs-4 fw-bold">@_stats.DivisionCount</div>
+                            <div class="text-muted small">Divisions</div>
+                        </div>
+                        <div class="col-3">
+                            <div class="fs-4 fw-bold">@_stats.UnitCount</div>
+                            <div class="text-muted small">Local Units</div>
+                        </div>
+                        <div class="col-3">
+                            <div class="fs-4 fw-bold">@_stats.UserCount</div>
+                            <div class="text-muted small">Users</div>
+                        </div>
+                        <div class="col-3">
+                            <div class="fs-4 fw-bold">@_stats.MembershipCount</div>
+                            <div class="text-muted small">Role Assignments</div>
+                        </div>
+                    </div>
+                }
+            }
+            else if (_activeTab == "Sites")
+            {
+                <SitesTab />
+            }
+            else if (_activeTab == "Domains")
+            {
+                <ComingSoonBox Title="Domain Management" Description="Map custom domains to Divisions and Local Units and manage verification status." />
+            }
+            else if (_activeTab == "Users")
+            {
+                <h6>All Users</h6>
+                <div class="table-responsive mb-3">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>Email</th>
+                                <th>Display Name</th>
+                                <th>Confirmed</th>
+                                <th>First Login</th>
+                                <th>Last Login</th>
+                                <th>Last Login Site</th>
+                                <th>Login Count</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var u in _users)
+                            {
+                                <tr role="button" class="@(_selectedUserId == u.IdentityUserId ? "table-active" : "")" @onclick="() => SelectUserAsync(u)">
+                                    <td>@u.Email</td>
+                                    <td>@u.DisplayName</td>
+                                    <td>@(u.EmailConfirmed ? "Yes" : "No")</td>
+                                    <td>@FormatDate(u.FirstLoginUtc)</td>
+                                    <td>@FormatDate(u.LastLoginUtc)</td>
+                                    <td>@(u.LastLoginSiteName ?? "—")</td>
+                                    <td>@u.LoginCount</td>
+                                </tr>
+                            }
+                            @if (_users.Count == 0)
+                            {
+                                <tr><td colspan="7" class="text-muted">None yet.</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                @if (_selectedUser is not null)
+                {
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-body">
+                            <h6 class="card-title d-flex justify-content-between align-items-start">
+                                <span>@_selectedUser.DisplayName <span class="text-muted small">(@_selectedUser.Email)</span></span>
+                                <button type="button" class="btn-close" aria-label="Close" @onclick="ClearSelectedUser"></button>
+                            </h6>
+
+                            <h6 class="mt-3">User Activity</h6>
+                            <dl class="row mb-3">
+                                <dt class="col-sm-3">First Login</dt>
+                                <dd class="col-sm-9">@FormatDate(_selectedUser.FirstLoginUtc)</dd>
+                                <dt class="col-sm-3">Last Login</dt>
+                                <dd class="col-sm-9">@FormatDate(_selectedUser.LastLoginUtc)</dd>
+                                <dt class="col-sm-3">Login Count</dt>
+                                <dd class="col-sm-9">@_selectedUser.LoginCount</dd>
+                            </dl>
+
+                            <h6>Recent Logins</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead><tr><th>Site</th><th>Login Time</th><th>IP Address</th></tr></thead>
+                                    <tbody>
+                                        @foreach (var h in _selectedUserHistory)
+                                        {
+                                            <tr>
+                                                <td>@(h.SiteName ?? "—")</td>
+                                                <td>@FormatDate(h.LoginUtc)</td>
+                                                <td>@h.IpAddress</td>
+                                            </tr>
+                                        }
+                                        @if (_selectedUserHistory.Count == 0)
+                                        {
+                                            <tr><td colspan="3" class="text-muted">No recorded logins yet.</td></tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+            else if (_activeTab == "Login Analytics")
+            {
+                <h6>Recent Logins</h6>
+                <div class="table-responsive mb-4">
+                    <table class="table table-sm">
+                        <thead><tr><th>User</th><th>Site</th><th>Login Time</th><th>IP Address</th><th>Network</th></tr></thead>
+                        <tbody>
+                            @foreach (var l in _recentLogins)
+                            {
+                                <tr>
+                                    <td>@l.Email</td>
+                                    <td>@(l.SiteName ?? "—")</td>
+                                    <td>@FormatDate(l.LoginUtc)</td>
+                                    <td>@l.IpAddress</td>
+                                    <td><span class="badge @NetworkBadgeClass(l.NetworkType)">@l.NetworkType</span></td>
+                                </tr>
+                            }
+                            @if (_recentLogins.Count == 0)
+                            {
+                                <tr><td colspan="5" class="text-muted">No recorded logins yet.</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <h6>Logins per Site</h6>
+                <div class="mb-4">
+                    @{ var maxSiteLogins = _loginsPerSite.Count == 0 ? 0 : _loginsPerSite.Max(s => s.LoginCount); }
+                    @foreach (var s in _loginsPerSite)
+                    {
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between small">
+                                <span>@s.SiteName</span>
+                                <span class="text-muted">@s.LoginCount</span>
+                            </div>
+                            <div class="progress" role="progressbar" aria-valuenow="@s.LoginCount" aria-valuemin="0" aria-valuemax="@maxSiteLogins" style="height:8px;">
+                                <div class="progress-bar bg-primary rounded-2" style="width:@(maxSiteLogins == 0 ? 0 : s.LoginCount * 100 / maxSiteLogins)%"></div>
+                            </div>
+                        </div>
+                    }
+                    @if (_loginsPerSite.Count == 0)
+                    {
+                        <p class="text-muted">No recorded logins yet.</p>
+                    }
+                </div>
+
+                <h6>Network Breakdown</h6>
+                <p class="text-muted small">Network classification isn't implemented yet — every login is currently logged as <span class="badge @NetworkBadgeClass(LoginNetworkType.Unknown)">Unknown</span>.</p>
+                <div class="mb-4">
+                    @{ var totalNetworkLogins = _networkBreakdown.Sum(n => n.LoginCount); }
+                    @foreach (var n in _networkBreakdown)
+                    {
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between small">
+                                <span><span class="badge @NetworkBadgeClass(n.NetworkType)">@n.NetworkType</span></span>
+                                <span class="text-muted">@n.LoginCount</span>
+                            </div>
+                            <div class="progress" role="progressbar" aria-valuenow="@n.LoginCount" aria-valuemin="0" aria-valuemax="@totalNetworkLogins" style="height:8px;">
+                                <div class="progress-bar @NetworkBadgeClass(n.NetworkType) rounded-2" style="width:@(totalNetworkLogins == 0 ? 0 : n.LoginCount * 100 / totalNetworkLogins)%"></div>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <h6>Yearly Summaries</h6>
+                <div class="table-responsive mb-3">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>User</th><th>School Year</th><th>Primary Site</th><th>Total Logins</th>
+                                <th>School</th><th>Home</th><th>Mobile</th><th>Unique Sites</th><th>First Login</th><th>Last Login</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var y in _yearlySummaries)
+                            {
+                                <tr>
+                                    <td>@y.Email</td>
+                                    <td>@y.SchoolYear</td>
+                                    <td>@(y.SiteName ?? "—")</td>
+                                    <td>@y.TotalLogins</td>
+                                    <td>@y.SchoolNetworkLogins</td>
+                                    <td>@y.HomeNetworkLogins</td>
+                                    <td>@y.MobileNetworkLogins</td>
+                                    <td>@y.UniqueSites</td>
+                                    <td>@FormatDate(y.FirstLoginUtc)</td>
+                                    <td>@FormatDate(y.LastLoginUtc)</td>
+                                </tr>
+                            }
+                            @if (_yearlySummaries.Count == 0)
+                            {
+                                <tr><td colspan="10" class="text-muted">No yearly summaries generated yet — the yearly rollup is a placeholder routine that hasn't been scheduled.</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else if (_activeTab == "Roles")
+            {
+                <h6>All Role Assignments</h6>
+                <div class="table-responsive mb-3">
+                    <table class="table table-sm">
+                        <thead><tr><th>User</th><th>Site</th><th>Role</th><th>School Year</th></tr></thead>
+                        <tbody>
+                            @foreach (var r in _roles)
+                            {
+                                <tr>
+                                    <td>@r.UserEmail</td>
+                                    <td>@r.SiteName</td>
+                                    <td>@(r.CustomRoleName ?? r.Role?.ToString() ?? "-")</td>
+                                    <td>@r.SchoolYear</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else if (_activeTab == "Forms")
+            {
+                <ComingSoonBox Title="Form Templates" Description="Manage the library of reusable form templates available across the portal." />
+                <ComingSoonBox Title="Create Template" Description="Build a new form template from scratch or from an existing one." />
+                <ComingSoonBox Title="Assign to Sites" Description="Choose which Divisions or Local Units a form template is available on." />
+                <ComingSoonBox Title="Form Stats" Description="See submission counts and completion rates for each form template." />
+            }
+            else if (_activeTab == "Requests")
+            {
+                <ComingSoonBox Title="All Requests" Description="Browse every request submitted across Divisions and Local Units." />
+                <ComingSoonBox Title="Request Details" Description="View the full submission, history, and attachments for a single request." />
+                <ComingSoonBox Title="Workflow Status" Description="Track where each request sits in its approval workflow." />
+            }
+            else if (_activeTab == "Branding")
+            {
+                <ComingSoonBox Title="Branding" Description="Customize the portal's logo, colors, and theming." />
+            }
+            else if (_activeTab == "Portal Settings")
+            {
+                <h6>Portal Settings</h6>
+                @if (_config is not null)
+                {
+                    <dl class="row mb-0">
+                        <dt class="col-sm-3">Portal Name</dt><dd class="col-sm-9">@_config.PortalName</dd>
+                        <dt class="col-sm-3">Portal Domain</dt><dd class="col-sm-9">@_config.PortalDomain</dd>
+                        <dt class="col-sm-3">SMTP Host</dt><dd class="col-sm-9">@_config.SmtpHost:@_config.SmtpPort</dd>
+                        <dt class="col-sm-3">SMTP From</dt><dd class="col-sm-9">@_config.SmtpFromAddress</dd>
+                    </dl>
+                    <p class="text-muted small mt-2 mb-4">Editing these lives in the setup wizard for now.</p>
+                }
+            }
+            else if (_activeTab == "Developer Tools")
+            {
+                <ComingSoonBox Title="Developer Tools" Description="Diagnostics, log viewers, and environment inspection tools for engineers." />
+            }
+            else if (_activeTab == "Audit Logs")
+            {
+                <ComingSoonBox Title="Audit Logs" Description="Review a chronological record of administrative actions taken across the portal." />
+            }
+        </div>
+    }
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private static readonly string[] _tabs =
+    [
+        "Overview", "Sites", "Domains", "Users", "Login Analytics", "Roles", "Forms",
+        "Requests", "Branding", "Portal Settings", "Developer Tools", "Audit Logs"
+    ];
+    private string _activeTab = "Overview";
+
+    private bool _loaded;
+    private bool _hasAccess;
+    private SystemStats? _stats;
+    private List<UserSummary> _users = new();
+    private List<RoleAssignmentSummary> _roles = new();
+    private PortalConfig? _config;
+
+    private List<RecentLoginEntry> _recentLogins = new();
+    private List<SiteLoginCount> _loginsPerSite = new();
+    private List<NetworkBreakdownEntry> _networkBreakdown = new();
+    private List<YearlySummaryEntry> _yearlySummaries = new();
+
+    private UserSummary? _selectedUser;
+    private string? _selectedUserId;
+    private List<UserLoginEntry> _selectedUserHistory = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var relativePath = NavigationManager.ToBaseRelativePath(NavigationManager.Uri).TrimEnd('/');
+        if (relativePath.Equals("globaladmin/sites", StringComparison.OrdinalIgnoreCase))
+            _activeTab = "Sites";
+
+        var user = AuthState is null ? null : (await AuthState).User;
+        var identityUserId = user?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+
+        if (string.IsNullOrEmpty(identityUserId))
+        {
+            NavigationManager.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        // SuperAdmin only means anything at the Portal level in this schema
+        // (see Dashboard.razor / SiteRoleResolver), so this checks the Portal
+        // site specifically rather than the cross-site EffectiveRole.
+        var portalRole = await SiteRoleResolver.ResolveAsync(identityUserId, SeedData.DefaultPortalSiteId);
+        _hasAccess = portalRole == SiteRole.SuperAdmin;
+
+        if (_hasAccess)
+        {
+            _stats = await DashboardService.GetSystemStatsAsync();
+            _users = await DashboardService.GetAllUsersAsync();
+            _roles = await DashboardService.GetAllRoleAssignmentsAsync();
+            _config = await DashboardService.GetPortalConfigAsync();
+
+            _recentLogins = await LoginAnalyticsService.GetRecentLoginsAsync();
+            _loginsPerSite = await LoginAnalyticsService.GetLoginsPerSiteAsync();
+            _networkBreakdown = await LoginAnalyticsService.GetNetworkBreakdownAsync();
+            _yearlySummaries = await LoginAnalyticsService.GetYearlySummariesAsync();
+        }
+
+        _loaded = true;
+    }
+
+    private void SetTab(string tab) => _activeTab = tab;
+
+    private async Task SelectUserAsync(UserSummary u)
+    {
+        if (_selectedUserId == u.IdentityUserId)
+        {
+            ClearSelectedUser();
+            return;
+        }
+
+        _selectedUser = u;
+        _selectedUserId = u.IdentityUserId;
+        _selectedUserHistory = await LoginAnalyticsService.GetUserLoginHistoryAsync(u.IdentityUserId);
+    }
+
+    private void ClearSelectedUser()
+    {
+        _selectedUser = null;
+        _selectedUserId = null;
+        _selectedUserHistory = new();
+    }
+
+    private static string FormatDate(DateTimeOffset? value) =>
+        value?.ToLocalTime().ToString("MMM d, yyyy h:mm tt") ?? "Never";
+
+    private static string NetworkBadgeClass(LoginNetworkType type) => type switch
+    {
+        LoginNetworkType.School => "text-bg-success",
+        LoginNetworkType.Home => "text-bg-info",
+        LoginNetworkType.Mobile => "text-bg-warning",
+        _ => "text-bg-secondary"
+    };
+}

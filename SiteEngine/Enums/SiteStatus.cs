@@ -8,6 +8,8 @@ namespace SiteEngine.Enums;
 
 public enum SiteStatus
 {
+	Pending,
+	MembersOnly,
 	Active,
 	Inactive,
 	Archived

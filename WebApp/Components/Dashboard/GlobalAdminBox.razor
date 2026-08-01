@@ -1,0 +1,43 @@
+@using WebApp.Services
+@inject DashboardService DashboardService
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Global Admin</h5>
+
+        @if (_stats is not null)
+        {
+            <div class="row text-center g-3 mb-3">
+                <div class="col-3">
+                    <div class="fs-4 fw-bold">@_stats.DivisionCount</div>
+                    <div class="text-muted small">Divisions</div>
+                </div>
+                <div class="col-3">
+                    <div class="fs-4 fw-bold">@_stats.UnitCount</div>
+                    <div class="text-muted small">Local Units</div>
+                </div>
+                <div class="col-3">
+                    <div class="fs-4 fw-bold">@_stats.UserCount</div>
+                    <div class="text-muted small">Users</div>
+                </div>
+                <div class="col-3">
+                    <div class="fs-4 fw-bold">@_stats.MembershipCount</div>
+                    <div class="text-muted small">Role Assignments</div>
+                </div>
+            </div>
+        }
+
+        <p class="text-muted">System-wide administration: all Divisions, Local Units, users, role assignments, portal configuration, and SMTP settings.</p>
+
+        <a class="btn btn-sm btn-outline-primary" href="/globaladmin">Open Global Admin &rarr;</a>
+    </div>
+</div>
+
+@code {
+    private SystemStats? _stats;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _stats = await DashboardService.GetSystemStatsAsync();
+    }
+}

@@ -1,0 +1,203 @@
+@using SiteEngine.Entities
+@using SiteEngine.Enums
+@using WebApp.Services
+@inject SiteAdminService SiteAdminService
+@inject DashboardService DashboardService
+
+<div class="form-check mb-3">
+    <input class="form-check-input" type="checkbox" id="showLocalUnits" @bind="_showLocalUnits" />
+    <label class="form-check-label" for="showLocalUnits">Show Local Units</label>
+</div>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <input class="form-control" style="max-width: 420px;"
+           placeholder="Search by name, hostname, or domain..."
+           value="@_searchTerm" @oninput="e => _searchTerm = e.Value?.ToString() ?? string.Empty" />
+
+    <div class="d-flex align-items-center gap-2">
+        <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                    data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                Status (@_selectedStatuses.Count)
+            </button>
+            <ul class="dropdown-menu p-2">
+                @foreach (var status in _statusOptions)
+                {
+                    <li>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="@($"status-filter-{status}")"
+                                   checked="@_selectedStatuses.Contains(status)"
+                                   @onchange="e => ToggleStatus(status, e.Value)" />
+                            <label class="form-check-label" for="@($"status-filter-{status}")">@status</label>
+                        </div>
+                    </li>
+                }
+            </ul>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="ToggleSort">
+            Sort: Name @(_sortAscending ? "A-Z" : "Z-A")
+        </button>
+        <button type="button" class="btn btn-sm btn-primary" @onclick="() => _addDivisionModal?.Open()">
+            + Add Division
+        </button>
+    </div>
+</div>
+
+@if (!_loaded)
+{
+    <p class="text-muted">Loading sites...</p>
+}
+else
+{
+    var visibleDivisions = FilteredDivisions().ToList();
+
+    @foreach (var division in visibleDivisions)
+    {
+        <div class="card shadow-sm mb-3">
+            <div class="card-header d-flex flex-wrap justify-content-between align-items-start gap-2">
+                <div class="flex-grow-1">
+                    <DivisionRow Division="division" PortalDomain="@_portalDomain" />
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => _addLocalUnitModal?.Open(division.Id)">
+                    + Add Local Unit
+                </button>
+            </div>
+            @if (_showLocalUnits)
+            {
+                var children = FilteredChildren(division).ToList();
+
+                <ul class="list-group list-group-flush">
+                    @foreach (var unit in children)
+                    {
+                        <li class="list-group-item">
+                            <LocalUnitRow Unit="unit" PortalDomain="@_portalDomain" />
+                        </li>
+                    }
+                    @if (children.Count == 0)
+                    {
+                        <li class="list-group-item text-muted">No Local Units yet.</li>
+                    }
+                </ul>
+            }
+        </div>
+    }
+
+    @if (visibleDivisions.Count == 0)
+    {
+        <p class="text-muted">No Divisions match your search.</p>
+    }
+
+    //@if (_showLocalUnits)
+    //{
+        var visibleIndependentUnits = FilteredIndependentUnits().ToList();
+
+        <div class="card shadow-sm mb-3">
+            <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <span class="fw-semibold">Independent Local Units</span>
+                <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => _addLocalUnitModal?.Open(null)">
+                    + Add Local Unit
+                </button>
+            </div>
+            <ul class="list-group list-group-flush">
+                @foreach (var unit in visibleIndependentUnits)
+                {
+                    <li class="list-group-item">
+                        <LocalUnitRow Unit="unit" PortalDomain="@_portalDomain" />
+                    </li>
+                }
+                @if (visibleIndependentUnits.Count == 0)
+                {
+                    <li class="list-group-item text-muted">None yet.</li>
+                }
+            </ul>
+        </div>
+    //}
+}
+
+<AddDivisionModal @ref="_addDivisionModal" OnCreated="ReloadAsync" />
+<AddLocalUnitModal @ref="_addLocalUnitModal" Divisions="_divisions" OnCreated="ReloadAsync" />
+
+@code {
+    private bool _loaded;
+    private bool _showLocalUnits;
+    private string _searchTerm = string.Empty;
+    private bool _sortAscending = true;
+
+    private static readonly SiteStatus[] _statusOptions = Enum.GetValues<SiteStatus>();
+    private HashSet<SiteStatus> _selectedStatuses = new(_statusOptions);
+
+    private List<Site> _divisions = new();
+    private List<Site> _independentUnits = new();
+    private string _portalDomain = string.Empty;
+
+    private AddDivisionModal? _addDivisionModal;
+    private AddLocalUnitModal? _addLocalUnitModal;
+
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        _divisions = await SiteAdminService.GetDivisionsWithUnitsAsync();
+        _independentUnits = await SiteAdminService.GetIndependentLocalUnitsAsync();
+
+        var config = await DashboardService.GetPortalConfigAsync();
+        _portalDomain = config?.PortalDomain?.Trim() ?? string.Empty;
+
+        _loaded = true;
+    }
+
+    private void ToggleSort() => _sortAscending = !_sortAscending;
+
+    private void ToggleStatus(SiteStatus status, object? value)
+    {
+        if (value is true)
+            _selectedStatuses.Add(status);
+        else
+            _selectedStatuses.Remove(status);
+    }
+
+    private IEnumerable<Site> FilteredDivisions()
+    {
+        IEnumerable<Site> divisions = _divisions.Where(d => _selectedStatuses.Contains(d.SiteStatus));
+
+        if (!string.IsNullOrWhiteSpace(_searchTerm))
+            divisions = divisions.Where(d => MatchesSearch(d) || d.ChildSites.Any(MatchesSearch));
+
+        return Sort(divisions);
+    }
+
+    private IEnumerable<Site> FilteredChildren(Site division)
+    {
+        var children = division.ChildSites.Where(c => _selectedStatuses.Contains(c.SiteStatus));
+
+        // If the search matched the division itself, show all of its units;
+        // otherwise narrow down to just the units that matched.
+        if (!string.IsNullOrWhiteSpace(_searchTerm) && !MatchesSearch(division))
+            children = children.Where(MatchesSearch);
+
+        return Sort(children);
+    }
+
+    private IEnumerable<Site> FilteredIndependentUnits()
+    {
+        IEnumerable<Site> units = _independentUnits.Where(u => _selectedStatuses.Contains(u.SiteStatus));
+
+        if (!string.IsNullOrWhiteSpace(_searchTerm))
+            units = units.Where(MatchesSearch);
+
+        return Sort(units);
+    }
+
+    private bool MatchesSearch(Site site)
+    {
+        var term = _searchTerm.Trim();
+        return Contains(site.SiteName, term) || Contains(site.Hostname, term) || Contains(site.Domain, term);
+    }
+
+    private static bool Contains(string value, string term) =>
+        !string.IsNullOrEmpty(value) && value.Contains(term, StringComparison.OrdinalIgnoreCase);
+
+    private IEnumerable<Site> Sort(IEnumerable<Site> sites) => _sortAscending
+        ? sites.OrderBy(s => s.SiteName, StringComparer.OrdinalIgnoreCase)
+        : sites.OrderByDescending(s => s.SiteName, StringComparer.OrdinalIgnoreCase);
+}

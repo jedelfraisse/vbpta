@@ -1,3 +1,4 @@
+@using SiteEngine.Data
 @using WebApp.Services
 @inherits SiteLayoutBase
 @inject SetupStateService SetupState
@@ -7,25 +8,18 @@
 @code {
     protected override async Task OnParametersSetAsync()
     {
-        await RefreshUserStateAsync();
+        // PortalLayout only ever renders for the single, well-known Portal
+        // site (Division/Unit sites render through their own DivisionLayout
+        // / UnitLayout instead), so the role lookup is scoped to it directly
+        // rather than depending on SiteContext, which isn't guaranteed to be
+        // initialized yet at this point in the component tree.
+        await RefreshUserStateAsync(SeedData.DefaultPortalSiteId);
     }
-
-    // PortalLayout is the Global Portal Admin / public central-site shell -
-    // Division (city/council) and Unit sites render through their own
-    // DivisionLayout / UnitLayout with their own branded headers, so the
-    // only roles this bar needs to know about are Public and Global Admin.
-    //
-    // NOTE: gated on IsAuthenticated, not IsGlobalAdmin - SiteLayoutBase's
-    // IsGlobalAdmin is currently a stub that's never actually set to true
-    // (see RefreshUserStateAsync), so keying off it here made every signed-in
-    // user look signed-out in the nav. Once real global-admin role lookup is
-    // wired into SiteLayoutBase, switch this back to IsGlobalAdmin.
-    private SiteRole? CurrentPortalRole => IsAuthenticated ? SiteRole.SuperAdmin : (SiteRole?)null;
 }
 
 <div class="d-flex flex-column min-vh-100">
 
-    <TopNavBar CurrentRole="@CurrentPortalRole" />
+    <TopNavBar />
 
     <!-- Main Body -->
     <main class="container my-5 flex-grow-1">

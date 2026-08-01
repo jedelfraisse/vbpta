@@ -9,9 +9,14 @@
 
 @code {
     private Type _layoutType = typeof(PortalLayout);
-    private bool _initialized = false;
 
-    protected override async Task OnParametersSetAsync()
+    // Resolved in OnInitializedAsync (not OnAfterRenderAsync) so the correct
+    // layout is already chosen before the very first render — including the
+    // prerender pass. RuntimeSiteContext.InitializeAsync pulls its own
+    // DbContext from IDbContextFactory (see LiveConnectionDbContextFactory),
+    // never the shared scoped AppDbContext Identity uses, so there's no
+    // concurrent-operation hazard running it this early.
+    protected override async Task OnInitializedAsync()
     {
         var status = SetupState.GetStatus();
 
@@ -21,26 +26,14 @@
             _layoutType = typeof(BasicLayout);
             return;
         }
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (!firstRender || _initialized)
-            return;
-
-        _initialized = true;
 
         var ctx = ContextResolver.GetContext();
 
         if (ctx is RuntimeSiteContext runtime)
         {
             var host = new Uri(Nav.Uri).Host;
-
-            // Initialize AFTER first render to avoid EF reader issues
             await runtime.InitializeAsync(host);
-
             _layoutType = ResolveLayoutType(runtime);
-            StateHasChanged(); // Re-render with correct layout
         }
     }
 

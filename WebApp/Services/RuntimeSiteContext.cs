@@ -22,9 +22,14 @@ public class RuntimeSiteContext
 
 		await using var db = await _dbFactory.CreateDbContextAsync();
 
+		// Hostname is stored as just the subdomain label (see SiteContext.
+		// InitializeAsync for the full explanation), so it has to be matched
+		// against the first label of the request host, not the full host.
+		var subdomain = host.Split('.')[0];
+
 		CurrentSite =
-			await db.Sites.FirstOrDefaultAsync(s => s.Hostname.ToLower() == host)
-			?? await db.Sites.FirstOrDefaultAsync(s => s.Domain.ToLower() == host)
+			await db.Sites.FirstOrDefaultAsync(s => s.Domain != "" && s.Domain.ToLower() == host)
+			?? await db.Sites.FirstOrDefaultAsync(s => s.SiteType != SiteType.Portal && s.Hostname.ToLower() == subdomain)
 			?? await db.Sites.FirstOrDefaultAsync(s => s.SiteType == SiteType.Portal);
 	}
 }

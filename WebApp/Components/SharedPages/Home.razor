@@ -11,13 +11,20 @@
 
 <PageTitle>@SiteContext.CurrentSite?.SiteName</PageTitle>
 
-@if (SiteContext.SiteNotFound)
+@if (SiteContext.CurrentSite is null)
 {
-    <h2>Sorry, I didn’t find that local unit.</h2>
+    @* Still resolving the current site from the request host — CurrentSite
+       is null both before InitializeAsync has run and, briefly, during
+       Blazor's initial prerender pass while its DB call is in flight. *@
+}
+else if (SiteContext.SiteNotFound)
+{
+    <h2>Sorry, we couldn't find "@SiteContext.RequestedHost".</h2>
+    <p>There's no Division or Local Unit site at that address. Double-check the link, or use the navigation above to browse Divisions and Local Units.</p>
 }
 else
 {
-    @switch (SiteContext.CurrentSite!.SiteType)
+    @switch (SiteContext.CurrentSite.SiteType)
     {
         case SiteType.Portal:
             <PortalHome />

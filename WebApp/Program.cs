@@ -102,6 +102,45 @@ builder.Services.AddScoped<SiteRoleResolver>();
 var app = builder.Build();
 
 // ------------------------------------------------------------
+// Startup migration check. Only meaningful once a connection string
+// already exists — a fresh, unconfigured install has no DB to check yet,
+// and the setup wizard (SetupService.RunMigrationsAsync) applies the
+// initial schema itself once the operator submits one. This is what keeps
+// an already-running deployment's schema current across later deploys —
+// nothing else re-applies migrations after the wizard's one-time run.
+// ------------------------------------------------------------
+using (var startupScope = app.Services.CreateScope())
+{
+	var connectionProvider = startupScope.ServiceProvider.GetRequiredService<SetupConnectionStringProvider>();
+	var startupLogger = app.Services.GetRequiredService<ILogger<Program>>();
+
+	if (connectionProvider.IsConfigured)
+	{
+		try
+		{
+			var dbFactory = startupScope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
+			await using var startupDb = await dbFactory.CreateDbContextAsync();
+
+			var pendingMigrations = (await startupDb.Database.GetPendingMigrationsAsync()).ToList();
+			if (pendingMigrations.Count > 0)
+			{
+				startupLogger.LogWarning(
+					"Applying {Count} pending migration(s): {Migrations}",
+					pendingMigrations.Count, string.Join(", ", pendingMigrations));
+
+				await startupDb.Database.MigrateAsync();
+
+				startupLogger.LogInformation("Pending migrations applied successfully.");
+			}
+		}
+		catch (Exception ex)
+		{
+			startupLogger.LogError(ex, "Startup migration check failed.");
+		}
+	}
+}
+
+// ------------------------------------------------------------
 // Middleware pipeline
 // ------------------------------------------------------------
 app.UseStaticFiles();

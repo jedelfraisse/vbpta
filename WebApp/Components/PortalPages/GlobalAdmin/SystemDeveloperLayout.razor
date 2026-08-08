@@ -1,0 +1,15 @@
+@layout GlobalAdminLayout
+@inherits LayoutComponentBase
+
+<div class="ga-section">
+    <nav class="ga-section-nav" aria-label="System & Developer">
+        <NavLink class="ga-section-link" href="/globaladmin/system" Match="NavLinkMatch.All">Developer Console</NavLink>
+        <NavLink class="ga-section-link" href="/globaladmin/system/logs">System Logs</NavLink>
+        <NavLink class="ga-section-link" href="/globaladmin/system/jobs">Background Jobs</NavLink>
+        <NavLink class="ga-section-link" href="/globaladmin/system/flags">Feature Flags</NavLink>
+        <NavLink class="ga-section-link" href="/globaladmin/system/environment">Environment Info</NavLink>
+    </nav>
+    <div class="ga-section-content">
+        @Body
+    </div>
+</div>

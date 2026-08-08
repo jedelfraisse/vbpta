@@ -1,21 +1,46 @@
 using System.Text;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using SiteEngine;
 using SiteEngine.Data;
 using SiteEngine.Entities;
 using SiteEngine.Enums;
+using SiteEngine.Identity;
 
 namespace WebApp.Services;
 
 public record SiteAdminResult(bool Success, string? Error, Site? Site = null);
 public record SiteSummary(int UserCount, int ChildSiteCount);
 
+// Contact/login data for a single site, as shown alongside its computed
+// URLs in the Global Admin Sites list and Site Detail's Local Units section.
+// ContactAdminName/Email come from whichever current-school-year SiteUserRole
+// is flagged IsPrimaryContact — not a separate field on Site, so there's only
+// one place a "who do we contact for this site" answer can come from.
+public record SiteActivity(string? ContactAdminName, string? ContactAdminEmail, DateTimeOffset? LastLogin, DateTimeOffset? LastAdminLogin);
+
+// Admin-editable logo fields shared by Division and Local Unit sites (every
+// value but SchoolCrest applies to both site types — see UpdateSiteLogoAsync).
+// Deliberately excludes LogoUrl, which is never hand-uploaded — see
+// GeneratePtaLogoAsync/EnsureGeneratedLogoAsync.
+public enum SiteLogoField
+{
+	PTALogoVariant,
+	SchoolCrest,
+	DistrictLogo,
+	PartnerLogo,
+}
+
 // Backs the Global Admin "Sites" tab: hierarchical Division/Local Unit listing,
 // creation, and Hostname/Domain edits. Read-only site queries that predate this
 // (GetSitesByTypeAsync, GetSiteStatusAsync/SetSiteStatusAsync) stay on
 // DashboardService; this service owns everything new for site administration.
-public class SiteAdminService(IDbContextFactory<AppDbContext> dbFactory)
+public class SiteAdminService(
+	IDbContextFactory<AppDbContext> dbFactory, PtaLogoGenerationService logoGenerator, UserManager<ApplicationUser> userManager)
 {
 	private readonly IDbContextFactory<AppDbContext> _dbFactory = dbFactory;
+	private readonly PtaLogoGenerationService _logoGenerator = logoGenerator;
+	private readonly UserManager<ApplicationUser> _userManager = userManager;
 
 	public async Task<List<Site>> GetDivisionsWithUnitsAsync(CancellationToken cancellationToken = default)
 	{
@@ -85,23 +110,33 @@ public class SiteAdminService(IDbContextFactory<AppDbContext> dbFactory)
 	}
 
 	public Task<SiteAdminResult> CreateDivisionAsync(
-		string siteName, string hostname, string domain, SiteStatus status, CancellationToken cancellationToken = default)
-		=> CreateSiteAsync(siteName, hostname, domain, status, SiteType.Division, parentSiteId: null, cancellationToken);
+		string siteName, string ptaId, string hostname, string domain, SiteStatus status,
+		string? firstContactEmail = null, CancellationToken cancellationToken = default)
+		=> CreateSiteAsync(siteName, ptaId, hostname, domain, status, SiteType.Division, parentSiteId: null, firstContactEmail, cancellationToken);
 
 	public Task<SiteAdminResult> CreateLocalUnitAsync(
-		string siteName, Guid? parentSiteId, string hostname, string domain, SiteStatus status, CancellationToken cancellationToken = default)
-		=> CreateSiteAsync(siteName, hostname, domain, status, SiteType.LocalUnit, parentSiteId, cancellationToken);
+		string siteName, Guid? parentSiteId, string ptaId, string hostname, string domain, SiteStatus status,
+		string? firstContactEmail = null, CancellationToken cancellationToken = default)
+		=> CreateSiteAsync(siteName, ptaId, hostname, domain, status, SiteType.LocalUnit, parentSiteId, firstContactEmail, cancellationToken);
 
 	private async Task<SiteAdminResult> CreateSiteAsync(
-		string siteName, string hostname, string domain, SiteStatus status,
-		SiteType siteType, Guid? parentSiteId, CancellationToken cancellationToken)
+		string siteName, string ptaId, string hostname, string domain, SiteStatus status,
+		SiteType siteType, Guid? parentSiteId, string? firstContactEmail, CancellationToken cancellationToken)
 	{
 		siteName = siteName.Trim();
+		ptaId = ptaId.Trim();
 		hostname = hostname.Trim().ToLowerInvariant();
 		domain = domain.Trim().ToLowerInvariant();
+		var normalizedContactEmail = string.IsNullOrWhiteSpace(firstContactEmail)
+			? null
+			: firstContactEmail.Trim().ToLowerInvariant();
 
 		if (string.IsNullOrWhiteSpace(siteName))
 			return new SiteAdminResult(false, "Site name is required.");
+		if (string.IsNullOrWhiteSpace(ptaId))
+			return new SiteAdminResult(false, "PTA ID # is required.");
+		if (ptaId.Length > 8)
+			return new SiteAdminResult(false, "PTA ID # must be 8 characters or fewer.");
 		if (string.IsNullOrWhiteSpace(hostname))
 			return new SiteAdminResult(false, "Hostname is required.");
 
@@ -115,6 +150,9 @@ public class SiteAdminService(IDbContextFactory<AppDbContext> dbFactory)
 				return new SiteAdminResult(false, "Selected parent Division was not found.");
 		}
 
+		if (await db.Sites.AnyAsync(s => s.PtaId == ptaId, cancellationToken))
+			return new SiteAdminResult(false, $"PTA ID \"{ptaId}\" is already in use.");
+
 		if (await db.Sites.AnyAsync(s => s.Hostname == hostname, cancellationToken))
 			return new SiteAdminResult(false, $"Hostname \"{hostname}\" is already in use.");
 
@@ -123,7 +161,7 @@ public class SiteAdminService(IDbContextFactory<AppDbContext> dbFactory)
 
 		var site = new Site
 		{
-			PtaId = await GenerateUniquePtaIdAsync(db, cancellationToken),
+			PtaId = ptaId,
 			SiteType = siteType,
 			ParentSiteId = parentSiteId,
 			SiteName = siteName,
@@ -142,10 +180,67 @@ public class SiteAdminService(IDbContextFactory<AppDbContext> dbFactory)
 		}
 		catch (DbUpdateException)
 		{
-			return new SiteAdminResult(false, "Could not save the site — its hostname or domain may already be in use.");
+			return new SiteAdminResult(false, "Could not save the site — its PTA ID, hostname, or domain may already be in use.");
+		}
+
+		if (normalizedContactEmail is not null)
+		{
+			var contactResult = await AssignFirstContactAsync(db, site, normalizedContactEmail, cancellationToken);
+			if (!contactResult.Success)
+				return new SiteAdminResult(true, $"Site created, but the first contact could not be set up: {contactResult.Error}", site);
 		}
 
 		return new SiteAdminResult(true, null, site);
+	}
+
+	// Ties the "First Contact Email" collected on the Add Division/Local Unit
+	// forms to a SiteAdmin SiteUserRole for the new site, reusing the same
+	// find-or-create-ApplicationUser flow as passwordless sign-in (see
+	// PasswordlessSignInService.RequestCodeAsync) so a contact who has never
+	// logged in yet still ends up with a normal, sign-in-able account.
+	private async Task<SiteAdminResult> AssignFirstContactAsync(
+		AppDbContext db, Site site, string normalizedEmail, CancellationToken cancellationToken)
+	{
+		var identityUser = await _userManager.FindByEmailAsync(normalizedEmail);
+		if (identityUser is null)
+		{
+			identityUser = new ApplicationUser
+			{
+				UserName = normalizedEmail,
+				Email = normalizedEmail,
+				EmailConfirmed = false,
+				IsFirstLogin = true,
+			};
+
+			var createResult = await _userManager.CreateAsync(identityUser);
+			if (!createResult.Succeeded)
+				return new SiteAdminResult(false, string.Join(" ", createResult.Errors.Select(e => e.Description)));
+		}
+
+		var siteUser = await db.SiteUsers.FirstOrDefaultAsync(u => u.IdentityUserId == identityUser.Id, cancellationToken);
+		if (siteUser is null)
+		{
+			siteUser = new SiteUser
+			{
+				IdentityUserId = identityUser.Id,
+				PreferredEmail = normalizedEmail,
+			};
+			db.SiteUsers.Add(siteUser);
+			await db.SaveChangesAsync(cancellationToken);
+		}
+
+		db.SiteUserRoles.Add(new SiteUserRole
+		{
+			SiteId = site.Id,
+			SiteUserId = siteUser.Id,
+			Role = SiteRole.SiteAdmin,
+			SchoolYear = SchoolYear.Current(),
+			StartUtc = DateTimeOffset.UtcNow,
+			IsPrimaryContact = true,
+		});
+		await db.SaveChangesAsync(cancellationToken);
+
+		return new SiteAdminResult(true, null);
 	}
 
 	public async Task<SiteAdminResult> UpdateSiteStatusAsync(
@@ -177,6 +272,71 @@ public class SiteAdminService(IDbContextFactory<AppDbContext> dbFactory)
 		var childSiteCount = await db.Sites.CountAsync(s => s.ParentSiteId == siteId, cancellationToken);
 
 		return new SiteSummary(userCount, childSiteCount);
+	}
+
+	// Batched so a page rendering a whole list of sites (Sites tab, a
+	// Division's Local Units section) issues one round of queries instead of
+	// N+1 per row. LastAdminLogin is the most recent LoginHistory row whose
+	// user held SiteAdmin+ on that site at all (not scoped to the login's
+	// school year — role history isn't tracked at that granularity).
+	public async Task<Dictionary<Guid, SiteActivity>> GetSiteActivityAsync(
+		IReadOnlyCollection<Guid> siteIds, CancellationToken cancellationToken = default)
+	{
+		if (siteIds.Count == 0)
+			return new Dictionary<Guid, SiteActivity>();
+
+		await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+		var currentSchoolYear = SchoolYear.Current();
+
+		var contactsBySite = (await db.SiteUserRoles
+			.Where(r => siteIds.Contains(r.SiteId) && r.IsPrimaryContact && r.SchoolYear == currentSchoolYear)
+			.Select(r => new { r.SiteId, r.SiteUser.DisplayName, r.SiteUser.PreferredEmail })
+			.ToListAsync(cancellationToken))
+			.GroupBy(x => x.SiteId)
+			.ToDictionary(g => g.Key, g => g.First());
+
+		var lastLoginBySite = await db.LoginHistories
+			.Where(h => h.SiteId != null && siteIds.Contains(h.SiteId.Value))
+			.GroupBy(h => h.SiteId!.Value)
+			.Select(g => new { SiteId = g.Key, LastLogin = g.Max(h => h.LoginUtc) })
+			.ToDictionaryAsync(x => x.SiteId, x => x.LastLogin, cancellationToken);
+
+		var adminUserIdsBySite = (await db.SiteUserRoles
+			.Where(r => siteIds.Contains(r.SiteId) && r.Role != null && r.Role >= SiteRole.SiteAdmin)
+			.Select(r => new { r.SiteId, r.SiteUser.IdentityUserId })
+			.ToListAsync(cancellationToken))
+			.GroupBy(x => x.SiteId)
+			.ToDictionary(g => g.Key, g => g.Select(x => x.IdentityUserId).ToHashSet());
+
+		var loginRows = await db.LoginHistories
+			.Where(h => h.SiteId != null && siteIds.Contains(h.SiteId.Value))
+			.Select(h => new { SiteId = h.SiteId!.Value, h.UserId, h.LoginUtc })
+			.ToListAsync(cancellationToken);
+
+		var lastAdminLoginBySite = new Dictionary<Guid, DateTimeOffset>();
+		foreach (var group in loginRows.GroupBy(x => x.SiteId))
+		{
+			if (!adminUserIdsBySite.TryGetValue(group.Key, out var adminIds))
+				continue;
+
+			var adminLoginTimes = group.Where(x => adminIds.Contains(x.UserId)).Select(x => x.LoginUtc).ToList();
+			if (adminLoginTimes.Count > 0)
+				lastAdminLoginBySite[group.Key] = adminLoginTimes.Max();
+		}
+
+		return siteIds.ToDictionary(id => id, id =>
+		{
+			contactsBySite.TryGetValue(id, out var contact);
+			lastLoginBySite.TryGetValue(id, out var lastLogin);
+			lastAdminLoginBySite.TryGetValue(id, out var lastAdminLogin);
+
+			return new SiteActivity(
+				contact?.DisplayName,
+				contact?.PreferredEmail,
+				lastLoginBySite.ContainsKey(id) ? lastLogin : null,
+				lastAdminLoginBySite.ContainsKey(id) ? lastAdminLogin : null);
+		});
 	}
 
 	public async Task<SiteAdminResult> UpdateDomainSettingsAsync(
@@ -216,16 +376,87 @@ public class SiteAdminService(IDbContextFactory<AppDbContext> dbFactory)
 		return new SiteAdminResult(true, null, site);
 	}
 
-	private static async Task<string> GenerateUniquePtaIdAsync(AppDbContext db, CancellationToken cancellationToken)
+	// Backs every admin-uploaded logo field except LogoUrl (which is always
+	// generated, never uploaded — see GeneratePtaLogoAsync). SchoolCrest is
+	// the only field actually restricted to a SiteType; the others apply to
+	// both Divisions and Local Units.
+	public async Task<SiteAdminResult> UpdateSiteLogoAsync(
+		Guid siteId, SiteLogoField field, string? url, CancellationToken cancellationToken = default)
 	{
-		for (var attempt = 0; attempt < 20; attempt++)
+		await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+		var site = await db.Sites.FirstOrDefaultAsync(s => s.Id == siteId, cancellationToken);
+		if (site is null)
+			return new SiteAdminResult(false, "Site not found.");
+
+		if (field == SiteLogoField.SchoolCrest && site.SiteType != SiteType.LocalUnit)
+			return new SiteAdminResult(false, "Only Local Units have a school crest.");
+
+		switch (field)
 		{
-			var candidate = Random.Shared.Next(0, 100_000_000).ToString("D8");
-			if (!await db.Sites.AnyAsync(s => s.PtaId == candidate, cancellationToken))
-				return candidate;
+			case SiteLogoField.PTALogoVariant:
+				site.PTALogoVariantUrl = url;
+				break;
+			case SiteLogoField.SchoolCrest:
+				site.SchoolCrestUrl = url;
+				break;
+			case SiteLogoField.DistrictLogo:
+				site.DistrictLogoUrl = url;
+				break;
+			case SiteLogoField.PartnerLogo:
+				site.PartnerLogoUrl = url;
+				break;
 		}
 
-		throw new InvalidOperationException("Unable to generate a unique PtaId.");
+		site.UpdatedAtUtc = DateTimeOffset.UtcNow;
+		await db.SaveChangesAsync(cancellationToken);
+
+		return new SiteAdminResult(true, null, site);
+	}
+
+	// Explicit admin-requested regeneration ("Generate PTA Logo" button) —
+	// always renders a fresh PNG and replaces LogoUrl, deleting the old
+	// generated file. Never called automatically; see EnsureGeneratedLogoAsync
+	// for the one-time lazy fallback a masthead render triggers instead.
+	public async Task<SiteAdminResult> GeneratePtaLogoAsync(Guid siteId, CancellationToken cancellationToken = default)
+	{
+		await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+		var site = await db.Sites.FirstOrDefaultAsync(s => s.Id == siteId, cancellationToken);
+		if (site is null)
+			return new SiteAdminResult(false, "Site not found.");
+
+		var previousUrl = site.LogoUrl;
+		site.LogoUrl = await _logoGenerator.GenerateAsync(site.Id, site.SiteName, cancellationToken);
+		site.UpdatedAtUtc = DateTimeOffset.UtcNow;
+		await db.SaveChangesAsync(cancellationToken);
+
+		_logoGenerator.DeleteIfGenerated(previousUrl);
+
+		return new SiteAdminResult(true, null, site);
+	}
+
+	// Lazy fallback for a site that has never had a LogoUrl generated (e.g.
+	// created before this feature, or before an admin ever clicked
+	// "Generate PTA Logo"). Generates and persists once, then never again —
+	// a site with an existing LogoUrl is returned unchanged. Called from
+	// DivisionLayout/UnitLayout on render, not from any admin action.
+	public async Task<string?> EnsureGeneratedLogoAsync(Guid siteId, CancellationToken cancellationToken = default)
+	{
+		await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+		var site = await db.Sites.FirstOrDefaultAsync(s => s.Id == siteId, cancellationToken);
+		if (site is null)
+			return null;
+
+		if (!string.IsNullOrWhiteSpace(site.LogoUrl))
+			return site.LogoUrl;
+
+		site.LogoUrl = await _logoGenerator.GenerateAsync(site.Id, site.SiteName, cancellationToken);
+		site.UpdatedAtUtc = DateTimeOffset.UtcNow;
+		await db.SaveChangesAsync(cancellationToken);
+
+		return site.LogoUrl;
 	}
 
 	public static string SlugifyHostname(string siteName)

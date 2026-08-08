@@ -1,0 +1,123 @@
+@page "/globaladmin/identity/users"
+@layout IdentityAccessLayout
+@using WebApp.Services
+@inject DashboardService DashboardService
+@inject LoginAnalyticsService LoginAnalyticsService
+
+<PageTitle>User Directory — Global Admin</PageTitle>
+
+<h5 class="mb-3">User Directory</h5>
+
+<h6>All Users</h6>
+<div class="table-responsive mb-3">
+    <table class="table table-sm table-hover">
+        <thead>
+            <tr>
+                <th>Email</th>
+                <th>Display Name</th>
+                <th>Confirmed</th>
+                <th>First Login</th>
+                <th>Last Login</th>
+                <th>Last Login Site</th>
+                <th>Login Count</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var u in _users)
+            {
+                <tr role="button" class="@(_selectedUserId == u.IdentityUserId ? "table-active" : "")" @onclick="() => SelectUserAsync(u)">
+                    <td>@u.Email</td>
+                    <td>@u.DisplayName</td>
+                    <td>@(u.EmailConfirmed ? "Yes" : "No")</td>
+                    <td>@FormatDate(u.FirstLoginUtc)</td>
+                    <td>@FormatDate(u.LastLoginUtc)</td>
+                    <td>@(u.LastLoginSiteName ?? "—")</td>
+                    <td>@u.LoginCount</td>
+                </tr>
+            }
+            @if (_users.Count == 0)
+            {
+                <tr><td colspan="7" class="text-muted">None yet.</td></tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@if (_selectedUser is not null)
+{
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h6 class="card-title d-flex justify-content-between align-items-start">
+                <span>@_selectedUser.DisplayName <span class="text-muted small">(@_selectedUser.Email)</span></span>
+                <button type="button" class="btn-close" aria-label="Close" @onclick="ClearSelectedUser"></button>
+            </h6>
+
+            <h6 class="mt-3">User Activity</h6>
+            <dl class="row mb-3">
+                <dt class="col-sm-3">First Login</dt>
+                <dd class="col-sm-9">@FormatDate(_selectedUser.FirstLoginUtc)</dd>
+                <dt class="col-sm-3">Last Login</dt>
+                <dd class="col-sm-9">@FormatDate(_selectedUser.LastLoginUtc)</dd>
+                <dt class="col-sm-3">Login Count</dt>
+                <dd class="col-sm-9">@_selectedUser.LoginCount</dd>
+            </dl>
+
+            <h6>Recent Logins</h6>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead><tr><th>Site</th><th>Login Time</th><th>IP Address</th></tr></thead>
+                    <tbody>
+                        @foreach (var h in _selectedUserHistory)
+                        {
+                            <tr>
+                                <td>@(h.SiteName ?? "—")</td>
+                                <td>@FormatDate(h.LoginUtc)</td>
+                                <td>@h.IpAddress</td>
+                            </tr>
+                        }
+                        @if (_selectedUserHistory.Count == 0)
+                        {
+                            <tr><td colspan="3" class="text-muted">No recorded logins yet.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<UserSummary> _users = new();
+
+    private UserSummary? _selectedUser;
+    private string? _selectedUserId;
+    private List<UserLoginEntry> _selectedUserHistory = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _users = await DashboardService.GetAllUsersAsync();
+    }
+
+    private async Task SelectUserAsync(UserSummary u)
+    {
+        if (_selectedUserId == u.IdentityUserId)
+        {
+            ClearSelectedUser();
+            return;
+        }
+
+        _selectedUser = u;
+        _selectedUserId = u.IdentityUserId;
+        _selectedUserHistory = await LoginAnalyticsService.GetUserLoginHistoryAsync(u.IdentityUserId);
+    }
+
+    private void ClearSelectedUser()
+    {
+        _selectedUser = null;
+        _selectedUserId = null;
+        _selectedUserHistory = new();
+    }
+
+    private static string FormatDate(DateTimeOffset? value) =>
+        value?.ToLocalTime().ToString("MMM d, yyyy h:mm tt") ?? "Never";
+}

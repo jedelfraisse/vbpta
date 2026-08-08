@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using SiteEngine.Data;
 using SiteEngine.Identity;
@@ -82,6 +83,8 @@ builder.Services.AddScoped<ProfileService>();
 builder.Services.AddScoped<MembershipLookupService>();
 builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<SiteAdminService>();
+builder.Services.AddScoped<FileUploadService>();
+builder.Services.AddScoped<PtaLogoGenerationService>();
 builder.Services.AddScoped<LoginTrackingService>();
 builder.Services.AddScoped<LoginAnalyticsService>();
 builder.Services.AddScoped<PasswordlessSignInService>();
@@ -108,36 +111,90 @@ var app = builder.Build();
 // initial schema itself once the operator submits one. This is what keeps
 // an already-running deployment's schema current across later deploys —
 // nothing else re-applies migrations after the wizard's one-time run.
+//
+// Before trusting IsConfigured, we verify the target database actually
+// exists and has a schema. SetupConnectionStringProvider only remembers
+// whatever appsettings.json said at process start (or whatever the setup
+// wizard last proved worked) — it has no way to notice that the database
+// was deleted, renamed, or swapped out from under it. If we skipped this
+// check, a stale-but-"configured" connection string would make Routes.razor
+// treat the app as fully set up and try to build AppDbContext/Identity
+// against a target that doesn't exist. Detecting that here and resetting
+// the provider is what lets Routes.razor fall back into setup mode instead.
 // ------------------------------------------------------------
 using (var startupScope = app.Services.CreateScope())
 {
 	var connectionProvider = startupScope.ServiceProvider.GetRequiredService<SetupConnectionStringProvider>();
 	var startupLogger = app.Services.GetRequiredService<ILogger<Program>>();
 
-	if (connectionProvider.IsConfigured)
+	var isConfigured = connectionProvider.IsConfigured;
+	var databaseExists = false;
+	var hasTables = false;
+	var hasPendingMigrations = false;
+
+	if (isConfigured)
 	{
+		var cs = connectionProvider.Current!;
+
 		try
 		{
-			var dbFactory = startupScope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
-			await using var startupDb = await dbFactory.CreateDbContextAsync();
+			using var conn = new SqlConnection(cs);
+			await conn.OpenAsync();
+			databaseExists = true;
 
-			var pendingMigrations = (await startupDb.Database.GetPendingMigrationsAsync()).ToList();
-			if (pendingMigrations.Count > 0)
+			using var tableCountCmd = conn.CreateCommand();
+			tableCountCmd.CommandText = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE'";
+			var tableCount = Convert.ToInt32(await tableCountCmd.ExecuteScalarAsync());
+			hasTables = tableCount > 0;
+		}
+		catch (SqlException ex)
+		{
+			// Server unreachable, or reachable but the database itself doesn't exist
+			// (e.g. "Cannot open database 'X' requested by the login").
+			startupLogger.LogWarning(ex, "Could not open the configured database.");
+			databaseExists = false;
+		}
+
+		if (!databaseExists || !hasTables)
+		{
+			startupLogger.LogWarning(
+				"Configured connection string does not point to a usable database (exists={DatabaseExists}, hasTables={HasTables}). Falling back to setup mode.",
+				databaseExists, hasTables);
+
+			connectionProvider.Reset();
+			isConfigured = false;
+		}
+		else
+		{
+			try
 			{
-				startupLogger.LogWarning(
-					"Applying {Count} pending migration(s): {Migrations}",
-					pendingMigrations.Count, string.Join(", ", pendingMigrations));
+				var dbFactory = startupScope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
+				await using var startupDb = await dbFactory.CreateDbContextAsync();
 
-				await startupDb.Database.MigrateAsync();
+				var pendingMigrations = (await startupDb.Database.GetPendingMigrationsAsync()).ToList();
+				hasPendingMigrations = pendingMigrations.Count > 0;
 
-				startupLogger.LogInformation("Pending migrations applied successfully.");
+				if (hasPendingMigrations)
+				{
+					startupLogger.LogWarning(
+						"Applying {Count} pending migration(s): {Migrations}",
+						pendingMigrations.Count, string.Join(", ", pendingMigrations));
+
+					await startupDb.Database.MigrateAsync();
+
+					startupLogger.LogInformation("Pending migrations applied successfully.");
+				}
+			}
+			catch (Exception ex)
+			{
+				startupLogger.LogError(ex, "Startup migration check failed.");
 			}
 		}
-		catch (Exception ex)
-		{
-			startupLogger.LogError(ex, "Startup migration check failed.");
-		}
 	}
+
+	startupLogger.LogInformation(
+		"Startup DB diagnostics: connectionStringConfigured={IsConfigured}, databaseExists={DatabaseExists}, hasTables={HasTables}, pendingMigrations={HasPendingMigrations}",
+		isConfigured, databaseExists, hasTables, hasPendingMigrations);
 }
 
 // ------------------------------------------------------------
@@ -145,6 +202,32 @@ using (var startupScope = app.Services.CreateScope())
 // ------------------------------------------------------------
 app.UseStaticFiles();
 app.UseRouting();
+
+// ------------------------------------------------------------
+// Setup-mode cookie guard: while the DB isn't configured (fresh install,
+// or reset back into setup mode above after a DB reset/swap), strip any
+// Identity auth cookies before UseAuthentication() runs. Otherwise
+// Identity's cookie handler tries to validate them, which resolves
+// AppDbContext and throws "Cannot create AppDbContext: no connection
+// string has been configured yet." before the setup wizard ever gets a
+// chance to run. This also has the effect of logging everyone out
+// whenever setup mode is (re-)entered. Once IsConfigured is true again,
+// this middleware is a no-op and normal cookie-based login persists.
+// ------------------------------------------------------------
+app.Use(async (context, next) =>
+{
+	var connectionProvider = context.RequestServices.GetRequiredService<SetupConnectionStringProvider>();
+	if (!connectionProvider.IsConfigured)
+	{
+		foreach (var cookieName in context.Request.Cookies.Keys.Where(name => name.StartsWith(".AspNetCore.Identity.", StringComparison.Ordinal)).ToList())
+		{
+			context.Response.Cookies.Delete(cookieName);
+		}
+	}
+
+	await next();
+});
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();

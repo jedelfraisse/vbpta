@@ -2,6 +2,7 @@
 @using WebApp.Services
 @inherits SiteLayoutBase
 @inject SiteContext SiteContext
+@inject SiteAdminService SiteAdminService
 
 @code {
     private Site? Site => SiteContext.CurrentSite;
@@ -13,6 +14,15 @@
         // Viewer (see SiteLayoutBase.RefreshUserStateAsync).
         await SiteContext.InitializeAsync(new Uri(NavigationManager.Uri).Host);
         await RefreshUserStateAsync(Site?.Id);
+
+        // One-time lazy fallback for a site that has never had its PTA-style
+        // logo generated — see SiteAdminService.EnsureGeneratedLogoAsync.
+        if (Site is not null && string.IsNullOrWhiteSpace(Site.LogoUrl))
+        {
+            var logoUrl = await SiteAdminService.EnsureGeneratedLogoAsync(Site.Id);
+            if (logoUrl is not null)
+                Site.LogoUrl = logoUrl;
+        }
     }
 }
 
@@ -20,15 +30,34 @@
     <div class="theme-topbar"></div>
 
     <header class="page-header" role="banner">
-        <div class="brand-block">
+        <div class="brand-block masthead-logos">
             @if (!string.IsNullOrWhiteSpace(Site?.LogoUrl))
             {
-                <img class="site-logo" src="@Site.LogoUrl" alt="@Site.SiteName logo" />
+                <img class="masthead-logo pta-generated-logo" src="@Site.LogoUrl" alt="@Site?.SiteName" />
             }
-            <div>
-                <div class="site-kicker">Local Unit</div>
-                <h1>@Site?.SiteName</h1>
-            </div>
+
+            @if (!string.IsNullOrWhiteSpace(Site?.PTALogoVariantUrl))
+            {
+                <img class="masthead-logo pta-variant-logo" src="@Site.PTALogoVariantUrl" alt="@Site?.SiteName PTA logo" />
+            }
+
+            @{ var schoolCrestUrl = Site?.ResolvedSchoolCrestUrl(); }
+            @if (!string.IsNullOrWhiteSpace(schoolCrestUrl))
+            {
+                <img class="masthead-logo school-crest" src="@schoolCrestUrl" alt="@Site?.SiteName school crest" />
+            }
+
+            @{ var districtLogoUrl = Site?.ResolvedDistrictLogoUrl(); }
+            @if (!string.IsNullOrWhiteSpace(districtLogoUrl))
+            {
+                <img class="masthead-logo district-logo" src="@districtLogoUrl" alt="@Site?.SiteName district logo" />
+            }
+
+            @{ var partnerLogoUrl = Site?.ResolvedPartnerLogoUrl(); }
+            @if (!string.IsNullOrWhiteSpace(partnerLogoUrl))
+            {
+                <img class="masthead-logo partner-logo" src="@partnerLogoUrl" alt="@Site?.SiteName partner logo" />
+            }
         </div>
         <nav>
             <a href="/">Home</a>

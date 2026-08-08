@@ -1,0 +1,39 @@
+@page "/globaladmin/identity/roles"
+@layout IdentityAccessLayout
+@using WebApp.Services
+@inject DashboardService DashboardService
+
+<PageTitle>Roles &amp; Permissions — Global Admin</PageTitle>
+
+<h5 class="mb-3">Roles &amp; Permissions</h5>
+
+<h6>All Role Assignments</h6>
+<div class="table-responsive mb-3">
+    <table class="table table-sm">
+        <thead><tr><th>User</th><th>Site</th><th>Role</th><th>School Year</th></tr></thead>
+        <tbody>
+            @foreach (var r in _roles)
+            {
+                <tr>
+                    <td>@r.UserEmail</td>
+                    <td>@r.SiteName</td>
+                    <td>@(r.CustomRoleName ?? r.Role?.ToString() ?? "-")</td>
+                    <td>@r.SchoolYear</td>
+                </tr>
+            }
+            @if (_roles.Count == 0)
+            {
+                <tr><td colspan="4" class="text-muted">None yet.</td></tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    private List<RoleAssignmentSummary> _roles = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _roles = await DashboardService.GetAllRoleAssignmentsAsync();
+    }
+}

@@ -30,18 +30,27 @@
     gap: 0.9rem;
 }
 
-.site-kicker {
-    font-size: 0.72rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-}
-
 .site-logo {
     max-width: 140px;
     max-height: 90px;
     width: auto;
     height: auto;
     object-fit: contain;
+}
+
+/* Horizontal masthead logo row (PTA logo, school crest, partner logo) —
+   height-matched and proportionally scaled, per-logo spacing instead of
+   relying solely on the flex gap so a wrapped row still reads cleanly. */
+.masthead-logo {
+    max-height: 48px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    margin-right: 12px;
+}
+
+.masthead-logo:last-child {
+    margin-right: 0;
 }
 
 .local-shell .banner-image {

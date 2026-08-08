@@ -1,0 +1,29 @@
+@page "/globaladmin/sites/settings"
+@layout SitesContentLayout
+@using SiteEngine.Entities
+@using WebApp.Services
+@inject DashboardService DashboardService
+
+<PageTitle>Global Settings — Global Admin</PageTitle>
+
+<h5 class="mb-3">Global Settings</h5>
+
+@if (_config is not null)
+{
+    <dl class="row mb-0">
+        <dt class="col-sm-3">Portal Name</dt><dd class="col-sm-9">@_config.PortalName</dd>
+        <dt class="col-sm-3">Portal Domain</dt><dd class="col-sm-9">@_config.PortalDomain</dd>
+        <dt class="col-sm-3">SMTP Host</dt><dd class="col-sm-9">@_config.SmtpHost:@_config.SmtpPort</dd>
+        <dt class="col-sm-3">SMTP From</dt><dd class="col-sm-9">@_config.SmtpFromAddress</dd>
+    </dl>
+    <p class="text-muted small mt-2 mb-0">Editing these lives in the setup wizard for now.</p>
+}
+
+@code {
+    private PortalConfig? _config;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _config = await DashboardService.GetPortalConfigAsync();
+    }
+}

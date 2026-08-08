@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SiteEngine.Data;
 
@@ -11,9 +12,11 @@ using SiteEngine.Data;
 namespace SiteEngine.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260802012510_AddPtaLogoGeneration")]
+    partial class AddPtaLogoGeneration
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -375,10 +378,6 @@ namespace SiteEngine.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
-                    b.Property<string>("ExternalUrl")
-                        .HasMaxLength(512)
-                        .HasColumnType("nvarchar(512)");
-
                     b.Property<string>("FaceBookURL")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -500,8 +499,6 @@ namespace SiteEngine.Migrations
                         .IsUnique();
 
                     b.HasIndex("SiteId");
-
-                    b.HasIndex("SiteType", "ParentSiteId", "SiteName");
 
                     b.ToTable("Sites", (string)null);
                 });

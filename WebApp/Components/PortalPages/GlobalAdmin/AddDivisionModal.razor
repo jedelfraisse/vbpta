@@ -21,6 +21,10 @@
                         <input class="form-control" value="@_siteName" @oninput="OnSiteNameChanged" />
                     </div>
                     <div class="mb-3">
+                        <label class="form-label">PTA ID #</label>
+                        <input class="form-control" @bind="_ptaId" maxlength="8" required />
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label">Hostname (subdomain)</label>
                         <input class="form-control" @bind="_hostname" />
                         <div class="form-text">Auto-generated from Site Name; edit if needed.</div>
@@ -37,6 +41,11 @@
                                 <option value="@status">@status</option>
                             }
                         </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">First Contact Email (optional)</label>
+                        <input class="form-control" type="email" @bind="_firstContactEmail" />
+                        <div class="form-text">If provided, this person is granted Site Admin access as the primary contact.</div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -55,16 +64,20 @@
     private bool _saving;
     private string? _error;
     private string _siteName = "";
+    private string _ptaId = "";
     private string _hostname = "";
     private string _domain = "";
     private SiteStatus _status = SiteStatus.Pending;
+    private string _firstContactEmail = "";
 
     public void Open()
     {
         _siteName = "";
+        _ptaId = "";
         _hostname = "";
         _domain = "";
         _status = SiteStatus.Pending;
+        _firstContactEmail = "";
         _error = null;
         _visible = true;
     }
@@ -82,7 +95,8 @@
         _saving = true;
         _error = null;
 
-        var result = await SiteAdminService.CreateDivisionAsync(_siteName, _hostname, _domain, _status);
+        var contactEmail = string.IsNullOrWhiteSpace(_firstContactEmail) ? null : _firstContactEmail;
+        var result = await SiteAdminService.CreateDivisionAsync(_siteName, _ptaId, _hostname, _domain, _status, contactEmail);
 
         _saving = false;
 
@@ -92,7 +106,16 @@
             return;
         }
 
-        _visible = false;
         await OnCreated.InvokeAsync();
+
+        if (result.Error is not null)
+        {
+            // Site was created but the first-contact setup hit a problem — keep
+            // the modal open so the admin sees why before it disappears.
+            _error = result.Error;
+            return;
+        }
+
+        _visible = false;
     }
 }

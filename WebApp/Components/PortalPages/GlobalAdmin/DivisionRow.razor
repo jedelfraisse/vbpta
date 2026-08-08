@@ -20,16 +20,20 @@
 @code {
     [Parameter, EditorRequired] public Site Division { get; set; } = null!;
     [Parameter] public string PortalDomain { get; set; } = string.Empty;
+    [Parameter] public SiteActivity? SiteActivity { get; set; }
 
     private string HomePageUrl => SiteUrlHelper.BuildPublicUrl(Division, PortalDomain);
     private string InternalDisplay => string.IsNullOrEmpty(HomePageUrl) ? "---" : HomePageUrl;
     private string DomainDisplay => string.IsNullOrWhiteSpace(Division.Domain) ? "---" : Division.Domain;
 
-    // No data source exists yet for contact-admin/login tracking per site — these
-    // stay as placeholders until that's wired up (see SitesTab.razor conversation).
-    private string ContactAdminDisplay => "---";
-    private string LastAdminLoginDisplay => "---";
-    private string LastLoginDisplay => "---";
+    private string ContactAdminDisplay => SiteActivity?.ContactAdminEmail is { Length: > 0 } email
+        ? (string.IsNullOrWhiteSpace(SiteActivity.ContactAdminName) ? email : $"{SiteActivity.ContactAdminName} ({email})")
+        : "---";
+    private string LastAdminLoginDisplay => FormatDate(SiteActivity?.LastAdminLogin);
+    private string LastLoginDisplay => FormatDate(SiteActivity?.LastLogin);
+
+    private static string FormatDate(DateTimeOffset? value) =>
+        value?.ToLocalTime().ToString("MMM d, yyyy h:mm tt") ?? "---";
 
     private static string StatusBadgeClass(SiteStatus status) => status switch
     {

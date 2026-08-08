@@ -56,7 +56,7 @@ else
         <div class="card shadow-sm mb-3">
             <div class="card-header d-flex flex-wrap justify-content-between align-items-start gap-2">
                 <div class="flex-grow-1">
-                    <DivisionRow Division="division" PortalDomain="@_portalDomain" />
+                    <DivisionRow Division="division" PortalDomain="@_portalDomain" SiteActivity="_siteActivity.GetValueOrDefault(division.Id)" />
                 </div>
                 <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => _addLocalUnitModal?.Open(division.Id)">
                     + Add Local Unit
@@ -70,7 +70,7 @@ else
                     @foreach (var unit in children)
                     {
                         <li class="list-group-item">
-                            <LocalUnitRow Unit="unit" PortalDomain="@_portalDomain" />
+                            <LocalUnitRow Unit="unit" PortalDomain="@_portalDomain" SiteActivity="_siteActivity.GetValueOrDefault(unit.Id)" />
                         </li>
                     }
                     @if (children.Count == 0)
@@ -102,7 +102,7 @@ else
                 @foreach (var unit in visibleIndependentUnits)
                 {
                     <li class="list-group-item">
-                        <LocalUnitRow Unit="unit" PortalDomain="@_portalDomain" />
+                        <LocalUnitRow Unit="unit" PortalDomain="@_portalDomain" SiteActivity="_siteActivity.GetValueOrDefault(unit.Id)" />
                     </li>
                 }
                 @if (visibleIndependentUnits.Count == 0)
@@ -124,11 +124,16 @@ else
     private bool _sortAscending = true;
 
     private static readonly SiteStatus[] _statusOptions = Enum.GetValues<SiteStatus>();
-    private HashSet<SiteStatus> _selectedStatuses = new(_statusOptions);
+
+    // Inactive and Archived sites are noise in the day-to-day admin view, so
+    // they start hidden; an admin can still opt back in via the checkboxes.
+    private HashSet<SiteStatus> _selectedStatuses = new(
+        _statusOptions.Where(s => s != SiteStatus.Inactive && s != SiteStatus.Archived));
 
     private List<Site> _divisions = new();
     private List<Site> _independentUnits = new();
     private string _portalDomain = string.Empty;
+    private Dictionary<Guid, SiteActivity> _siteActivity = new();
 
     private AddDivisionModal? _addDivisionModal;
     private AddLocalUnitModal? _addLocalUnitModal;
@@ -142,6 +147,12 @@ else
 
         var config = await DashboardService.GetPortalConfigAsync();
         _portalDomain = config?.PortalDomain?.Trim() ?? string.Empty;
+
+        var allSiteIds = _divisions
+            .SelectMany(d => d.ChildSites.Select(c => c.Id).Append(d.Id))
+            .Concat(_independentUnits.Select(u => u.Id))
+            .ToList();
+        _siteActivity = await SiteAdminService.GetSiteActivityAsync(allSiteIds);
 
         _loaded = true;
     }

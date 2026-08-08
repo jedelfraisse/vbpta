@@ -1,0 +1,169 @@
+@page "/admin"
+@using System.Security.Claims
+@using SiteEngine.Entities
+@using SiteEngine.Enums
+@using WebApp.Services
+@inject SiteContext SiteContext
+@inject NavigationManager NavigationManager
+@inject SiteRoleResolver SiteRoleResolver
+@inject SiteAdminService SiteAdminService
+
+<PageTitle>Site Admin</PageTitle>
+
+@if (_loaded)
+{
+    @if (!_hasAccess)
+    {
+        <NoAccess />
+    }
+    else if (_site is null)
+    {
+        <div class="container">
+            <p class="text-muted">That site could not be found.</p>
+        </div>
+    }
+    else
+    {
+        <div class="container">
+            <h1 class="mb-1">@_site.SiteName Admin</h1>
+            <p class="text-muted mb-4">Branding for this @(_site.SiteType == SiteType.Division ? "Division" : "Local Unit").</p>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h6 class="card-title">PTA Logo</h6>
+                    <p class="text-muted small">
+                        The masthead logo generated for this site from the National PTA template
+                        (site name + "everychild. onevoice." tagline, in PTA blue). Regenerating
+                        replaces the current one — it's never generated automatically after that.
+                    </p>
+                    @if (!string.IsNullOrWhiteSpace(_site.LogoUrl))
+                    {
+                        <img src="@_site.LogoUrl" alt="@_site.SiteName PTA logo" class="img-thumbnail mb-3" style="max-height:80px;max-width:320px;object-fit:contain;" />
+                    }
+                    <div>
+                        <button type="button" class="btn btn-sm btn-primary" disabled="@_generating" @onclick="GenerateLogoAsync">
+                            @(string.IsNullOrWhiteSpace(_site.LogoUrl) ? "Generate PTA Logo" : "Regenerate PTA Logo")
+                        </button>
+                        @if (_generating)
+                        {
+                            <span class="text-muted small ms-2">Generating…</span>
+                        }
+                    </div>
+                    @if (!string.IsNullOrEmpty(_generateError))
+                    {
+                        <div class="text-danger small mt-2">@_generateError</div>
+                    }
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h6 class="card-title">Branding</h6>
+                    <ImageUploadField Label="PTA Logo (uploaded variant, optional)" CurrentUrl="_site.PTALogoVariantUrl" UploadFolder="pta-variant-logos" OnUploaded="SavePtaVariantAsync" />
+
+                    @if (_site.SiteType == SiteType.LocalUnit)
+                    {
+                        <ImageUploadField Label="School Crest" CurrentUrl="_site.SchoolCrestUrl" UploadFolder="school-crests" OnUploaded="SaveSchoolCrestAsync" />
+                    }
+
+                    <ImageUploadField Label="District Logo" CurrentUrl="_site.DistrictLogoUrl" UploadFolder="district-logos" OnUploaded="SaveDistrictLogoAsync" />
+                    <ImageUploadField Label="Partner Logo" CurrentUrl="_site.PartnerLogoUrl" UploadFolder="partner-logos" OnUploaded="SavePartnerLogoAsync" />
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private bool _loaded;
+    private bool _hasAccess;
+    private Site? _site;
+    private bool _generating;
+    private string? _generateError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthState is null ? null : (await AuthState).User;
+        var identityUserId = user?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+
+        if (string.IsNullOrEmpty(identityUserId))
+        {
+            NavigationManager.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        await SiteContext.InitializeAsync(new Uri(NavigationManager.Uri).Host);
+        _site = SiteContext.CurrentSite;
+
+        if (_site is not null)
+        {
+            var role = await SiteRoleResolver.ResolveAsync(identityUserId, _site.Id);
+            _hasAccess = role >= SiteRole.SiteAdmin;
+        }
+
+        _loaded = true;
+    }
+
+    private async Task GenerateLogoAsync()
+    {
+        if (_site is null)
+            return;
+
+        _generating = true;
+        _generateError = null;
+
+        var result = await SiteAdminService.GeneratePtaLogoAsync(_site.Id);
+
+        _generating = false;
+
+        if (!result.Success)
+        {
+            _generateError = result.Error;
+            return;
+        }
+
+        _site.LogoUrl = result.Site!.LogoUrl;
+    }
+
+    private async Task SavePtaVariantAsync(string url)
+    {
+        if (_site is null)
+            return;
+
+        var result = await SiteAdminService.UpdateSiteLogoAsync(_site.Id, SiteLogoField.PTALogoVariant, url);
+        if (result.Success)
+            _site.PTALogoVariantUrl = result.Site!.PTALogoVariantUrl;
+    }
+
+    private async Task SaveSchoolCrestAsync(string url)
+    {
+        if (_site is null)
+            return;
+
+        var result = await SiteAdminService.UpdateSiteLogoAsync(_site.Id, SiteLogoField.SchoolCrest, url);
+        if (result.Success)
+            _site.SchoolCrestUrl = result.Site!.SchoolCrestUrl;
+    }
+
+    private async Task SaveDistrictLogoAsync(string url)
+    {
+        if (_site is null)
+            return;
+
+        var result = await SiteAdminService.UpdateSiteLogoAsync(_site.Id, SiteLogoField.DistrictLogo, url);
+        if (result.Success)
+            _site.DistrictLogoUrl = result.Site!.DistrictLogoUrl;
+    }
+
+    private async Task SavePartnerLogoAsync(string url)
+    {
+        if (_site is null)
+            return;
+
+        var result = await SiteAdminService.UpdateSiteLogoAsync(_site.Id, SiteLogoField.PartnerLogo, url);
+        if (result.Success)
+            _site.PartnerLogoUrl = result.Site!.PartnerLogoUrl;
+    }
+}

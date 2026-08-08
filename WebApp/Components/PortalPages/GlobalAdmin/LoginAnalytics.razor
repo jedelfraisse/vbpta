@@ -1,0 +1,130 @@
+@page "/globaladmin/identity/login-analytics"
+@layout IdentityAccessLayout
+@using SiteEngine.Enums
+@using WebApp.Services
+@inject LoginAnalyticsService LoginAnalyticsService
+
+<PageTitle>Authentication &amp; Login Analytics — Global Admin</PageTitle>
+
+<h5 class="mb-3">Authentication &amp; Login Analytics</h5>
+
+<h6>Recent Logins</h6>
+<div class="table-responsive mb-4">
+    <table class="table table-sm">
+        <thead><tr><th>User</th><th>Site</th><th>Login Time</th><th>IP Address</th><th>Network</th></tr></thead>
+        <tbody>
+            @foreach (var l in _recentLogins)
+            {
+                <tr>
+                    <td>@l.Email</td>
+                    <td>@(l.SiteName ?? "—")</td>
+                    <td>@FormatDate(l.LoginUtc)</td>
+                    <td>@l.IpAddress</td>
+                    <td><span class="badge @NetworkBadgeClass(l.NetworkType)">@l.NetworkType</span></td>
+                </tr>
+            }
+            @if (_recentLogins.Count == 0)
+            {
+                <tr><td colspan="5" class="text-muted">No recorded logins yet.</td></tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<h6>Logins per Site</h6>
+<div class="mb-4">
+    @{ var maxSiteLogins = _loginsPerSite.Count == 0 ? 0 : _loginsPerSite.Max(s => s.LoginCount); }
+    @foreach (var s in _loginsPerSite)
+    {
+        <div class="mb-2">
+            <div class="d-flex justify-content-between small">
+                <span>@s.SiteName</span>
+                <span class="text-muted">@s.LoginCount</span>
+            </div>
+            <div class="progress" role="progressbar" aria-valuenow="@s.LoginCount" aria-valuemin="0" aria-valuemax="@maxSiteLogins" style="height:8px;">
+                <div class="progress-bar bg-primary rounded-2" style="width:@(maxSiteLogins == 0 ? 0 : s.LoginCount * 100 / maxSiteLogins)%"></div>
+            </div>
+        </div>
+    }
+    @if (_loginsPerSite.Count == 0)
+    {
+        <p class="text-muted">No recorded logins yet.</p>
+    }
+</div>
+
+<h6>Network Breakdown</h6>
+<p class="text-muted small">Network classification isn't implemented yet — every login is currently logged as <span class="badge @NetworkBadgeClass(LoginNetworkType.Unknown)">Unknown</span>.</p>
+<div class="mb-4">
+    @{ var totalNetworkLogins = _networkBreakdown.Sum(n => n.LoginCount); }
+    @foreach (var n in _networkBreakdown)
+    {
+        <div class="mb-2">
+            <div class="d-flex justify-content-between small">
+                <span><span class="badge @NetworkBadgeClass(n.NetworkType)">@n.NetworkType</span></span>
+                <span class="text-muted">@n.LoginCount</span>
+            </div>
+            <div class="progress" role="progressbar" aria-valuenow="@n.LoginCount" aria-valuemin="0" aria-valuemax="@totalNetworkLogins" style="height:8px;">
+                <div class="progress-bar @NetworkBadgeClass(n.NetworkType) rounded-2" style="width:@(totalNetworkLogins == 0 ? 0 : n.LoginCount * 100 / totalNetworkLogins)%"></div>
+            </div>
+        </div>
+    }
+</div>
+
+<h6>Yearly Summaries</h6>
+<div class="table-responsive mb-3">
+    <table class="table table-sm">
+        <thead>
+            <tr>
+                <th>User</th><th>School Year</th><th>Primary Site</th><th>Total Logins</th>
+                <th>School</th><th>Home</th><th>Mobile</th><th>Unique Sites</th><th>First Login</th><th>Last Login</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var y in _yearlySummaries)
+            {
+                <tr>
+                    <td>@y.Email</td>
+                    <td>@y.SchoolYear</td>
+                    <td>@(y.SiteName ?? "—")</td>
+                    <td>@y.TotalLogins</td>
+                    <td>@y.SchoolNetworkLogins</td>
+                    <td>@y.HomeNetworkLogins</td>
+                    <td>@y.MobileNetworkLogins</td>
+                    <td>@y.UniqueSites</td>
+                    <td>@FormatDate(y.FirstLoginUtc)</td>
+                    <td>@FormatDate(y.LastLoginUtc)</td>
+                </tr>
+            }
+            @if (_yearlySummaries.Count == 0)
+            {
+                <tr><td colspan="10" class="text-muted">No yearly summaries generated yet — the yearly rollup is a placeholder routine that hasn't been scheduled.</td></tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    private List<RecentLoginEntry> _recentLogins = new();
+    private List<SiteLoginCount> _loginsPerSite = new();
+    private List<NetworkBreakdownEntry> _networkBreakdown = new();
+    private List<YearlySummaryEntry> _yearlySummaries = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _recentLogins = await LoginAnalyticsService.GetRecentLoginsAsync();
+        _loginsPerSite = await LoginAnalyticsService.GetLoginsPerSiteAsync();
+        _networkBreakdown = await LoginAnalyticsService.GetNetworkBreakdownAsync();
+        _yearlySummaries = await LoginAnalyticsService.GetYearlySummariesAsync();
+    }
+
+    private static string FormatDate(DateTimeOffset? value) =>
+        value?.ToLocalTime().ToString("MMM d, yyyy h:mm tt") ?? "Never";
+
+    private static string NetworkBadgeClass(LoginNetworkType type) => type switch
+    {
+        LoginNetworkType.School => "text-bg-success",
+        LoginNetworkType.Home => "text-bg-info",
+        LoginNetworkType.Mobile => "text-bg-warning",
+        _ => "text-bg-secondary"
+    };
+}

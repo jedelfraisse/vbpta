@@ -29,4 +29,17 @@ public sealed class SetupConnectionStringProvider
 			_connectionString = connectionString;
 		}
 	}
+
+	// Clears the in-memory connection string so IsConfigured goes back to false.
+	// Used at startup when the configured connection string turns out to point at a
+	// database that no longer exists or has no schema (deleted DB, renamed DB, etc.) —
+	// without this, the provider would keep reporting "configured" against a target
+	// that was proven unusable, and the app would never fall back into setup mode.
+	public void Reset()
+	{
+		lock (_gate)
+		{
+			_connectionString = null;
+		}
+	}
 }

@@ -1,0 +1,104 @@
+@page "/unit-sites/{SiteId:guid}"
+@using SiteEngine.Enums
+@using WebApp.Services
+@inject DashboardService DashboardService
+@inject NavigationManager NavigationManager
+
+@if (_loading)
+{
+    <div class="container">
+        <p class="text-muted">Loading&hellip;</p>
+    </div>
+}
+else if (_site is null)
+{
+    @* Not found, or the site exists but isn't part of the public directory
+       (Archived/Disabled, or any status DashboardService.GetSiteDetailsAsync
+       doesn't surface) - render inline rather than redirect, same idiom as
+       SharedPages/Home.razor's SiteContext.SiteNotFound branch. *@
+    <div class="container">
+        <h2>Sorry, we couldn't find that site.</h2>
+        <p>
+            It may have been removed, or is no longer publicly listed.
+            <a href="/unit-sites">Back to Unit Sites</a>.
+        </p>
+    </div>
+}
+else if (_site.SiteStatus == SiteStatus.Active)
+{
+    @* Active sites are fully hosted here - send visitors straight to the
+       real thing instead of showing a directory stub. *@
+}
+else
+{
+    <div class="container">
+        <p><a href="/unit-sites">&larr; Back to Unit Sites</a></p>
+
+        <h1>@_site.SiteName</h1>
+        <p class="text-muted">
+            @_site.SiteType
+            @if (_site.ParentSiteName is not null)
+            {
+                <text> &middot; part of @_site.ParentSiteName</text>
+            }
+        </p>
+
+        @if (_site.SiteStatus == SiteStatus.MembersOnly)
+        {
+            <div class="alert alert-info">
+                <strong>Members Only.</strong> This site's content is restricted to members. Sign in or contact the unit to learn how to join.
+            </div>
+        }
+        else if (_site.SiteStatus == SiteStatus.Pending)
+        {
+            <div class="alert alert-secondary">
+                This site hasn't been claimed yet. Basic public information is shown below.
+            </div>
+        }
+
+        <dl class="row">
+            <dt class="col-sm-3">PTA ID</dt>
+            <dd class="col-sm-9">@_site.PtaId</dd>
+
+            <dt class="col-sm-3">Status</dt>
+            <dd class="col-sm-9"><span class="badge text-bg-info">@_site.SiteStatus</span></dd>
+
+            @if (_site.ExternalUrl is not null)
+            {
+                <dt class="col-sm-3">Website</dt>
+                <dd class="col-sm-9"><a href="@_site.ExternalUrl" target="_blank" rel="noopener noreferrer">@_site.ExternalUrl</a></dd>
+            }
+        </dl>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid SiteId { get; set; }
+
+    private SiteDetails? _site;
+    private bool _loading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _site = await DashboardService.GetSiteDetailsAsync(SiteId);
+        _loading = false;
+
+        if (_site is { SiteStatus: SiteStatus.Active })
+        {
+            var portalConfig = await DashboardService.GetPortalConfigAsync();
+            var hostedUrl = SiteUrlHelper.BuildPublicUrl(_site.Hostname, _site.Domain, portalConfig?.PortalDomain);
+
+            if (!string.IsNullOrEmpty(hostedUrl))
+            {
+                NavigationManager.NavigateTo(hostedUrl, forceLoad: true);
+                return;
+            }
+
+            // No usable hosted URL (Hostname/Domain/PortalDomain not configured
+            // yet) - fall through and render the same public-info stub as
+            // ActiveListed, rather than a redirect to nowhere.
+            _site = _site with { SiteStatus = SiteStatus.ActiveListed };
+        }
+    }
+}

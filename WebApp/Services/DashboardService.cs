@@ -18,6 +18,24 @@ public record UserSummary(
 	string? LastLoginSiteName,
 	int LoginCount);
 public record RoleAssignmentSummary(string UserEmail, string SiteName, SiteRole? Role, string? CustomRoleName, string SchoolYear);
+public record UnitSiteSummary(Guid Id, string SiteName, string PtaId, Guid? DivisionId, string? DivisionName, SiteStatus SiteStatus);
+public record UnitSitePage(List<UnitSiteSummary> Items, int TotalCount, int PageNumber, int PageSize);
+
+// A single row in the public /unit-sites directory (either group).
+public record DirectorySite(
+	Guid Id, string SiteName, SiteType SiteType, string PtaId,
+	Guid? ParentSiteId, string? ParentSiteName,
+	SiteStatus SiteStatus, string? ExternalUrl);
+public record DirectorySites(List<DirectorySite> Divisions, List<DirectorySite> LocalUnits);
+
+// Backs /unit-sites/{SiteId}. Includes Hostname/Domain (not shown on the page
+// itself) so the Details component can build the hosted-site redirect URL for
+// Status == Active via SiteUrlHelper.BuildPublicUrl without a second query.
+public record SiteDetails(
+	Guid Id, string SiteName, SiteType SiteType, string PtaId,
+	Guid? ParentSiteId, string? ParentSiteName,
+	SiteStatus SiteStatus, string? ExternalUrl,
+	string Hostname, string Domain);
 
 // Read (and, for site status, write) access behind the Dashboard's real —
 // as opposed to "coming soon" — sections. Every query here maps to data that
@@ -69,6 +87,89 @@ public class DashboardService(IDbContextFactory<AppDbContext> dbFactory)
 			.Where(s => s.SiteType == type)
 			.OrderBy(s => s.SiteName)
 			.ToListAsync(cancellationToken);
+	}
+
+	// The only statuses the public directory (list or detail) ever surfaces.
+	// Everything else - Inactive (not yet part of this directory model),
+	// Archived, Disabled - is treated as "do not list".
+	private static readonly SiteStatus[] DirectoryListedStatuses =
+		[SiteStatus.Active, SiteStatus.ActiveListed, SiteStatus.MembersOnly, SiteStatus.Pending];
+
+	// Backs the public Unit Sites browse page: Local Units only (Divisions
+	// are their own browsable rows elsewhere, not part of this list), with an
+	// optional division filter and a name/PTA-ID search. There's no "city" on
+	// Site — the schema has never carried one — so search only covers the
+	// two fields that actually exist. Pagination and the SiteName sort both
+	// happen in SQL; only the current page's rows round-trip.
+	public async Task<UnitSitePage> GetUnitSitesAsync(
+		Guid? divisionId, string? searchText, int pageNumber, int pageSize = 25, CancellationToken cancellationToken = default)
+	{
+		await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+		var query = db.Sites.Where(s => s.SiteType == SiteType.LocalUnit && DirectoryListedStatuses.Contains(s.SiteStatus));
+
+		if (divisionId is not null)
+			query = query.Where(s => s.ParentSiteId == divisionId);
+
+		if (!string.IsNullOrWhiteSpace(searchText))
+		{
+			var pattern = $"%{searchText.Trim()}%";
+			query = query.Where(s => EF.Functions.Like(s.SiteName, pattern) || EF.Functions.Like(s.PtaId, pattern));
+		}
+
+		var totalCount = await query.CountAsync(cancellationToken);
+
+		pageNumber = Math.Max(pageNumber, 1);
+
+		var items = await query
+			.OrderBy(s => s.SiteName)
+			.Skip((pageNumber - 1) * pageSize)
+			.Take(pageSize)
+			.Select(s => new UnitSiteSummary(
+				s.Id,
+				s.SiteName,
+				s.PtaId,
+				s.ParentSiteId,
+				s.ParentSite != null ? s.ParentSite.SiteName : null,
+				s.SiteStatus))
+			.ToListAsync(cancellationToken);
+
+		return new UnitSitePage(items, totalCount, pageNumber, pageSize);
+	}
+
+	// Backs the Divisions section of /unit-sites (no search/pagination there,
+	// same as before - just every listed Division, alphabetically). Local
+	// Units keep using the paginated/searchable GetUnitSitesAsync above; this
+	// exists only for the ungrouped Division list next to it.
+	public async Task<List<DirectorySite>> GetDirectoryDivisionsAsync(CancellationToken cancellationToken = default)
+	{
+		await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+		return await db.Sites
+			.Where(s => s.SiteType == SiteType.Division && DirectoryListedStatuses.Contains(s.SiteStatus))
+			.OrderBy(s => s.SiteName)
+			.Select(s => new DirectorySite(
+				s.Id, s.SiteName, s.SiteType, s.PtaId,
+				s.ParentSiteId, s.ParentSite != null ? s.ParentSite.SiteName : null,
+				s.SiteStatus, s.ExternalUrl))
+			.ToListAsync(cancellationToken);
+	}
+
+	// Backs /unit-sites/{SiteId}. Returns null for sites that aren't part of
+	// the public directory at all (not found, Archived, Disabled, or any
+	// other status outside DirectoryListedStatuses) - the caller 404s on null.
+	public async Task<SiteDetails?> GetSiteDetailsAsync(Guid siteId, CancellationToken cancellationToken = default)
+	{
+		await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+		return await db.Sites
+			.Where(s => s.Id == siteId && DirectoryListedStatuses.Contains(s.SiteStatus))
+			.Select(s => new SiteDetails(
+				s.Id, s.SiteName, s.SiteType, s.PtaId,
+				s.ParentSiteId, s.ParentSite != null ? s.ParentSite.SiteName : null,
+				s.SiteStatus, s.ExternalUrl,
+				s.Hostname, s.Domain))
+			.FirstOrDefaultAsync(cancellationToken);
 	}
 
 	public async Task<List<UserSummary>> GetAllUsersAsync(CancellationToken cancellationToken = default)

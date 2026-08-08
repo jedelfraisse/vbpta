@@ -1,0 +1,128 @@
+/* --------------------------------------------------
+   Global Admin — control center shell
+   Loaded once by GlobalAdminLayout and shared by every
+   /globaladmin page and section layout underneath it.
+-------------------------------------------------- */
+
+.ga-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.ga-header .ga-title {
+    margin-bottom: 0.15rem;
+}
+
+.ga-header .ga-subtitle {
+    margin-bottom: 0;
+}
+
+/* ---------- Top-level section switcher ---------- */
+/* flex-wrap (not overflow-x/auto-scroll) is what keeps this from ever
+   growing its own mini horizontal scrollbar — it just wraps to a second
+   row on narrow viewports instead. */
+.ga-top-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 1rem;
+}
+
+.ga-top-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    color: #374151;
+    text-decoration: none;
+    font-size: 0.95rem;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: background-color .15s ease, color .15s ease;
+}
+
+.ga-top-link:hover {
+    background: #f3f4f6;
+    color: #15803d;
+}
+
+.ga-top-link.active {
+    background: #2f9e44;
+    color: #ffffff;
+}
+
+/* ---------- Section layout: left nav + right content ---------- */
+.ga-section {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    align-items: start;
+    gap: 2rem;
+}
+
+.ga-section-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    position: sticky;
+    top: 80px;
+}
+
+.ga-section-link {
+    padding: 0.55rem 0.75rem;
+    border-radius: 8px;
+    color: #374151;
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.ga-section-link:hover {
+    background: #f3f4f6;
+    color: #15803d;
+}
+
+.ga-section-link.active {
+    background: #eaf7ec;
+    color: #15803d;
+    font-weight: 600;
+}
+
+.ga-section-content {
+    min-width: 0;
+}
+
+/* ---------- Overview cards ---------- */
+.ga-overview-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+}
+
+.ga-overview-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    height: 100%;
+}
+
+.ga-overview-card .card-title {
+    margin-bottom: 0;
+}
+
+/* ---------- Breakpoint: stack the section nav above its content ---------- */
+@media (max-width: 768px) {
+    .ga-section {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .ga-section-nav {
+        position: static;
+        flex-direction: row;
+        flex-wrap: wrap;
+        border-bottom: 1px solid #e5e7eb;
+        padding-bottom: 0.75rem;
+    }
+}

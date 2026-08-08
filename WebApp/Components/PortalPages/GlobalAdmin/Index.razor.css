@@ -1,8 +1,2 @@
-.nav-tabs {
-    flex-wrap: wrap;
-    overflow-x: hidden;
-}
-
-.nav-tabs .nav-link {
-    padding: 0.4rem 0.75rem;
-}
+/* Overview cards now come from the shared global-admin.css (.ga-overview-*)
+   loaded by GlobalAdminLayout — nothing left to scope here. */

@@ -1,0 +1,71 @@
+@layout WebApp.Components.Layout.PortalLayout
+@inherits LayoutComponentBase
+@using System.Security.Claims
+@using SiteEngine.Data
+@using SiteEngine.Enums
+@using WebApp.Components.SharedPages
+@using WebApp.Services
+@inject NavigationManager NavigationManager
+@inject SiteRoleResolver SiteRoleResolver
+
+<link href="global-admin.css" rel="stylesheet" />
+
+@if (_loaded)
+{
+    @if (!_hasAccess)
+    {
+        <NoAccess />
+    }
+    else
+    {
+        <div class="container">
+            <div class="ga-shell">
+                <div class="ga-header">
+                    <h1 class="ga-title">Global Admin</h1>
+                    <p class="ga-subtitle text-muted">The central control center for the Portal — identity, sites, and system tools all in one place.</p>
+                </div>
+
+                <nav class="ga-top-nav" aria-label="Global Admin sections">
+                    <NavLink class="ga-top-link" href="/globaladmin" Match="NavLinkMatch.All">Overview</NavLink>
+                    <NavLink class="ga-top-link" href="/globaladmin/identity">Identity &amp; Access</NavLink>
+                    <NavLink class="ga-top-link" href="/globaladmin/sites">Sites &amp; Content</NavLink>
+                    <NavLink class="ga-top-link" href="/globaladmin/system">System &amp; Developer</NavLink>
+                </nav>
+
+                <div class="ga-body">
+                    @Body
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    // Every /globaladmin* page routes through this layout (directly, or via
+    // one of the section layouts nested under it — see IdentityAccessLayout /
+    // SitesContentLayout / SystemDeveloperLayout), so the access check lives
+    // here once instead of being repeated on every page. Same check Index.razor
+    // used to run per-tab: SiteAdmin or SuperAdmin on the Portal site itself
+    // (see TopNavBar's ShowGlobalAdminLink for why those two roles).
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private bool _loaded;
+    private bool _hasAccess;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthState is null ? null : (await AuthState).User;
+        var identityUserId = user?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+
+        if (string.IsNullOrEmpty(identityUserId))
+        {
+            NavigationManager.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        var portalRole = await SiteRoleResolver.ResolveAsync(identityUserId, SeedData.DefaultPortalSiteId);
+        _hasAccess = portalRole is SiteRole.SiteAdmin or SiteRole.SuperAdmin;
+
+        _loaded = true;
+    }
+}

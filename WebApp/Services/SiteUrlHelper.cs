@@ -13,17 +13,23 @@ public static class SiteUrlHelper
 	// return empty rather than emit a broken URL (e.g. a bare hostname or an
 	// unconfigured/placeholder PortalDomain value).
 	public static string BuildPublicUrl(Site site, string? portalDomain)
-	{
-		var domain = site.Domain?.Trim() ?? string.Empty;
-		if (!string.IsNullOrEmpty(domain))
-			return $"https://{domain}";
+		=> BuildPublicUrl(site.Hostname, site.Domain, portalDomain);
 
-		var hostname = site.Hostname?.Trim() ?? string.Empty;
+	// Same rule as the Site overload above, for callers (e.g. the /unit-sites
+	// Details page) that only have a projected Hostname/Domain pair rather
+	// than a full Site entity.
+	public static string BuildPublicUrl(string? hostname, string? domain, string? portalDomain)
+	{
+		var trimmedDomain = domain?.Trim() ?? string.Empty;
+		if (!string.IsNullOrEmpty(trimmedDomain))
+			return $"https://{trimmedDomain}";
+
+		var trimmedHostname = hostname?.Trim() ?? string.Empty;
 		var portal = portalDomain?.Trim() ?? string.Empty;
-		if (string.IsNullOrEmpty(hostname) || string.IsNullOrEmpty(portal))
+		if (string.IsNullOrEmpty(trimmedHostname) || string.IsNullOrEmpty(portal))
 			return string.Empty;
 
-		return $"https://{hostname}.{portal}";
+		return $"https://{trimmedHostname}.{portal}";
 	}
 
 	public static string BuildAdminUrl(Site site, string? portalDomain)

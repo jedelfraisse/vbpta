@@ -237,21 +237,50 @@
             {
                 <div class="card shadow-sm mb-4">
                     <div class="card-body">
-                        <h6 class="card-title">Local Units</h6>
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                            <h6 class="card-title mb-0">Local Units</h6>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                                            data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                                        Status (@_selectedUnitStatuses.Count)
+                                    </button>
+                                    <ul class="dropdown-menu p-2">
+                                        @foreach (var status in _statusOptions)
+                                        {
+                                            <li>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" id="@($"unit-status-filter-{status}")"
+                                                           checked="@_selectedUnitStatuses.Contains(status)"
+                                                           @onchange="e => ToggleUnitStatus(status, e.Value)" />
+                                                    <label class="form-check-label" for="@($"unit-status-filter-{status}")">@status</label>
+                                                </div>
+                                            </li>
+                                        }
+                                    </ul>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => _addLocalUnitModal?.Open(_site.Id)">
+                                    + Local Unit
+                                </button>
+                            </div>
+                        </div>
+                        @{ var visibleChildUnits = FilteredChildUnits().ToList(); }
                         <ul class="list-group list-group-flush">
-                            @foreach (var unit in _site.ChildSites)
+                            @foreach (var unit in visibleChildUnits)
                             {
                                 <li class="list-group-item">
-                                    <LocalUnitRow Unit="unit" PortalDomain="_portalDomain" />
+                                    <LocalUnitRow Unit="unit" PortalDomain="@_portalDomain" SiteActivity="_siteActivity.GetValueOrDefault(unit.Id)" />
                                 </li>
                             }
-                            @if (_site.ChildSites.Count == 0)
+                            @if (visibleChildUnits.Count == 0)
                             {
                                 <li class="list-group-item text-muted">No Local Units yet.</li>
                             }
                         </ul>
                     </div>
                 </div>
+
+                <AddLocalUnitModal @ref="_addLocalUnitModal" Divisions="_allDivisions" OnCreated="ReloadSiteAsync" />
             }
         </div>
     }
@@ -268,6 +297,7 @@
     private string _publicUrl = string.Empty;
     private string _portalDomain = string.Empty;
     private SiteSummary? _summary;
+    private Dictionary<Guid, SiteActivity> _siteActivity = new();
 
     private SiteStatus _status;
     private bool _savingStatus;
@@ -279,6 +309,16 @@
     private bool _savingDomain;
     private string? _domainError;
     private string? _domainSuccessMessage;
+
+    private static readonly SiteStatus[] _statusOptions = Enum.GetValues<SiteStatus>();
+
+    // Same automatic exclusion as the Sites tab — Inactive/Archived Local
+    // Units start hidden, opt back in via the checkboxes.
+    private HashSet<SiteStatus> _selectedUnitStatuses = new(
+        _statusOptions.Where(s => s != SiteStatus.Inactive && s != SiteStatus.Archived));
+
+    private List<Site> _allDivisions = new();
+    private AddLocalUnitModal? _addLocalUnitModal;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -299,20 +339,43 @@
             var config = await DashboardService.GetPortalConfigAsync();
             _portalDomain = config?.PortalDomain?.Trim() ?? string.Empty;
 
-            _site = await SiteAdminService.GetSiteDetailAsync(SiteId);
-            if (_site is not null)
-            {
-                _adminUrl = SiteUrlHelper.BuildAdminUrl(_site, _portalDomain);
-                _publicUrl = SiteUrlHelper.BuildPublicUrl(_site, _portalDomain);
-                _summary = await SiteAdminService.GetSiteSummaryAsync(_site.Id);
-                _status = _site.SiteStatus;
-                _hostname = _site.Hostname;
-                _domain = _site.Domain;
-            }
+            await ReloadSiteAsync();
         }
 
         _loaded = true;
     }
+
+    private async Task ReloadSiteAsync()
+    {
+        _site = await SiteAdminService.GetSiteDetailAsync(SiteId);
+        if (_site is null)
+            return;
+
+        _adminUrl = SiteUrlHelper.BuildAdminUrl(_site, _portalDomain);
+        _publicUrl = SiteUrlHelper.BuildPublicUrl(_site, _portalDomain);
+        _summary = await SiteAdminService.GetSiteSummaryAsync(_site.Id);
+        _status = _site.SiteStatus;
+        _hostname = _site.Hostname;
+        _domain = _site.Domain;
+
+        var activitySiteIds = _site.ChildSites.Select(c => c.Id).Append(_site.Id).ToList();
+        _siteActivity = await SiteAdminService.GetSiteActivityAsync(activitySiteIds);
+
+        if (_site.SiteType == SiteType.Division)
+            _allDivisions = await SiteAdminService.GetAllDivisionsAsync();
+    }
+
+    private void ToggleUnitStatus(SiteStatus status, object? value)
+    {
+        if (value is true)
+            _selectedUnitStatuses.Add(status);
+        else
+            _selectedUnitStatuses.Remove(status);
+    }
+
+    private IEnumerable<Site> FilteredChildUnits() => _site!.ChildSites
+        .Where(u => _selectedUnitStatuses.Contains(u.SiteStatus))
+        .OrderBy(u => u.SiteName, StringComparer.OrdinalIgnoreCase);
 
     private async Task SaveStatusAsync()
     {

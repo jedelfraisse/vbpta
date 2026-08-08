@@ -1,57 +1,162 @@
 @page "/unit-sites"
+@using SiteEngine.Entities
+@using SiteEngine.Enums
+@using WebApp.Services
+@inject DashboardService DashboardService
 
 <div class="container">
     <h1>Unit Sites</h1>
-    <p class="lead">Browse PTA Divisions and Local Units</p>
+    <p class="lead">Browse Divisions and Local Units</p>
 
-    <div class="row g-2 mb-4">
-        <div class="col-sm-8">
-            <input type="search" class="form-control" placeholder="Search by name..." @bind="_searchText" />
-        </div>
-        <div class="col-sm-4">
-            <select class="form-select" @bind="_typeFilter">
-                <option value="">All Types</option>
-                <option value="Division">Division</option>
-                <option value="LocalUnit">Local Unit</option>
-            </select>
-        </div>
-    </div>
-
-    <div class="list-group">
-        @foreach (var site in _placeholderSites)
-        {
-            <div class="list-group-item d-flex justify-content-between align-items-center">
-                <div>
-                    <div class="fw-semibold">@site.Name</div>
-                    <span class="badge text-bg-secondary">@site.Type</span>
-                </div>
-
-                <div class="d-flex align-items-center gap-2">
+    <h2 class="h4 mt-4">Divisions</h2>
+    @if (_divisionsLoading)
+    {
+        <p class="text-muted">Loading&hellip;</p>
+    }
+    else if (_directoryDivisions.Count == 0)
+    {
+        <p class="text-muted">No Divisions are listed yet.</p>
+    }
+    else
+    {
+        <div class="list-group mb-3">
+            @foreach (var division in _directoryDivisions)
+            {
+                <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" href="@($"/unit-sites/{division.Id}")">
+                    <div>
+                        <div class="fw-semibold">@division.SiteName</div>
+                        <span class="text-muted small">PTA ID @division.PtaId</span>
+                    </div>
                     <AuthorizeView>
                         <Authorized>
-                            <span class="badge text-bg-info">@site.Status</span>
+                            <span class="badge text-bg-info">@division.SiteStatus</span>
                         </Authorized>
                     </AuthorizeView>
+                </a>
+            }
+        </div>
+    }
 
-                    @* Clicking conceptually opens the site's public info only - not wired up yet *@
-                    <a class="btn btn-sm btn-outline-primary" href="#">View Public Info</a>
-                </div>
-            </div>
-        }
+    <h2 class="h4 mt-4">Local Units</h2>
+
+    <div class="row g-2 mb-3 align-items-center">
+        <div class="col-sm-6">
+            <input type="search" class="form-control" placeholder="Search by unit name or PTA ID..."
+                   value="@_searchText" @oninput="OnSearchChanged" />
+        </div>
+        <div class="col-sm-4">
+            <select class="form-select" value="@_divisionId" @onchange="OnDivisionChanged">
+                <option value="">All Divisions</option>
+                @foreach (var division in _directoryDivisions)
+                {
+                    <option value="@division.Id">@division.SiteName</option>
+                }
+            </select>
+        </div>
+        <div class="col-sm-2 text-muted small text-sm-end">
+            @_page.TotalCount unit@(_page.TotalCount == 1 ? "" : "s")
+        </div>
     </div>
+
+    @if (_loading)
+    {
+        <p class="text-muted">Loading&hellip;</p>
+    }
+    else if (_page.Items.Count == 0)
+    {
+        <p class="text-muted">No Local Units match your search.</p>
+    }
+    else
+    {
+        <div class="list-group mb-3">
+            @foreach (var unit in _page.Items)
+            {
+                <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" href="@($"/unit-sites/{unit.Id}")">
+                    <div>
+                        <div class="fw-semibold">@unit.SiteName</div>
+                        <span class="text-muted small">@(unit.DivisionName ?? "Independent") &middot; PTA ID @unit.PtaId</span>
+                    </div>
+
+                    <AuthorizeView>
+                        <Authorized>
+                            <span class="badge text-bg-info">@unit.SiteStatus</span>
+                        </Authorized>
+                    </AuthorizeView>
+                </a>
+            }
+        </div>
+
+        @if (_totalPages > 1)
+        {
+            <nav aria-label="Unit Sites pagination">
+                <ul class="pagination justify-content-center">
+                    <li class="page-item @(_page.PageNumber <= 1 ? "disabled" : "")">
+                        <button type="button" class="page-link" @onclick="() => GoToPageAsync(_page.PageNumber - 1)">Previous</button>
+                    </li>
+                    <li class="page-item disabled">
+                        <span class="page-link">Page @_page.PageNumber of @_totalPages</span>
+                    </li>
+                    <li class="page-item @(_page.PageNumber >= _totalPages ? "disabled" : "")">
+                        <button type="button" class="page-link" @onclick="() => GoToPageAsync(_page.PageNumber + 1)">Next</button>
+                    </li>
+                </ul>
+            </nav>
+        }
+    }
 </div>
 
 @code {
+    private const int PageSize = 25;
+
+    private List<DirectorySite> _directoryDivisions = new();
+    private bool _divisionsLoading = true;
+
+    private UnitSitePage _page = new(new List<UnitSiteSummary>(), 0, 1, PageSize);
     private string _searchText = string.Empty;
-    private string _typeFilter = string.Empty;
+    private Guid? _divisionId;
+    private bool _loading = true;
 
-    private readonly List<PlaceholderSite> _placeholderSites = new()
+    private int _totalPages => Math.Max(1, (int)Math.Ceiling(_page.TotalCount / (double)PageSize));
+
+    protected override async Task OnInitializedAsync()
     {
-        new("Virginia Beach Division", "Division", "Guest"),
-        new("Chesapeake Division", "Division", "Member"),
-        new("Luxford Elementary PTA", "Local Unit", "Admin"),
-        new("Tallwood Elementary PTA", "Local Unit", "Guest"),
-    };
+        await Task.WhenAll(
+            LoadDivisionsAsync(),
+            LoadAsync(pageNumber: 1));
+    }
 
-    private record PlaceholderSite(string Name, string Type, string Status);
+    private async Task LoadDivisionsAsync()
+    {
+        _divisionsLoading = true;
+        _directoryDivisions = await DashboardService.GetDirectoryDivisionsAsync();
+        _divisionsLoading = false;
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        _loading = true;
+        _page = await DashboardService.GetUnitSitesAsync(_divisionId, _searchText, pageNumber, PageSize);
+        _loading = false;
+    }
+
+    private Task OnSearchChanged(ChangeEventArgs e)
+    {
+        _searchText = e.Value?.ToString() ?? string.Empty;
+        return LoadAsync(pageNumber: 1);
+    }
+
+    private Task OnDivisionChanged(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString();
+        _divisionId = string.IsNullOrEmpty(value) ? null : Guid.Parse(value);
+        return LoadAsync(pageNumber: 1);
+    }
+
+    private Task GoToPageAsync(int pageNumber)
+    {
+        if (pageNumber < 1 || pageNumber > _totalPages || pageNumber == _page.PageNumber)
+            return Task.CompletedTask;
+
+        return LoadAsync(pageNumber);
+    }
 }

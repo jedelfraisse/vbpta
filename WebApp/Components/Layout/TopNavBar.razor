@@ -1,3 +1,5 @@
+@using SiteEngine.Enums
+
 <header class="topbar">
     <div class="topbar-inner">
         <a class="brand" href="/" @onclick="CloseMenus">
@@ -28,6 +30,10 @@
                     <span class="nav-divider" aria-hidden="true"></span>
 
                     <a class="nav-link" href="/dashboard">Dashboard</a>
+                    @if (ShowGlobalAdminLink)
+                    {
+                        <a class="nav-link" href="/globaladmin">Global Admin</a>
+                    }
                     <a class="nav-link nav-logout" href="/logout">Logout</a>
                 </Authorized>
                 <NotAuthorized>
@@ -61,6 +67,10 @@
                 <div class="mobile-divider" aria-hidden="true"></div>
 
                 <a class="mobile-link" href="/dashboard" @onclick="CloseMenus">Dashboard</a>
+                @if (ShowGlobalAdminLink)
+                {
+                    <a class="mobile-link" href="/globaladmin" @onclick="CloseMenus">Global Admin</a>
+                }
                 <a class="mobile-link mobile-logout" href="/logout" @onclick="CloseMenus">Logout</a>
             </Authorized>
             <NotAuthorized>
@@ -76,6 +86,17 @@
     // authenticated user regardless of role — role-specific sections
     // (Portal Admin, Global Admin, etc.) render inside it, not as separate
     // nav destinations. See Dashboard.razor / SiteRoleResolver.
+    //
+    // The one exception is the Global Admin link below: CurrentRole is
+    // resolved by PortalLayout scoped to the Portal site specifically (this
+    // component only ever renders under PortalLayout), so SiteAdmin here
+    // means "Central Portal Admin" and SuperAdmin means "Global Admin" —
+    // both get a shortcut straight into /globaladmin.
+
+    [Parameter]
+    public SiteRole? CurrentRole { get; set; }
+
+    private bool ShowGlobalAdminLink => CurrentRole is SiteRole.SiteAdmin or SiteRole.SuperAdmin;
 
     private bool _mobileMenuOpen;
 

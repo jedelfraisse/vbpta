@@ -53,6 +53,28 @@ public static class SiteThemeExtensions
 	public static string? ResolvedPageBackgroundImageUrl(this Site site) =>
 		ResolveImage(site, s => s.PageBackgroundImageUrl);
 
+	// Division's own district/city logo. A Local Unit has no DistrictLogoUrl
+	// of its own — it only ever surfaces here via the parent-Division fallback.
+	public static string? ResolvedDistrictLogoUrl(this Site site) =>
+		ResolveImage(site, s => s.DistrictLogoUrl);
+
+	// Local Unit's own school crest, falling back to the parent Division's
+	// DistrictLogoUrl (not the parent's own SchoolCrestUrl, which Divisions
+	// don't have) when unset.
+	public static string? ResolvedSchoolCrestUrl(this Site site)
+	{
+		if (!string.IsNullOrWhiteSpace(site.SchoolCrestUrl))
+			return site.SchoolCrestUrl;
+
+		if (site.SiteType == SiteType.LocalUnit && site.ParentSite is not null)
+			return ResolvedDistrictLogoUrl(site.ParentSite);
+
+		return null;
+	}
+
+	public static string? ResolvedPartnerLogoUrl(this Site site) =>
+		ResolveImage(site, s => s.PartnerLogoUrl);
+
 	private static string Resolve(Site site, Func<Site, string?> selector, string globalDefault)
 	{
 		return ResolveOwnOrParent(site, selector) ?? globalDefault;

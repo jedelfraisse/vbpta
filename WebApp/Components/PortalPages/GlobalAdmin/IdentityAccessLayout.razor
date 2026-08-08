@@ -1,0 +1,14 @@
+@layout GlobalAdminLayout
+@inherits LayoutComponentBase
+
+<div class="ga-section">
+    <nav class="ga-section-nav" aria-label="Identity & Access">
+        <NavLink class="ga-section-link" href="/globaladmin/identity" Match="NavLinkMatch.All">Domains</NavLink>
+        <NavLink class="ga-section-link" href="/globaladmin/identity/users">User Directory</NavLink>
+        <NavLink class="ga-section-link" href="/globaladmin/identity/roles">Roles &amp; Permissions</NavLink>
+        <NavLink class="ga-section-link" href="/globaladmin/identity/login-analytics">Authentication &amp; Login Analytics</NavLink>
+    </nav>
+    <div class="ga-section-content">
+        @Body
+    </div>
+</div>

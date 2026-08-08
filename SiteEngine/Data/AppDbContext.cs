@@ -126,9 +126,12 @@ public DbSet<LoginHistorySummary> LoginHistorySummaries => Set<LoginHistorySumma
 			entity.Property(x => x.Hostname).HasMaxLength(255).IsRequired();
 			entity.Property(x => x.Domain).HasMaxLength(255).IsRequired();
 			entity.Property(x => x.SiteName).HasMaxLength(256).IsRequired();
-			entity.Property(x => x.LogoUrl).HasMaxLength(512).IsRequired();
+			entity.Property(x => x.LogoUrl).HasMaxLength(512);
 			entity.Property(x => x.BannerUrl).HasMaxLength(512).IsRequired();
-			entity.Property(x => x.PartnerLogoUrl).HasMaxLength(512).IsRequired();
+			entity.Property(x => x.PTALogoVariantUrl).HasMaxLength(512);
+			entity.Property(x => x.PartnerLogoUrl).HasMaxLength(512);
+			entity.Property(x => x.DistrictLogoUrl).HasMaxLength(512);
+			entity.Property(x => x.SchoolCrestUrl).HasMaxLength(512);
 			entity.Property(x => x.HeaderText).HasMaxLength(1024).IsRequired();
 
 			entity.Property(x => x.PrimaryColor).HasMaxLength(32);
@@ -142,9 +145,16 @@ public DbSet<LoginHistorySummary> LoginHistorySummaries => Set<LoginHistorySumma
 			entity.Property(x => x.MenuBackgroundImageUrl).HasMaxLength(512);
 			entity.Property(x => x.PageBackgroundImageUrl).HasMaxLength(512);
 
+			entity.Property(x => x.ExternalUrl).HasMaxLength(512);
+
 			entity.HasIndex(x => x.PtaId).IsUnique();
 			entity.HasIndex(x => x.Hostname).IsUnique().HasFilter("[Hostname] <> ''");
 			entity.HasIndex(x => x.Domain).IsUnique().HasFilter("[Domain] <> ''");
+
+			// Backs the Unit Sites browse page (DashboardService.GetUnitSitesAsync):
+			// every query there filters on SiteType, optionally narrows by
+			// ParentSiteId (the division filter), and always orders by SiteName.
+			entity.HasIndex(x => new { x.SiteType, x.ParentSiteId, x.SiteName });
 
 			entity.HasOne(x => x.ParentSite)
 				.WithMany()

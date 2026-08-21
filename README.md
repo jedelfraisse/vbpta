@@ -89,14 +89,14 @@ Each unit (school‑level PTA) will have its own site under its division:
 
 ```
 division.localhost
-unit.division.localhost
+unit.localhost
 ```
 
 or in staging:
 
 ```
 division.ptaportal.delfraisse.com
-unit.division.ptaportal.delfraisse.com
+unit.ptaportal.delfraisse.com
 ```
 
 Unit sites include:
@@ -143,9 +143,9 @@ https://unit.localhost
 
 ### **Staging Environment**
 ```
-https://ptaportal.delfraisse.com
-https://division.ptaportal.delfraisse.com
-https://unit.ptaportal.delfraisse.com
+https://centralportal.delfraisse.com
+https://division.centralportal.delfraisse.com
+https://unit.centralportal.delfraisse.com
 ```
 
 ### **Custom Domains**
@@ -159,7 +159,7 @@ luxfordpta.org
 However:
 
 > **All sites will always remain accessible via their platform subdomain**  
-> (e.g., `unit.ptaportal.delfraisse.com`),  
+> (e.g., `unit.centralportal.delfraisse.com`),  
 > even when a custom domain is attached.
 
 This ensures:

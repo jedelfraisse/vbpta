@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -78,7 +79,20 @@ builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
 builder.Services.AddCascadingAuthenticationState();
 
 builder.Services.AddAuthorization();
-builder.Services.AddDataProtection();
+
+// Persist keys to a stable folder under the site root rather than the
+// default profile/registry location. Shared/Plesk-style hosting often has
+// no loaded user profile and no writable registry for the app pool
+// identity, so without this the key ring silently regenerates on every
+// process restart — anything encrypted before that (e.g. PortalConfig's
+// SmtpPassword) becomes permanently undecryptable. This folder lives
+// outside the publish output, so redeploys (dangerous-clean-slate: false)
+// never touch it.
+var dataProtectionKeysPath = Path.Combine(builder.Environment.ContentRootPath, "DataProtection-Keys");
+Directory.CreateDirectory(dataProtectionKeysPath);
+builder.Services.AddDataProtection()
+	.PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath))
+	.SetApplicationName("VbptaPortal");
 
 
 builder.Services.AddSingleton<PasswordlessCodeStore>();

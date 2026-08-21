@@ -87,6 +87,15 @@
         {
             _statusMessage = ex.Message;
         }
+        catch (Exception)
+        {
+            // Don't let a send failure (SMTP misconfiguration, transient
+            // network error, etc.) go unhandled — an uncaught exception here
+            // terminates the whole Blazor Server circuit, which looks to the
+            // user like the button silently did nothing rather than showing
+            // an error.
+            _statusMessage = "We couldn't send a sign‑in code right now. Please try again in a few minutes.";
+        }
     }
 
     private Task VerifyCodeAsync()

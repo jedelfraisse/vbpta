@@ -25,6 +25,7 @@ public class SetupService
 	private readonly ILogger<SetupService> _logger;
 	private readonly SetupStateService _setupState;
 	private readonly IDataProtector _protector;
+	private readonly SystemDiagnosticsState _diagnostics;
 
 
 	private static readonly Dictionary<string, string> _adminCodes = new();
@@ -37,7 +38,8 @@ public class SetupService
 		SetupConnectionStringProvider connectionProvider,
 		ILogger<SetupService> logger,
 		SetupStateService setupState,
-		IDataProtectionProvider provider)
+		IDataProtectionProvider provider,
+		SystemDiagnosticsState diagnostics)
 	{
 		_env = env;
 		_lifetime = lifetime;
@@ -46,6 +48,7 @@ public class SetupService
 		_connectionProvider = connectionProvider;
 		_logger = logger;
 		_setupState = setupState;
+		_diagnostics = diagnostics;
 
 		_protector = provider.CreateProtector("PortalConfig.SmtpPassword");
 	}
@@ -317,7 +320,144 @@ public class SetupService
 	}
 
 	// ------------------------------------------------------------
-	// 7. TRIGGER RESTART
+	// 7. GLOBAL ADMIN — SYSTEM SETTINGS (Database Connection / Email Server)
+	// ------------------------------------------------------------
+	// Back the SuperAdmin-only pages under /globaladmin/system/database and
+	// /globaladmin/system/email. Deliberately NOT built on top of SaveStepAsync:
+	// that method writes the SQL connection string and every SMTP/portal field
+	// together, unconditionally for SMTP. That's correct for the one-time setup
+	// wizard (one form, one submit) but wrong here, where the two pages save
+	// independently — reusing it would blank out SMTP fields when only the SQL
+	// connection is being edited, and vice versa.
+
+	// Dry-run a raw, already-assembled connection string (used by the "Validate"
+	// button before saving). Never touches SetupConnectionStringProvider.
+	public async Task TestRawSqlConnectionAsync(string connectionString)
+	{
+		using var conn = new SqlConnection(connectionString);
+		await conn.OpenAsync();
+	}
+
+	public async Task<(bool Success, string? Error)> ValidateDatabaseConnectionAsync(SetupSetupModel model)
+	{
+		try
+		{
+			await TestRawSqlConnectionAsync(BuildConnectionString(model));
+			return (true, null);
+		}
+		catch (Exception ex)
+		{
+			return (false, ex.Message);
+		}
+	}
+
+	// Persists the new connection string to appsettings.json only — it does NOT
+	// call _connectionProvider.Set(...). Unlike the setup wizard (which only
+	// publishes a connection string in-memory once RunMigrationsAsync has proven
+	// it against a real, migrated schema), a connection string edited here later
+	// might point at a database with a different schema entirely. Taking effect
+	// only after a restart is exactly what the "Restart Required" banner communicates.
+	public void SaveDatabaseConnection(SetupSetupModel model)
+	{
+		var cs = BuildConnectionString(model);
+
+		var settingsPath = Path.Combine(_env.ContentRootPath, "appsettings.json");
+		var json = File.ReadAllText(settingsPath);
+		var root = JsonNode.Parse(json)!.AsObject();
+
+		if (!root.ContainsKey("ConnectionStrings"))
+			root["ConnectionStrings"] = new JsonObject();
+
+		root["ConnectionStrings"]!.AsObject()["DefaultConnection"] = cs;
+
+		File.WriteAllText(settingsPath, root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+	}
+
+	public async Task<(bool Success, string? Error)> TestSmtpSettingsAsync(SetupSetupModel model)
+	{
+		try
+		{
+			await TestSmtpAsync(model);
+			return (true, null);
+		}
+		catch (Exception ex)
+		{
+			return (false, ex.Message);
+		}
+	}
+
+	// Updates only the SMTP fields on PortalConfig — PortalName/PortalDomain are
+	// left untouched, unlike SaveStepAsync's all-in-one write.
+	public async Task SaveSmtpSettingsAsync(SetupSetupModel model, bool passwordChanged)
+	{
+		await using var db = await _dbFactory.CreateDbContextAsync();
+
+		var cfg = await db.PortalConfigs.FirstOrDefaultAsync(c => c.Id == SeedData.DefaultGlobalConfigId)
+			?? throw new InvalidOperationException("PortalConfig not found.");
+
+		cfg.SmtpHost = model.SmtpHost;
+		cfg.SmtpPort = model.SmtpPort;
+		cfg.SmtpUsername = model.SmtpUsername;
+		cfg.SmtpFromAddress = model.SmtpFrom;
+		cfg.SmtpReplyToAddress = model.SmtpReplyTo;
+		cfg.UseSsl = model.SmtpUseSsl;
+
+		// The field is shown masked and left blank when unchanged — only overwrite
+		// the stored (encrypted) password when the admin actually typed a new one,
+		// so leaving it blank doesn't wipe out the working secret.
+		if (passwordChanged)
+			cfg.SmtpPassword = _protector.Protect(model.SmtpPassword);
+
+		await db.SaveChangesAsync();
+	}
+
+	// Sends a one-off test message using whatever SMTP settings are currently
+	// saved on PortalConfig (i.e. the last-saved settings, not unsaved form
+	// edits) to the logged-in admin's own address, and records the outcome on
+	// SystemDiagnosticsState for the "Last successful send" field.
+	public async Task<(bool Success, string? Error)> SendSystemTestEmailAsync(string toEmail)
+	{
+		try
+		{
+			await using var db = await _dbFactory.CreateDbContextAsync();
+			var cfg = await db.PortalConfigs.FirstOrDefaultAsync(c => c.Id == SeedData.DefaultGlobalConfigId)
+				?? throw new InvalidOperationException("PortalConfig not found.");
+
+			var password = _protector.Unprotect(cfg.SmtpPassword);
+
+			using var client = new SmtpClient(cfg.SmtpHost, cfg.SmtpPort)
+			{
+				EnableSsl = cfg.UseSsl,
+				Credentials = new NetworkCredential(cfg.SmtpUsername, password)
+			};
+
+			var msg = new MailMessage
+			{
+				From = new MailAddress(cfg.SmtpFromAddress),
+				Subject = "Global Admin: SMTP test email",
+				Body = "This is a test message sent from Global Admin → System & Developer → System Settings → Email Server. " +
+					"If you received this, the saved SMTP configuration is working."
+			};
+
+			if (!string.IsNullOrWhiteSpace(cfg.SmtpReplyToAddress))
+				msg.ReplyToList.Add(new MailAddress(cfg.SmtpReplyToAddress));
+
+			msg.To.Add(toEmail);
+
+			await client.SendMailAsync(msg);
+
+			_diagnostics.RecordEmailTest(succeeded: true);
+			return (true, null);
+		}
+		catch (Exception ex)
+		{
+			_diagnostics.RecordEmailTest(succeeded: false);
+			return (false, ex.Message);
+		}
+	}
+
+	// ------------------------------------------------------------
+	// 8. TRIGGER RESTART
 	// ------------------------------------------------------------
 	public void TriggerRestart()
 	{

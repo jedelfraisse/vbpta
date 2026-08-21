@@ -10,6 +10,7 @@ public class RuntimeSiteContext
 	private readonly IDbContextFactory<AppDbContext> _dbFactory;
 
 	public Site? CurrentSite { get; private set; }
+	private string? _portalDomain;
 
 	public RuntimeSiteContext(IDbContextFactory<AppDbContext> dbFactory)
 	{
@@ -30,6 +31,32 @@ public class RuntimeSiteContext
 		CurrentSite =
 			await db.Sites.FirstOrDefaultAsync(s => s.Domain != "" && s.Domain.ToLower() == host)
 			?? await db.Sites.FirstOrDefaultAsync(s => s.SiteType != SiteType.Portal && s.Hostname.ToLower() == subdomain)
+			// PtaId (unique, always set) always works as a fallback access path
+			// - "{PtaId}.{PortalDomain}" - for a site that hasn't had a Hostname
+			// or Domain configured yet. See GetCanonicalRedirectUrl below.
+			?? await db.Sites.FirstOrDefaultAsync(s => s.SiteType != SiteType.Portal && s.PtaId.ToLower() == subdomain)
 			?? await db.Sites.FirstOrDefaultAsync(s => s.SiteType == SiteType.Portal);
+
+		_portalDomain = (await db.PortalConfigs.FirstOrDefaultAsync())?.PortalDomain;
+	}
+
+	// If CurrentSite has a real Hostname or Domain configured and the visitor
+	// didn't arrive on it (e.g. they came in on the PtaId fallback subdomain
+	// above, or on an old Hostname after a custom Domain was added), this
+	// returns the canonical URL to redirect them to. Null means the request
+	// is already on the canonical host, or no better URL exists yet.
+	public string? GetCanonicalRedirectUrl(string requestedHost)
+	{
+		if (CurrentSite is null || CurrentSite.SiteType == SiteType.Portal)
+			return null;
+
+		var canonicalUrl = SiteUrlHelper.BuildPublicUrl(CurrentSite, _portalDomain);
+		if (string.IsNullOrEmpty(canonicalUrl))
+			return null;
+
+		var canonicalHost = new Uri(canonicalUrl).Host;
+		var requestedHostOnly = requestedHost.ToLowerInvariant().Split(':')[0];
+
+		return canonicalHost == requestedHostOnly ? null : canonicalUrl;
 	}
 }

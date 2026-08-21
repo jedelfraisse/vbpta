@@ -1,4 +1,4 @@
-@page "/unit-sites/{SiteId:guid}"
+@page "/unit-sites/{PtaId}"
 @using SiteEngine.Enums
 @using WebApp.Services
 @inject DashboardService DashboardService
@@ -43,25 +43,9 @@ else
             }
         </p>
 
-        @if (_site.SiteStatus == SiteStatus.MembersOnly)
-        {
-            <div class="alert alert-info">
-                <strong>Members Only.</strong> This site's content is restricted to members. Sign in or contact the unit to learn how to join.
-            </div>
-        }
-        else if (_site.SiteStatus == SiteStatus.Pending)
-        {
-            <div class="alert alert-secondary">
-                This site hasn't been claimed yet. Basic public information is shown below.
-            </div>
-        }
-
         <dl class="row">
             <dt class="col-sm-3">PTA ID</dt>
             <dd class="col-sm-9">@_site.PtaId</dd>
-
-            <dt class="col-sm-3">Status</dt>
-            <dd class="col-sm-9"><span class="badge text-bg-info">@_site.SiteStatus</span></dd>
 
             @if (_site.ExternalUrl is not null)
             {
@@ -69,19 +53,48 @@ else
                 <dd class="col-sm-9"><a href="@_site.ExternalUrl" target="_blank" rel="noopener noreferrer">@_site.ExternalUrl</a></dd>
             }
         </dl>
+
+        @if (_site.SiteType == SiteType.Division)
+        {
+            <h2 class="h4 mt-4">Local Units</h2>
+
+            @if (_childUnitsLoading)
+            {
+                <p class="text-muted">Loading&hellip;</p>
+            }
+            else if (_childUnits.Count == 0)
+            {
+                <p class="text-muted">No Local Units are listed under this Division yet.</p>
+            }
+            else
+            {
+                <div class="list-group mb-3">
+                    @foreach (var unit in _childUnits)
+                    {
+                        <a class="list-group-item list-group-item-action" href="@($"/unit-sites/{unit.PtaId}")">
+                            <div class="fw-semibold">@unit.SiteName</div>
+                            <span class="text-muted small">PTA ID @unit.PtaId</span>
+                        </a>
+                    }
+                </div>
+            }
+        }
     </div>
 }
 
 @code {
-    [Parameter] public Guid SiteId { get; set; }
+    [Parameter] public string PtaId { get; set; } = string.Empty;
 
     private SiteDetails? _site;
     private bool _loading = true;
 
+    private List<DirectorySite> _childUnits = new();
+    private bool _childUnitsLoading;
+
     protected override async Task OnParametersSetAsync()
     {
         _loading = true;
-        _site = await DashboardService.GetSiteDetailsAsync(SiteId);
+        _site = await DashboardService.GetSiteDetailsAsync(PtaId);
         _loading = false;
 
         if (_site is { SiteStatus: SiteStatus.Active })
@@ -99,6 +112,13 @@ else
             // yet) - fall through and render the same public-info stub as
             // ActiveListed, rather than a redirect to nowhere.
             _site = _site with { SiteStatus = SiteStatus.ActiveListed };
+        }
+
+        if (_site is { SiteType: SiteType.Division })
+        {
+            _childUnitsLoading = true;
+            _childUnits = await DashboardService.GetChildUnitsAsync(_site.Id);
+            _childUnitsLoading = false;
         }
     }
 }

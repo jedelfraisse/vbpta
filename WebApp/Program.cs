@@ -32,6 +32,10 @@ builder.Services.AddScoped<SetupService>();
 // ------------------------------------------------------------
 builder.Services.AddSingleton<SetupConnectionStringProvider>();
 
+// Process-lifetime diagnostics (last startup validation, last test email) shown
+// on the Global Admin > System Settings > Database Connection / Email Server pages.
+builder.Services.AddSingleton<SystemDiagnosticsState>();
+
 // ------------------------------------------------------------
 // AppDbContext factory — the ONLY place DbContextOptions<AppDbContext> gets
 // built. Registered as a plain singleton service (not via AddDbContextFactory,
@@ -195,6 +199,11 @@ using (var startupScope = app.Services.CreateScope())
 	startupLogger.LogInformation(
 		"Startup DB diagnostics: connectionStringConfigured={IsConfigured}, databaseExists={DatabaseExists}, hasTables={HasTables}, pendingMigrations={HasPendingMigrations}",
 		isConfigured, databaseExists, hasTables, hasPendingMigrations);
+
+	// Recorded regardless of outcome — the Database Connection admin page shows
+	// this as "Last startup validation" either way; isConfigured/databaseExists
+	// above already cover whether it succeeded.
+	startupScope.ServiceProvider.GetRequiredService<SystemDiagnosticsState>().RecordStartupValidation();
 }
 
 // ------------------------------------------------------------

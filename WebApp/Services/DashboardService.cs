@@ -155,15 +155,35 @@ public class DashboardService(IDbContextFactory<AppDbContext> dbFactory)
 			.ToListAsync(cancellationToken);
 	}
 
-	// Backs /unit-sites/{SiteId}. Returns null for sites that aren't part of
-	// the public directory at all (not found, Archived, Disabled, or any
-	// other status outside DirectoryListedStatuses) - the caller 404s on null.
-	public async Task<SiteDetails?> GetSiteDetailsAsync(Guid siteId, CancellationToken cancellationToken = default)
+	// Backs the "Local Units in this Division" list on /unit-sites/{PtaId}
+	// when the site is a Division - every listed child, alphabetically. No
+	// pagination, same reasoning as GetDirectoryDivisionsAsync above: this is
+	// a bounded child list, not the full unit directory.
+	public async Task<List<DirectorySite>> GetChildUnitsAsync(Guid divisionId, CancellationToken cancellationToken = default)
 	{
 		await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
 
 		return await db.Sites
-			.Where(s => s.Id == siteId && DirectoryListedStatuses.Contains(s.SiteStatus))
+			.Where(s => s.ParentSiteId == divisionId && DirectoryListedStatuses.Contains(s.SiteStatus))
+			.OrderBy(s => s.SiteName)
+			.Select(s => new DirectorySite(
+				s.Id, s.SiteName, s.SiteType, s.PtaId,
+				s.ParentSiteId, s.ParentSite != null ? s.ParentSite.SiteName : null,
+				s.SiteStatus, s.ExternalUrl))
+			.ToListAsync(cancellationToken);
+	}
+
+	// Backs /unit-sites/{PtaId}. Returns null for sites that aren't part of
+	// the public directory at all (not found, Archived, Disabled, or any
+	// other status outside DirectoryListedStatuses) - the caller 404s on null.
+	// Keyed by PtaId (unique, char(8)) rather than the internal Id so the
+	// public URL doesn't expose/depend on the database-generated Guid.
+	public async Task<SiteDetails?> GetSiteDetailsAsync(string ptaId, CancellationToken cancellationToken = default)
+	{
+		await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+		return await db.Sites
+			.Where(s => s.PtaId == ptaId && DirectoryListedStatuses.Contains(s.SiteStatus))
 			.Select(s => new SiteDetails(
 				s.Id, s.SiteName, s.SiteType, s.PtaId,
 				s.ParentSiteId, s.ParentSite != null ? s.ParentSite.SiteName : null,

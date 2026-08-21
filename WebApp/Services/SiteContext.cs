@@ -64,7 +64,12 @@ public class SiteContext
 		// Division — see SiteThemeExtensions.
 		CurrentSite =
 			await db.Sites.Include(s => s.ParentSite).FirstOrDefaultAsync(s => s.Domain != "" && s.Domain.ToLower() == host)
-			?? await db.Sites.Include(s => s.ParentSite).FirstOrDefaultAsync(s => s.SiteType != SiteType.Portal && s.Hostname.ToLower() == subdomain);
+			?? await db.Sites.Include(s => s.ParentSite).FirstOrDefaultAsync(s => s.SiteType != SiteType.Portal && s.Hostname.ToLower() == subdomain)
+			// PtaId (unique, always set) always works as a fallback access path
+			// - "{PtaId}.{PortalDomain}" - for a site that hasn't had a Hostname
+			// or Domain configured yet. See RuntimeSiteContext.GetCanonicalRedirectUrl,
+			// which redirects away from this once a real Hostname/Domain exists.
+			?? await db.Sites.Include(s => s.ParentSite).FirstOrDefaultAsync(s => s.SiteType != SiteType.Portal && s.PtaId.ToLower() == subdomain);
 
 		if (CurrentSite is not null)
 		{

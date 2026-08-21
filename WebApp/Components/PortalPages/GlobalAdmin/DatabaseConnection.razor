@@ -1,0 +1,274 @@
+@page "/globaladmin/system/database"
+@layout SystemDeveloperLayout
+@using System.Security.Claims
+@using Microsoft.Data.SqlClient
+@using Microsoft.EntityFrameworkCore
+@using SiteEngine.Data
+@using SiteEngine.Enums
+@using WebApp.Models
+@using WebApp.Services
+@inject SetupService SetupService
+@inject SetupConnectionStringProvider ConnectionProvider
+@inject SystemDiagnosticsState Diagnostics
+@inject IDbContextFactory<AppDbContext> DbFactory
+@inject SiteRoleResolver SiteRoleResolver
+
+<PageTitle>Database Connection — Global Admin</PageTitle>
+
+<h5 class="mb-3">Database Connection</h5>
+
+@if (!_loaded)
+{
+    <p class="text-muted">Loading…</p>
+}
+else if (!_hasAccess)
+{
+    <div class="alert alert-warning">This page is restricted to SuperAdmins.</div>
+}
+else
+{
+    @if (_restartRequired)
+    {
+        <div class="alert alert-warning">
+            Connection settings were saved to <code>appsettings.json</code>. <strong>Restart the app</strong> for the new connection string to take effect — the values below still reflect what's currently live.
+        </div>
+    }
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h6 class="card-title">Current Configuration</h6>
+            <FieldBox Label="SQL Server" Value="@Display(_currentServer)" />
+            <FieldBox Label="Database" Value="@Display(_currentDatabase)" />
+            <FieldBox Label="Authentication Mode" Value="@Display(_currentAuthMode)" />
+            <FieldBox Label="Username" Value="@Mask(_currentUsername)" />
+            <FieldBox Label="Connection String" Value="@_maskedConnectionString" />
+            <FieldBox Label="EF Provider" Value="@Display(_efProviderName)" />
+            <FieldBox Label="Migrations Assembly" Value="@Display(_migrationsAssembly)" />
+            <FieldBox Label="Last Startup Validation" Value="@_lastStartupValidation" />
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h6 class="card-title">Edit Connection</h6>
+
+            <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" id="rawToggle" @bind="_useRawConnectionString" />
+                <label class="form-check-label" for="rawToggle">Edit as a raw connection string instead</label>
+            </div>
+
+            @if (_useRawConnectionString)
+            {
+                <div class="mb-3">
+                    <label class="form-label">Connection String</label>
+                    <input type="password" class="form-control" placeholder="Leave blank to keep the current connection string" @bind="_rawConnectionString" />
+                </div>
+            }
+            else
+            {
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">SQL Server</label>
+                        <input class="form-control" @bind="_model.SqlServer" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Database Name</label>
+                        <input class="form-control" @bind="_model.DatabaseName" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Username</label>
+                        <input class="form-control" @bind="_model.SqlUsername" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Password</label>
+                        <input type="password" class="form-control" placeholder="Leave blank to keep the current password" @bind="_model.SqlPassword" />
+                    </div>
+                </div>
+            }
+
+            @if (_validateResult is not null)
+            {
+                <div class="alert @(_validateResult.Value.Success ? "alert-success" : "alert-danger")">
+                    @(_validateResult.Value.Success ? "Connection succeeded." : $"Connection failed: {_validateResult.Value.Error}")
+                </div>
+            }
+
+            @if (_saveError is not null)
+            {
+                <div class="alert alert-danger">@_saveError</div>
+            }
+
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-secondary" disabled="@_busy" @onclick="ValidateAsync">Test Connection</button>
+                <button class="btn btn-primary" disabled="@_busy" @onclick="SaveAsync">Save Changes</button>
+            </div>
+            <p class="text-muted small mt-2 mb-0">Saving updates <code>appsettings.json</code> only — it does not run migrations and does not affect the currently running app.</p>
+        </div>
+    </div>
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private bool _loaded;
+    private bool _hasAccess;
+    private bool _busy;
+    private bool _restartRequired;
+
+    private string _currentServer = "";
+    private string _currentDatabase = "";
+    private string _currentUsername = "";
+    private string _currentAuthMode = "";
+    private string _existingPassword = "";
+    private string _maskedConnectionString = "(not configured)";
+    private string _efProviderName = "";
+    private string _migrationsAssembly = "";
+    private string _lastStartupValidation = "Not yet recorded";
+
+    private readonly SetupSetupModel _model = new();
+    private bool _useRawConnectionString;
+    private string _rawConnectionString = "";
+
+    private (bool Success, string? Error)? _validateResult;
+    private string? _saveError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthState is null ? null : (await AuthState).User;
+        var identityUserId = user?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+
+        var portalRole = string.IsNullOrEmpty(identityUserId)
+            ? SiteRole.Viewer
+            : await SiteRoleResolver.ResolveAsync(identityUserId, SeedData.DefaultPortalSiteId);
+
+        _hasAccess = portalRole == SiteRole.SuperAdmin;
+
+        if (_hasAccess)
+            LoadCurrent();
+
+        _loaded = true;
+    }
+
+    private void LoadCurrent()
+    {
+        _migrationsAssembly = typeof(AppDbContext).Assembly.GetName().Name ?? "SiteEngine";
+        _lastStartupValidation = Diagnostics.LastStartupValidationUtc is { } ts
+            ? $"{ts.ToLocalTime():g}"
+            : "Not yet recorded";
+
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            _efProviderName = db.Database.ProviderName ?? "Unknown";
+        }
+        catch
+        {
+            _efProviderName = "Unknown";
+        }
+
+        var cs = ConnectionProvider.Current ?? "";
+        if (string.IsNullOrWhiteSpace(cs))
+            return;
+
+        try
+        {
+            var builder = new SqlConnectionStringBuilder(cs);
+            _currentServer = builder.DataSource;
+            _currentDatabase = builder.InitialCatalog;
+            _currentUsername = builder.UserID;
+            _currentAuthMode = builder.IntegratedSecurity ? "Windows Authentication" : "SQL Server Authentication";
+            _existingPassword = builder.Password;
+
+            _model.SqlServer = builder.DataSource;
+            _model.DatabaseName = builder.InitialCatalog;
+            _model.SqlUsername = builder.UserID;
+
+            _maskedConnectionString = $"{new string('•', 24)} ({cs.Length} chars)";
+        }
+        catch
+        {
+            _currentAuthMode = "Unknown";
+            _maskedConnectionString = $"{new string('•', 24)} ({cs.Length} chars)";
+        }
+    }
+
+    // Resolves whichever edit mode is active (fields vs. raw string) into a
+    // SetupSetupModel, falling back to the existing password when the admin
+    // left the password field blank so saving never wipes a working secret.
+    private SetupSetupModel BuildEffectiveModel()
+    {
+        if (_useRawConnectionString)
+        {
+            var raw = string.IsNullOrWhiteSpace(_rawConnectionString) ? (ConnectionProvider.Current ?? "") : _rawConnectionString;
+            var builder = new SqlConnectionStringBuilder(raw);
+            return new SetupSetupModel
+            {
+                SqlServer = builder.DataSource,
+                DatabaseName = builder.InitialCatalog,
+                SqlUsername = builder.UserID,
+                SqlPassword = builder.Password
+            };
+        }
+
+        return new SetupSetupModel
+        {
+            SqlServer = _model.SqlServer,
+            DatabaseName = _model.DatabaseName,
+            SqlUsername = _model.SqlUsername,
+            SqlPassword = string.IsNullOrEmpty(_model.SqlPassword) ? _existingPassword : _model.SqlPassword
+        };
+    }
+
+    private async Task ValidateAsync()
+    {
+        _busy = true;
+        _saveError = null;
+        _validateResult = null;
+        try
+        {
+            var model = BuildEffectiveModel();
+            _validateResult = await SetupService.ValidateDatabaseConnectionAsync(model);
+        }
+        catch (Exception ex)
+        {
+            _validateResult = (false, ex.Message);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void SaveAsync()
+    {
+        _busy = true;
+        _saveError = null;
+        try
+        {
+            var model = BuildEffectiveModel();
+            if (string.IsNullOrWhiteSpace(model.SqlServer) || string.IsNullOrWhiteSpace(model.DatabaseName))
+            {
+                _saveError = "Server and Database are required.";
+                return;
+            }
+
+            SetupService.SaveDatabaseConnection(model);
+
+            _restartRequired = true;
+            _model.SqlPassword = "";
+            _rawConnectionString = "";
+        }
+        catch (Exception ex)
+        {
+            _saveError = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string Display(string value) => string.IsNullOrEmpty(value) ? "—" : value;
+
+    private static string Mask(string value) => string.IsNullOrEmpty(value) ? "(none)" : "••••••••";
+}

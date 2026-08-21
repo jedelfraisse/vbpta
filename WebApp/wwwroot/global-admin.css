@@ -89,6 +89,22 @@
     font-weight: 600;
 }
 
+/* Non-link group header inside .ga-section-nav (e.g. "System Settings" over
+   its Global Settings / Database Connection / Email Server children). */
+.ga-section-nav-group {
+    margin-top: 0.75rem;
+    padding: 0 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #9ca3af;
+}
+
+.ga-section-sublink {
+    padding-left: 1.5rem;
+}
+
 .ga-section-content {
     min-width: 0;
 }
@@ -124,5 +140,18 @@
         flex-wrap: wrap;
         border-bottom: 1px solid #e5e7eb;
         padding-bottom: 0.75rem;
+    }
+
+    /* In the stacked row layout there's no "above the children" visual grouping
+       left, so the group header collapses to an inline chip instead of a
+       full-width label, and its children lose the indent that implied nesting. */
+    .ga-section-nav-group {
+        margin-top: 0;
+        padding: 0.55rem 0.25rem;
+        align-self: center;
+    }
+
+    .ga-section-sublink {
+        padding-left: 0.75rem;
     }
 }

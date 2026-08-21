@@ -12,27 +12,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 9.0.x
-
-      - name: Detect migration changes
-        id: migration_changes
-        run: |
-          BEFORE_SHA="${{ github.event.before }}"
-          if [ -z "$BEFORE_SHA" ] || [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
-            BEFORE_SHA="$(git rev-parse HEAD^)"
-          fi
-
-          if git diff --name-only "$BEFORE_SHA" "${{ github.sha }}" | grep -q '^SiteEngine/Migrations/'; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          fi
 
       - name: Restore
         run: dotnet restore vbpta-web.slnx
@@ -45,10 +29,6 @@ jobs:
 
       - name: Publish
         run: dotnet publish WebApp/WebApp.csproj --configuration Release --output ./publish --no-build
-
-      - name: Add migration trigger marker
-        if: steps.migration_changes.outputs.changed == 'true'
-        run: echo "run migrations" > ./publish/wwwroot/run-migration.txt
 
       - name: Upload app-offline.htm
         run: |

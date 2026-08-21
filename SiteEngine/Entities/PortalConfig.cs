@@ -15,4 +15,8 @@ public class PortalConfig
 	public string SmtpUsername { get; set; } = string.Empty;
 	public string SmtpPassword { get; set; } = string.Empty;
 	public bool UseSsl { get; set; } = true;
+
+	// Reply-To for outbound mail (login codes, admin test emails, etc). Optional —
+	// when blank, senders fall back to SmtpFromAddress.
+	public string SmtpReplyToAddress { get; set; } = string.Empty;
 }

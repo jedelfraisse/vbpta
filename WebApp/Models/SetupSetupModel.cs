@@ -14,6 +14,7 @@ public class SetupSetupModel
 	public string SmtpUsername { get; set; } = "";
 	public string SmtpPassword { get; set; } = "";
 	public string SmtpFrom { get; set; } = "";
+	public string SmtpReplyTo { get; set; } = "";
 	public bool SmtpUseSsl { get; set; }
 
 	// Step 3 — Admin

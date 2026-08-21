@@ -33,6 +33,18 @@
         {
             var host = new Uri(Nav.Uri).Host;
             await runtime.InitializeAsync(host);
+
+            // Resolved via a non-canonical host (e.g. the PtaId fallback
+            // subdomain, or an old Hostname after a custom Domain was added)?
+            // Send the visitor straight to the real one instead of rendering
+            // here.
+            var redirectUrl = runtime.GetCanonicalRedirectUrl(host);
+            if (redirectUrl is not null)
+            {
+                Nav.NavigateTo(redirectUrl, forceLoad: true);
+                return;
+            }
+
             _layoutType = ResolveLayoutType(runtime);
         }
     }

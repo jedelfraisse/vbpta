@@ -1,0 +1,218 @@
+@page "/globaladmin/system/email"
+@layout SystemDeveloperLayout
+@using System.Security.Claims
+@using SiteEngine.Data
+@using SiteEngine.Enums
+@using WebApp.Models
+@using WebApp.Services
+@inject SetupService SetupService
+@inject SystemDiagnosticsState Diagnostics
+@inject DashboardService DashboardService
+@inject SiteRoleResolver SiteRoleResolver
+
+<PageTitle>Email Server — Global Admin</PageTitle>
+
+<h5 class="mb-3">Email Server (SMTP)</h5>
+
+@if (!_loaded)
+{
+    <p class="text-muted">Loading…</p>
+}
+else if (!_hasAccess)
+{
+    <div class="alert alert-warning">This page is restricted to SuperAdmins.</div>
+}
+else
+{
+    @if (_restartRequired)
+    {
+        <div class="alert alert-warning">
+            SMTP settings were saved. Some deployments cache mail settings per-process — <strong>restart the app</strong> if a test email doesn't reflect the change.
+        </div>
+    }
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h6 class="card-title">Current Configuration</h6>
+            <FieldBox Label="SMTP Host" Value="@Display(_config?.SmtpHost)" />
+            <FieldBox Label="Port" Value="@Display(_config?.SmtpPort.ToString())" />
+            <FieldBox Label="SSL/TLS" Value="@((_config?.UseSsl ?? false) ? "Enabled" : "Disabled")" />
+            <FieldBox Label="Username" Value="@Mask(_config?.SmtpUsername)" />
+            <FieldBox Label="From Address" Value="@Display(_config?.SmtpFromAddress)" />
+            <FieldBox Label="Reply-To Address" Value="@Display(_config?.SmtpReplyToAddress)" />
+            <FieldBox Label="Last Successful Send" Value="@_lastSendDisplay" />
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h6 class="card-title">Edit SMTP Settings</h6>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">SMTP Host</label>
+                    <input class="form-control" @bind="_model.SmtpHost" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Port</label>
+                    <input type="number" class="form-control" @bind="_model.SmtpPort" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Username</label>
+                    <input class="form-control" @bind="_model.SmtpUsername" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Password</label>
+                    <input type="password" class="form-control" placeholder="Leave blank to keep the current password" @bind="_model.SmtpPassword" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">From Address</label>
+                    <input class="form-control" @bind="_model.SmtpFrom" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Reply-To Address</label>
+                    <input class="form-control" @bind="_model.SmtpReplyTo" placeholder="Optional — defaults to From Address" />
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check form-switch mt-4">
+                        <input class="form-check-input" type="checkbox" id="sslToggle" @bind="_model.SmtpUseSsl" />
+                        <label class="form-check-label" for="sslToggle">Use SSL/TLS</label>
+                    </div>
+                </div>
+            </div>
+
+            @if (_saveError is not null)
+            {
+                <div class="alert alert-danger">@_saveError</div>
+            }
+            @if (_saveSucceeded)
+            {
+                <div class="alert alert-success">SMTP settings saved.</div>
+            }
+
+            <button class="btn btn-primary" disabled="@_busy" @onclick="SaveAsync">Save Changes</button>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h6 class="card-title">Send Test Email</h6>
+            <p class="card-text text-muted">
+                Sends a test message using the currently <strong>saved</strong> SMTP settings to your own address
+                (@_adminEmail).
+            </p>
+
+            @if (_testResult is not null)
+            {
+                <div class="alert @(_testResult.Value.Success ? "alert-success" : "alert-danger")">
+                    @(_testResult.Value.Success ? $"Test email sent to {_adminEmail}." : $"Send failed: {_testResult.Value.Error}")
+                </div>
+            }
+
+            <button class="btn btn-outline-secondary" disabled="@(_busy || string.IsNullOrEmpty(_adminEmail))" @onclick="SendTestEmailAsync">Send Test Email</button>
+        </div>
+    </div>
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private bool _loaded;
+    private bool _hasAccess;
+    private bool _busy;
+    private bool _restartRequired;
+    private bool _saveSucceeded;
+    private string? _saveError;
+    private string _adminEmail = "";
+    private string _lastSendDisplay = "Not yet recorded";
+
+    private PortalConfig? _config;
+    private readonly SetupSetupModel _model = new();
+    private (bool Success, string? Error)? _testResult;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthState is null ? null : (await AuthState).User;
+        var identityUserId = user?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+        _adminEmail = user?.Identity?.Name ?? string.Empty;
+
+        var portalRole = string.IsNullOrEmpty(identityUserId)
+            ? SiteRole.Viewer
+            : await SiteRoleResolver.ResolveAsync(identityUserId, SeedData.DefaultPortalSiteId);
+
+        _hasAccess = portalRole == SiteRole.SuperAdmin;
+
+        if (_hasAccess)
+            await LoadCurrentAsync();
+
+        _loaded = true;
+    }
+
+    private async Task LoadCurrentAsync()
+    {
+        _config = await DashboardService.GetPortalConfigAsync();
+
+        if (_config is not null)
+        {
+            _model.SmtpHost = _config.SmtpHost;
+            _model.SmtpPort = _config.SmtpPort;
+            _model.SmtpUsername = _config.SmtpUsername;
+            _model.SmtpFrom = _config.SmtpFromAddress;
+            _model.SmtpReplyTo = _config.SmtpReplyToAddress;
+            _model.SmtpUseSsl = _config.UseSsl;
+        }
+
+        RefreshLastSendDisplay();
+    }
+
+    private void RefreshLastSendDisplay()
+    {
+        _lastSendDisplay = Diagnostics.LastEmailTestUtc is { } ts
+            ? $"{ts.ToLocalTime():g} ({(Diagnostics.LastEmailTestSucceeded == true ? "succeeded" : "failed")})"
+            : "Not yet recorded";
+    }
+
+    private async Task SaveAsync()
+    {
+        _busy = true;
+        _saveError = null;
+        _saveSucceeded = false;
+        try
+        {
+            await SetupService.SaveSmtpSettingsAsync(_model, passwordChanged: !string.IsNullOrEmpty(_model.SmtpPassword));
+
+            _saveSucceeded = true;
+            _restartRequired = true;
+            _model.SmtpPassword = "";
+
+            await LoadCurrentAsync();
+        }
+        catch (Exception ex)
+        {
+            _saveError = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task SendTestEmailAsync()
+    {
+        _busy = true;
+        _testResult = null;
+        try
+        {
+            _testResult = await SetupService.SendSystemTestEmailAsync(_adminEmail);
+            RefreshLastSendDisplay();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string Display(string? value) => string.IsNullOrEmpty(value) ? "—" : value;
+
+    private static string Mask(string? value) => string.IsNullOrEmpty(value) ? "(none)" : "••••••••";
+}

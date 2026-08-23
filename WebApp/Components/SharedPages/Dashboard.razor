@@ -24,20 +24,7 @@
 
         <ProfileBox />
 
-        <MembershipsBox Memberships="_memberships" />
-        <ToolsBox Tools="_tools" />
-
-        <ComingSoonBox Title="Forms" Description="Submit new requests to Divisions and Local Units and track your past submissions." />
-        <ComingSoonBox Title="Request Statistics" Description="See counts and status breakdowns for requests you've submitted." />
-        <ComingSoonBox Title="Current Unit" Description="Pick which of your Units or Divisions you're actively working in." />
-        <ComingSoonBox Title="Per-Unit Profile" Description="Set a different nickname or avatar for each Unit or Division you belong to." />
-
-        @if (EffectiveRole >= SiteRole.SiteAdmin)
-        {
-            <SiteAdminBox Memberships="_memberships" />
-        }
-
-
+        <MembershipsBox Memberships="_memberships" VisitedSites="_visitedSites" />
     </div>
 }
 
@@ -47,12 +34,13 @@
     private string _identityUserId = string.Empty;
     private SiteRole? CurrentRole;
     private List<MembershipSummary> _memberships = new();
-    private List<PortalTools> _tools = new();
+    private List<VisitedSiteSummary> _visitedSites = new();
     private bool _loaded;
 
     // The Portal-scoped CurrentRole misses privilege a user holds only on a
-    // Division/Unit site (e.g. a Local Unit's Site Admin). Admin sections gate
-    // on this instead so they show up regardless of which site granted the role.
+    // Division/Unit site (e.g. a Local Unit's Site Admin) — this folds those
+    // in from _memberships so the header badge reflects the user's highest
+    // role anywhere, not just at the Portal.
     private SiteRole EffectiveRole => WebApp.Services.SiteRoleResolver.HighestRole(CurrentRole ?? SiteRole.Viewer, _memberships.Select(m => m.Role));
 
     protected override async Task OnInitializedAsync()
@@ -72,7 +60,7 @@
         // Division/Unit-scoped roles from _memberships.
         CurrentRole = await SiteRoleResolver.ResolveAsync(_identityUserId, SeedData.DefaultPortalSiteId);
         _memberships = await DashboardService.GetMembershipsAsync(_identityUserId);
-        _tools = await DashboardService.GetEnabledToolsAsync();
+        _visitedSites = await DashboardService.GetVisitedSitesAsync(_identityUserId, _memberships.Select(m => m.SiteId));
 
         _loaded = true;
     }

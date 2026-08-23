@@ -14,16 +14,14 @@ public class ProfileService(IDbContextFactory<AppDbContext> dbFactory)
 		return await db.SiteUsers.FirstOrDefaultAsync(u => u.IdentityUserId == identityUserId, cancellationToken);
 	}
 
-	// Required fields today: FirstName, DisplayName. More may be added later.
+	// Required field today: DisplayName. FirstName/LastName remain on SiteUser
+	// (SetupService still sets FirstName for the wizard-created admin) but the
+	// self-service profile UI no longer collects them separately.
 	public static bool IsComplete(SiteUser? siteUser) =>
-		siteUser is not null &&
-		!string.IsNullOrWhiteSpace(siteUser.FirstName) &&
-		!string.IsNullOrWhiteSpace(siteUser.DisplayName);
+		siteUser is not null && !string.IsNullOrWhiteSpace(siteUser.DisplayName);
 
 	public async Task UpdateAsync(
 		string identityUserId,
-		string firstName,
-		string lastName,
 		string displayName,
 		CancellationToken cancellationToken = default)
 	{
@@ -32,8 +30,6 @@ public class ProfileService(IDbContextFactory<AppDbContext> dbFactory)
 		var siteUser = await db.SiteUsers.FirstOrDefaultAsync(u => u.IdentityUserId == identityUserId, cancellationToken)
 			?? throw new InvalidOperationException($"No SiteUser found for identity user '{identityUserId}'.");
 
-		siteUser.FirstName = firstName.Trim();
-		siteUser.LastName = lastName?.Trim() ?? string.Empty;
 		siteUser.DisplayName = displayName.Trim();
 		siteUser.UpdatedAtUtc = DateTimeOffset.UtcNow;
 

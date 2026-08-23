@@ -1,17 +1,38 @@
+@using SiteEngine.Enums
 @using WebApp.Services
 
 <div class="card shadow-sm mb-4">
     <div class="card-body">
-        <h5 class="card-title">Units &amp; Divisions</h5>
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <h5 class="card-title mb-0">Units &amp; Divisions</h5>
+
+            @if (_availableRoles.Count > 1)
+            {
+                <div class="d-flex align-items-center gap-2">
+                    <label for="roleFilter" class="form-label mb-0 small text-muted">Show only where I am a</label>
+                    <select id="roleFilter" class="form-select form-select-sm" style="width:auto;" @bind="_roleFilter">
+                        <option value="">any role</option>
+                        @foreach (var role in _availableRoles)
+                        {
+                            <option value="@role">@role</option>
+                        }
+                    </select>
+                </div>
+            }
+        </div>
 
         @if (Memberships.Count == 0)
         {
             <p class="text-muted mb-0">You're not a member of any Division or Local Unit yet.</p>
         }
+        else if (_filteredMemberships.Count == 0)
+        {
+            <p class="text-muted mb-0">No Divisions or Local Units match that role.</p>
+        }
         else
         {
-            <ul class="list-group list-group-flush">
-                @foreach (var m in Memberships)
+            <ul class="list-group list-group-flush mb-0">
+                @foreach (var m in _filteredMemberships)
                 {
                     <li class="list-group-item d-flex justify-content-between align-items-center px-0">
                         <div>
@@ -24,9 +45,64 @@
                 }
             </ul>
         }
+
+        @if (VisitedSites.Count > 0)
+        {
+            <div class="form-check mt-3">
+                <input class="form-check-input" type="checkbox" id="showVisited" @bind="_showVisited" />
+                <label class="form-check-label small text-muted" for="showVisited">
+                    Also show sites you've logged into
+                </label>
+            </div>
+
+            @if (_showVisited)
+            {
+                <ul class="list-group list-group-flush mt-2">
+                    @foreach (var v in VisitedSites)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            <div>
+                                <div class="fw-semibold">@v.SiteName</div>
+                                <span class="badge text-bg-secondary">@v.SiteType</span>
+                            </div>
+                            <span class="text-muted small">Last visited @v.LastLoginUtc.ToLocalTime().ToString("MMM d, yyyy")</span>
+                        </li>
+                    }
+                </ul>
+            }
+        }
+
+        @if (AdminSites.Count > 0)
+        {
+            <a class="btn btn-sm btn-outline-primary mt-3" href="/portaladmin">Manage Sites &amp; Settings &rarr;</a>
+        }
     </div>
 </div>
 
 @code {
     [Parameter, EditorRequired] public List<MembershipSummary> Memberships { get; set; } = new();
+    [Parameter] public List<VisitedSiteSummary> VisitedSites { get; set; } = new();
+
+    private string _roleFilter = "";
+    private bool _showVisited;
+
+    // Only roles the user actually holds populate the filter — not every
+    // possible SiteRole value.
+    private List<SiteRole> _availableRoles =>
+        Memberships
+            .Where(m => m.Role is not null)
+            .Select(m => m.Role!.Value)
+            .Distinct()
+            .OrderByDescending(r => r)
+            .ToList();
+
+    private List<MembershipSummary> _filteredMemberships =>
+        string.IsNullOrEmpty(_roleFilter)
+            ? Memberships
+            : Memberships.Where(m => m.Role?.ToString() == _roleFilter).ToList();
+
+    // Drives the "Manage Sites & Settings" link (formerly its own Site Admin
+    // card) — computed from the full list, not the role filter, so it
+    // doesn't disappear just because the viewer filtered to a lower role.
+    private List<MembershipSummary> AdminSites => Memberships.Where(m => m.Role >= SiteRole.SiteAdmin).ToList();
 }

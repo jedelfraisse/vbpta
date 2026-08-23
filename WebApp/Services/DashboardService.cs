@@ -6,6 +6,9 @@ using SiteEngine.Enums;
 namespace WebApp.Services;
 
 public record MembershipSummary(Guid SiteId, string SiteName, SiteType SiteType, SiteRole? Role, string? CustomRoleName, string SchoolYear);
+// A site the user has actually logged into (LoginHistory) but doesn't hold a
+// role on — distinct from MembershipSummary, which comes from SiteUserRoles.
+public record VisitedSiteSummary(Guid SiteId, string SiteName, SiteType SiteType, DateTimeOffset LastLoginUtc);
 public record SystemStats(int DivisionCount, int UnitCount, int UserCount, int MembershipCount);
 public record UserSummary(
 	string IdentityUserId,
@@ -58,6 +61,40 @@ public class DashboardService(IDbContextFactory<AppDbContext> dbFactory)
 				r.CustomRole != null ? r.CustomRole.Name : null,
 				r.SchoolYear))
 			.ToListAsync(cancellationToken);
+	}
+
+	// Backs the Dashboard's "Also show sites you've logged into" toggle on
+	// Units & Divisions — role-based memberships are the primary, always-shown
+	// list; this is the opt-in supplement for sites visited without a role
+	// (e.g. before a role was granted, or a role that was later removed).
+	// excludeSiteIds should be the caller's current MembershipSummary site IDs
+	// so a site never appears in both lists at once.
+	public async Task<List<VisitedSiteSummary>> GetVisitedSitesAsync(
+		string identityUserId, IEnumerable<Guid> excludeSiteIds, CancellationToken cancellationToken = default)
+	{
+		await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+		var exclude = excludeSiteIds.ToList();
+
+		var visited = await db.LoginHistories
+			.Where(h => h.UserId == identityUserId && h.SiteId != null && !exclude.Contains(h.SiteId!.Value))
+			.GroupBy(h => h.SiteId!.Value)
+			.Select(g => new { SiteId = g.Key, LastLoginUtc = g.Max(h => h.LoginUtc) })
+			.ToListAsync(cancellationToken);
+
+		if (visited.Count == 0)
+			return [];
+
+		var siteIds = visited.Select(v => v.SiteId).ToList();
+		var sites = await db.Sites
+			.Where(s => siteIds.Contains(s.Id))
+			.ToDictionaryAsync(s => s.Id, cancellationToken);
+
+		return visited
+			.Where(v => sites.ContainsKey(v.SiteId))
+			.Select(v => new VisitedSiteSummary(v.SiteId, sites[v.SiteId].SiteName, sites[v.SiteId].SiteType, v.LastLoginUtc))
+			.OrderByDescending(v => v.LastLoginUtc)
+			.ToList();
 	}
 
 	public async Task<List<PortalTools>> GetEnabledToolsAsync(CancellationToken cancellationToken = default)

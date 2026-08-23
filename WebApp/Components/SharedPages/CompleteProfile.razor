@@ -17,16 +17,6 @@
         @if (_loaded)
         {
             <div class="mb-3">
-                <label for="firstName" class="form-label">First name</label>
-                <input id="firstName" type="text" class="form-control" @bind="_firstName" />
-            </div>
-
-            <div class="mb-3">
-                <label for="lastName" class="form-label">Last name</label>
-                <input id="lastName" type="text" class="form-control" @bind="_lastName" />
-            </div>
-
-            <div class="mb-3">
                 <label for="displayName" class="form-label">Display name</label>
                 <input id="displayName" type="text" class="form-control" @bind="_displayName" placeholder="How other members will see you" />
             </div>
@@ -50,8 +40,6 @@
     [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
 
     private string _identityUserId = string.Empty;
-    private string _firstName = string.Empty;
-    private string _lastName = string.Empty;
     private string _displayName = string.Empty;
     private string _statusMessage = string.Empty;
     private bool _loaded;
@@ -69,24 +57,20 @@
 
         var siteUser = await ProfileService.GetByIdentityUserIdAsync(_identityUserId);
         if (siteUser is not null)
-        {
-            _firstName = siteUser.FirstName;
-            _lastName = siteUser.LastName;
             _displayName = siteUser.DisplayName;
-        }
 
         _loaded = true;
     }
 
     private async Task SaveAsync()
     {
-        if (string.IsNullOrWhiteSpace(_firstName) || string.IsNullOrWhiteSpace(_displayName))
+        if (string.IsNullOrWhiteSpace(_displayName))
         {
-            _statusMessage = "First name and display name are required.";
+            _statusMessage = "Display name is required.";
             return;
         }
 
-        await ProfileService.UpdateAsync(_identityUserId, _firstName, _lastName, _displayName);
+        await ProfileService.UpdateAsync(_identityUserId, _displayName);
 
         var target = LocalUrlGuard.IsLocalUrl(ReturnUrl) ? ReturnUrl! : "/";
         NavigationManager.NavigateTo(target);

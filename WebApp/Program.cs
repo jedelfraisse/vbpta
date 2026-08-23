@@ -105,6 +105,7 @@ builder.Services.AddScoped<FileUploadService>();
 builder.Services.AddScoped<PtaLogoGenerationService>();
 builder.Services.AddScoped<LoginTrackingService>();
 builder.Services.AddScoped<LoginAnalyticsService>();
+builder.Services.AddScoped<UserModerationService>();
 builder.Services.AddScoped<PasswordlessSignInService>();
 
 // ------------------------------------------------------------
@@ -283,6 +284,9 @@ app.MapGet("/auth/passwordless/complete", async (
 {
 	var ipAddress = context.Connection.RemoteIpAddress?.ToString();
 	var result = await signInService.SignInWithCodeAsync(email, code, context.Request.Host.Host, ipAddress);
+
+	if (result.Banned)
+		return Results.Redirect("/banned");
 
 	if (!result.Succeeded)
 	{

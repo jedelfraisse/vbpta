@@ -87,6 +87,10 @@
         {
             _statusMessage = ex.Message;
         }
+        catch (UserBannedException)
+        {
+            NavigationManager.NavigateTo("/banned", forceLoad: true);
+        }
         catch (Exception)
         {
             // Don't let a send failure (SMTP misconfiguration, transient

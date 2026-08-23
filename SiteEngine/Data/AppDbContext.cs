@@ -27,6 +27,7 @@ public DbSet<ToolRule> ToolRules { get; set; }
 public DbSet<ToolPermission> ToolPermissions { get; set; }
 public DbSet<LoginHistory> LoginHistories => Set<LoginHistory>();
 public DbSet<LoginHistorySummary> LoginHistorySummaries => Set<LoginHistorySummary>();
+public DbSet<BannedEmail> BannedEmails => Set<BannedEmail>();
 
 
 	protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -246,6 +247,20 @@ public DbSet<LoginHistorySummary> LoginHistorySummaries => Set<LoginHistorySumma
 				.WithMany()
 				.HasForeignKey(x => x.SiteId)
 				.OnDelete(DeleteBehavior.Restrict);
+		});
+
+		// ---------------------------
+		// BannedEmail
+		// ---------------------------
+		modelBuilder.Entity<BannedEmail>(entity =>
+		{
+			entity.ToTable("BannedEmails");
+			entity.HasKey(x => x.Id);
+
+			entity.Property(x => x.Email).HasMaxLength(255).IsRequired();
+			entity.Property(x => x.Reason).HasMaxLength(1024);
+
+			entity.HasIndex(x => x.Email).IsUnique();
 		});
 	}
 }

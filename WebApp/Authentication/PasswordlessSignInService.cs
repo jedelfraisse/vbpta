@@ -17,7 +17,8 @@ public class PasswordlessSignInService(
 	IDbContextFactory<AppDbContext> dbFactory,
 	ProfileService profileService,
 	MembershipLookupService membershipLookup,
-	LoginTrackingService loginTracking
+	LoginTrackingService loginTracking,
+	UserModerationService userModeration
 )
 {
 	private readonly UserManager<ApplicationUser> _userManager = userManager;
@@ -29,6 +30,7 @@ public class PasswordlessSignInService(
 	private readonly ProfileService _profileService = profileService;
 	private readonly MembershipLookupService _membershipLookup = membershipLookup;
 	private readonly LoginTrackingService _loginTracking = loginTracking;
+	private readonly UserModerationService _userModeration = userModeration;
 
 	// -----------------------------
 	// SEND CODE
@@ -42,6 +44,9 @@ public class PasswordlessSignInService(
 	public async Task RequestCodeAsync(string email)
 	{
 		var normalizedEmail = NormalizeEmail(email);
+
+		if (await _userModeration.IsBannedAsync(normalizedEmail))
+			throw new UserBannedException();
 
 		var user = await _userManager.FindByEmailAsync(normalizedEmail);
 		var isFirstLogin = user is null || user.IsFirstLogin;
@@ -86,6 +91,11 @@ public class PasswordlessSignInService(
 	{
 		var normalizedEmail = NormalizeEmail(email);
 		var normalizedCode = code?.Trim() ?? string.Empty;
+
+		// Backstop for a code that was issued before the ban landed — a
+		// still-valid code shouldn't let a since-banned email complete sign-in.
+		if (await _userModeration.IsBannedAsync(normalizedEmail))
+			return PasswordlessSignInResult.BannedResult;
 
 		if (string.IsNullOrWhiteSpace(normalizedCode))
 			return PasswordlessSignInResult.Failed;

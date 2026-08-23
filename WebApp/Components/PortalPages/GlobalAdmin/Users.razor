@@ -1,12 +1,22 @@
 @page "/globaladmin/identity/users"
 @layout IdentityAccessLayout
+@using System.Security.Claims
+@using SiteEngine.Data
+@using SiteEngine.Enums
 @using WebApp.Services
 @inject DashboardService DashboardService
 @inject LoginAnalyticsService LoginAnalyticsService
+@inject UserModerationService UserModeration
+@inject SiteRoleResolver SiteRoleResolver
 
 <PageTitle>User Directory — Global Admin</PageTitle>
 
 <h5 class="mb-3">User Directory</h5>
+
+@if (_actionError is not null)
+{
+    <div class="alert alert-danger">@_actionError</div>
+}
 
 <h6>All Users</h6>
 <div class="table-responsive mb-3">
@@ -20,24 +30,59 @@
                 <th>Last Login</th>
                 <th>Last Login Site</th>
                 <th>Login Count</th>
+                @if (_isSuperAdmin)
+                {
+                    <th>Actions</th>
+                }
             </tr>
         </thead>
         <tbody>
             @foreach (var u in _users)
             {
-                <tr role="button" class="@(_selectedUserId == u.IdentityUserId ? "table-active" : "")" @onclick="() => SelectUserAsync(u)">
-                    <td>@u.Email</td>
-                    <td>@u.DisplayName</td>
-                    <td>@(u.EmailConfirmed ? "Yes" : "No")</td>
-                    <td>@FormatDate(u.FirstLoginUtc)</td>
-                    <td>@FormatDate(u.LastLoginUtc)</td>
-                    <td>@(u.LastLoginSiteName ?? "—")</td>
-                    <td>@u.LoginCount</td>
+                var isBanned = _bannedEmails.Contains(u.Email.Trim().ToLowerInvariant());
+
+                <tr class="@(_selectedUserId == u.IdentityUserId ? "table-active" : "")">
+                    <td role="button" @onclick="() => SelectUserAsync(u)">
+                        @u.Email
+                        @if (isBanned)
+                        {
+                            <span class="badge text-bg-danger ms-1">Banned</span>
+                        }
+                    </td>
+                    <td role="button" @onclick="() => SelectUserAsync(u)">@u.DisplayName</td>
+                    <td role="button" @onclick="() => SelectUserAsync(u)">@(u.EmailConfirmed ? "Yes" : "No")</td>
+                    <td role="button" @onclick="() => SelectUserAsync(u)">@FormatDate(u.FirstLoginUtc)</td>
+                    <td role="button" @onclick="() => SelectUserAsync(u)">@FormatDate(u.LastLoginUtc)</td>
+                    <td role="button" @onclick="() => SelectUserAsync(u)">@(u.LastLoginSiteName ?? "—")</td>
+                    <td role="button" @onclick="() => SelectUserAsync(u)">@u.LoginCount</td>
+                    @if (_isSuperAdmin)
+                    {
+                        <td>
+                            @if (_pendingAction is not null && _pendingAction.Value.UserId == u.IdentityUserId)
+                            {
+                                <span class="small me-2">@(_pendingAction.Value.IsDelete ? "Delete" : "Ban") @u.Email — are you sure?</span>
+                                <button class="btn btn-sm btn-danger me-1" disabled="@_busy" @onclick="ConfirmPendingActionAsync">Confirm</button>
+                                <button class="btn btn-sm btn-outline-secondary" disabled="@_busy" @onclick="CancelPendingAction">Cancel</button>
+                            }
+                            else
+                            {
+                                @if (isBanned)
+                                {
+                                    <button class="btn btn-sm btn-outline-secondary me-1" disabled="@_busy" @onclick="() => UnbanAsync(u.Email)">Unban</button>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-sm btn-outline-warning me-1" disabled="@_busy" @onclick="() => RequestBan(u.IdentityUserId, u.Email)">Ban</button>
+                                }
+                                <button class="btn btn-sm btn-outline-danger" disabled="@_busy" @onclick="() => RequestDelete(u.IdentityUserId, u.Email)">Delete</button>
+                            }
+                        </td>
+                    }
                 </tr>
             }
             @if (_users.Count == 0)
             {
-                <tr><td colspan="7" class="text-muted">None yet.</td></tr>
+                <tr><td colspan="8" class="text-muted">None yet.</td></tr>
             }
         </tbody>
     </table>
@@ -86,16 +131,99 @@
     </div>
 }
 
+@if (_isSuperAdmin)
+{
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h6 class="card-title">Banned Emails</h6>
+            <p class="card-text text-muted">
+                A ban blocks an email address from signing in at all — including creating a brand-new
+                account — whether or not it currently has one. Deleting a banned user's account above
+                does not lift the ban.
+            </p>
+
+            <div class="table-responsive mb-3">
+                <table class="table table-sm">
+                    <thead><tr><th>Email</th><th>Banned</th><th>Reason</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var b in _bannedList)
+                        {
+                            <tr>
+                                <td>@b.Email</td>
+                                <td>@FormatDate(b.BannedAtUtc)</td>
+                                <td>@(string.IsNullOrWhiteSpace(b.Reason) ? "—" : b.Reason)</td>
+                                <td><button class="btn btn-sm btn-outline-secondary" disabled="@_busy" @onclick="() => UnbanAsync(b.Email)">Unban</button></td>
+                            </tr>
+                        }
+                        @if (_bannedList.Count == 0)
+                        {
+                            <tr><td colspan="4" class="text-muted">No banned emails.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="row g-2 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label">Email to ban</label>
+                    <input class="form-control" @bind="_newBanEmail" placeholder="someone@example.com" />
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label">Reason (optional)</label>
+                    <input class="form-control" @bind="_newBanReason" />
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-warning w-100" disabled="@(_busy || string.IsNullOrWhiteSpace(_newBanEmail))" @onclick="BanNewEmailAsync">Ban Email</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
     private List<UserSummary> _users = new();
+    private List<BannedEmail> _bannedList = new();
+    private HashSet<string> _bannedEmails = new();
 
     private UserSummary? _selectedUser;
     private string? _selectedUserId;
     private List<UserLoginEntry> _selectedUserHistory = new();
 
+    private bool _isSuperAdmin;
+    private string _actingUserId = "";
+    private bool _busy;
+    private string? _actionError;
+
+    private (string UserId, string Email, bool IsDelete)? _pendingAction;
+
+    private string _newBanEmail = "";
+    private string? _newBanReason;
+
     protected override async Task OnInitializedAsync()
     {
+        var user = AuthState is null ? null : (await AuthState).User;
+        _actingUserId = user?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+
+        var portalRole = string.IsNullOrEmpty(_actingUserId)
+            ? SiteRole.Viewer
+            : await SiteRoleResolver.ResolveAsync(_actingUserId, SeedData.DefaultPortalSiteId);
+
+        _isSuperAdmin = portalRole == SiteRole.SuperAdmin;
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
         _users = await DashboardService.GetAllUsersAsync();
+
+        if (_isSuperAdmin)
+        {
+            _bannedList = await UserModeration.GetBannedEmailsAsync();
+            _bannedEmails = _bannedList.Select(b => b.Email).ToHashSet();
+        }
     }
 
     private async Task SelectUserAsync(UserSummary u)
@@ -116,6 +244,98 @@
         _selectedUser = null;
         _selectedUserId = null;
         _selectedUserHistory = new();
+    }
+
+    private void RequestBan(string userId, string email)
+    {
+        _actionError = null;
+        _pendingAction = (userId, email, IsDelete: false);
+    }
+
+    private void RequestDelete(string userId, string email)
+    {
+        _actionError = null;
+        _pendingAction = (userId, email, IsDelete: true);
+    }
+
+    private void CancelPendingAction() => _pendingAction = null;
+
+    private async Task ConfirmPendingActionAsync()
+    {
+        if (_pendingAction is not { } action)
+            return;
+
+        _busy = true;
+        _actionError = null;
+        try
+        {
+            if (action.IsDelete)
+            {
+                await UserModeration.DeleteUserAsync(action.UserId);
+            }
+            else
+            {
+                await UserModeration.BanEmailAsync(action.Email, _actingUserId);
+            }
+
+            _pendingAction = null;
+
+            if (_selectedUserId == action.UserId)
+                ClearSelectedUser();
+
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _actionError = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task UnbanAsync(string email)
+    {
+        _busy = true;
+        _actionError = null;
+        try
+        {
+            await UserModeration.UnbanEmailAsync(email);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _actionError = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task BanNewEmailAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newBanEmail))
+            return;
+
+        _busy = true;
+        _actionError = null;
+        try
+        {
+            await UserModeration.BanEmailAsync(_newBanEmail, _actingUserId, _newBanReason);
+            _newBanEmail = "";
+            _newBanReason = null;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _actionError = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
     }
 
     private static string FormatDate(DateTimeOffset? value) =>

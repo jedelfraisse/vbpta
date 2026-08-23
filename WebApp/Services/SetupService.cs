@@ -272,9 +272,7 @@ public class SetupService
 	public async Task SaveStepAsync(SetupSetupModel model)
 	{
 		var settingsPath = Path.Combine(_env.ContentRootPath, "appsettings.json");
-		var json = File.ReadAllText(settingsPath);
-
-		var root = JsonNode.Parse(json)!.AsObject();
+		var root = LoadOrCreateAppSettings(settingsPath);
 
 		if (!root.ContainsKey("ConnectionStrings"))
 			root["ConnectionStrings"] = new JsonObject();
@@ -362,8 +360,7 @@ public class SetupService
 		var cs = BuildConnectionString(model);
 
 		var settingsPath = Path.Combine(_env.ContentRootPath, "appsettings.json");
-		var json = File.ReadAllText(settingsPath);
-		var root = JsonNode.Parse(json)!.AsObject();
+		var root = LoadOrCreateAppSettings(settingsPath);
 
 		if (!root.ContainsKey("ConnectionStrings"))
 			root["ConnectionStrings"] = new JsonObject();
@@ -474,6 +471,21 @@ public class SetupService
 	// ------------------------------------------------------------
 	// Helpers
 	// ------------------------------------------------------------
+
+	// Reads appsettings.json into a mutable JsonObject, or starts a fresh empty
+	// one if the file doesn't exist yet on disk — e.g. a brand-new deployment
+	// whose CI pipeline deliberately excludes appsettings.json from the FTP
+	// upload (so redeploys don't clobber a live-configured connection string)
+	// and this is the very first time anything has written it on this server.
+	private static JsonObject LoadOrCreateAppSettings(string settingsPath)
+	{
+		if (!File.Exists(settingsPath))
+			return new JsonObject();
+
+		var json = File.ReadAllText(settingsPath);
+		return JsonNode.Parse(json)!.AsObject();
+	}
+
 	private string BuildConnectionString(SetupSetupModel model)
 	{
 		var builder = new SqlConnectionStringBuilder

@@ -31,16 +31,18 @@ else
         </div>
     }
 
-    <div class="card shadow-sm mb-4">
+    <div class="card shadow-sm mb-4 config-panel">
         <div class="card-body">
             <h6 class="card-title">Current Configuration</h6>
-            <FieldBox Label="SMTP Host" Value="@Display(_config?.SmtpHost)" />
-            <FieldBox Label="Port" Value="@Display(_config?.SmtpPort.ToString())" />
-            <FieldBox Label="SSL/TLS" Value="@((_config?.UseSsl ?? false) ? "Enabled" : "Disabled")" />
-            <FieldBox Label="Username" Value="@Mask(_config?.SmtpUsername)" />
-            <FieldBox Label="From Address" Value="@Display(_config?.SmtpFromAddress)" />
-            <FieldBox Label="Reply-To Address" Value="@Display(_config?.SmtpReplyToAddress)" />
-            <FieldBox Label="Last Successful Send" Value="@_lastSendDisplay" />
+            <div class="config-grid">
+                <ConfigItem Label="SMTP Host" Value="@Display(_config?.SmtpHost)" />
+                <ConfigItem Label="Port" Value="@DisplayPort(_config?.SmtpPort)" />
+                <ConfigItem Label="SSL/TLS" Value="@((_config?.UseSsl ?? false) ? "Enabled" : "Disabled")" Tone="@((_config?.UseSsl ?? false) ? "success" : "neutral")" />
+                <ConfigItem Label="Username" Value="@Mask(_config?.SmtpUsername)" />
+                <ConfigItem Label="From Address" Value="@Display(_config?.SmtpFromAddress)" />
+                <ConfigItem Label="Reply-To Address" Value="@Display(_config?.SmtpReplyToAddress)" />
+                <ConfigItem Label="Last Successful Send" Value="@_lastSendDisplay" Tone="@_lastSendTone" />
+            </div>
         </div>
     </div>
 
@@ -125,6 +127,7 @@ else
     private string? _saveError;
     private string _adminEmail = "";
     private string _lastSendDisplay = "Not yet recorded";
+    private string? _lastSendTone;
 
     private PortalConfig? _config;
     private readonly SetupSetupModel _model = new();
@@ -167,9 +170,17 @@ else
 
     private void RefreshLastSendDisplay()
     {
-        _lastSendDisplay = Diagnostics.LastEmailTestUtc is { } ts
-            ? $"{ts.ToLocalTime():g} ({(Diagnostics.LastEmailTestSucceeded == true ? "succeeded" : "failed")})"
-            : "Not yet recorded";
+        if (Diagnostics.LastEmailTestUtc is { } ts)
+        {
+            var succeeded = Diagnostics.LastEmailTestSucceeded == true;
+            _lastSendDisplay = $"{ts.ToLocalTime():g} ({(succeeded ? "succeeded" : "failed")})";
+            _lastSendTone = succeeded ? "success" : "warning";
+        }
+        else
+        {
+            _lastSendDisplay = "Not yet recorded";
+            _lastSendTone = null;
+        }
     }
 
     private async Task SaveAsync()
@@ -215,4 +226,10 @@ else
     private static string Display(string? value) => string.IsNullOrEmpty(value) ? "—" : value;
 
     private static string Mask(string? value) => string.IsNullOrEmpty(value) ? "(none)" : "••••••••";
+
+    // 0 isn't a real SMTP port — it means "never configured" (a fresh
+    // PortalConfig row, or the SaveStepAsync bug this fix addresses).
+    // Showing it as a literal "0" instead of "—" is exactly what made
+    // that bug look like a valid, if wrong, saved value.
+    private static string DisplayPort(int? port) => port is null or 0 ? "—" : port.Value.ToString();
 }

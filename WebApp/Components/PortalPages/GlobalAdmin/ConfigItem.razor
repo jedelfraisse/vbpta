@@ -1,0 +1,32 @@
+@* One label/value cell inside a "Current Configuration" summary grid
+   (Database Connection / Email Server pages). Unlike FieldBox — which is a
+   compact inline chip meant to sit in a table row (DivisionRow, LocalUnitRow)
+   — this renders label-above-value, sized for a spacious summary panel.
+   Styling lives in global-admin.css (.config-grid / .config-item* /
+   .config-pill*) since it's shared across more than one page's grid. *@
+
+<div class="config-item">
+    <span class="config-item-label">@Label</span>
+    @if (!string.IsNullOrEmpty(Href))
+    {
+        <a href="@Href" target="_blank" rel="noopener noreferrer" class="config-item-value">@Value</a>
+    }
+    else if (!string.IsNullOrEmpty(Tone))
+    {
+        <span class="config-pill config-pill--@Tone">@Value</span>
+    }
+    else
+    {
+        <span class="config-item-value">@Value</span>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Value { get; set; } = string.Empty;
+    [Parameter] public string? Href { get; set; }
+
+    // "success" | "warning" | "neutral" — when set, Value renders as a
+    // dot-marked status pill instead of plain monospace text.
+    [Parameter] public string? Tone { get; set; }
+}

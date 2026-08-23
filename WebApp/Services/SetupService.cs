@@ -298,16 +298,32 @@ public class SetupService
 
 			if (cfg != null)
 			{
-				cfg.PortalName = model.PortalName;
-				cfg.PortalDomain = model.PortalDomain;
+				// SaveStepAsync runs after every wizard step against one shared
+				// model — but a page reload or dropped circuit between steps
+				// starts a *fresh* SetupSetupModel with these fields back at
+				// their defaults. Without these guards, e.g. Step 1's SQL save
+				// (before SMTP is even filled in) or a fresh Step 3/4 model
+				// would silently blank out SMTP settings a prior step already
+				// saved — which is exactly how "Port" ends up showing 0.
+				if (!string.IsNullOrWhiteSpace(model.PortalName))
+					cfg.PortalName = model.PortalName;
+				if (!string.IsNullOrWhiteSpace(model.PortalDomain))
+					cfg.PortalDomain = model.PortalDomain;
 
-				cfg.SmtpHost = model.SmtpHost;
-				cfg.SmtpPort = model.SmtpPort;
-				cfg.SmtpFromAddress = model.SmtpFrom;
-				cfg.SmtpUsername = model.SmtpUsername;
-				// Encrypt the password before saving
-				cfg.SmtpPassword = _protector.Protect(model.SmtpPassword);
-				cfg.UseSsl = model.SmtpUseSsl;
+				if (!string.IsNullOrWhiteSpace(model.SmtpHost))
+				{
+					cfg.SmtpHost = model.SmtpHost;
+					cfg.SmtpPort = model.SmtpPort;
+					cfg.SmtpFromAddress = model.SmtpFrom;
+					cfg.SmtpUsername = model.SmtpUsername;
+					cfg.UseSsl = model.SmtpUseSsl;
+
+					// Only overwrite the stored (encrypted) password when this
+					// step actually carried one — an empty password here means
+					// "not part of this step's model", not "clear it".
+					if (!string.IsNullOrEmpty(model.SmtpPassword))
+						cfg.SmtpPassword = _protector.Protect(model.SmtpPassword);
+				}
 
 				await db.SaveChangesAsync();
 			}

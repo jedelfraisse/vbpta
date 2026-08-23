@@ -127,6 +127,88 @@
     margin-bottom: 0;
 }
 
+/* ---------- "Current Configuration" summary panels ---------- */
+/* Used by Database Connection and Email Server's read-only summary cards.
+   ConfigItem renders label-above-value cells into this grid; unlike
+   FieldBox's compact inline chip (built for a table row), this is sized for
+   a spacious standalone panel. */
+.config-panel .card-title {
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #eef0f2;
+}
+
+.config-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1.1rem 1.75rem;
+}
+
+.config-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+}
+
+.config-item-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #9ca3af;
+}
+
+.config-item-value {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #1f2937;
+    font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-decoration: none;
+}
+
+a.config-item-value:hover {
+    text-decoration: underline;
+    color: #15803d;
+}
+
+.config-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    width: fit-content;
+    max-width: 100%;
+    padding: 0.2rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.config-pill::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    flex: none;
+}
+
+.config-pill--success { background: #eaf7ec; color: #15803d; }
+.config-pill--warning { background: #fef3c7; color: #b45309; }
+.config-pill--neutral { background: #f3f4f6; color: #6b7280; }
+
+@media (max-width: 576px) {
+    .config-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
 /* ---------- Breakpoint: stack the section nav above its content ---------- */
 @media (max-width: 768px) {
     .ga-section {

@@ -34,17 +34,19 @@ else
         </div>
     }
 
-    <div class="card shadow-sm mb-4">
+    <div class="card shadow-sm mb-4 config-panel">
         <div class="card-body">
             <h6 class="card-title">Current Configuration</h6>
-            <FieldBox Label="SQL Server" Value="@Display(_currentServer)" />
-            <FieldBox Label="Database" Value="@Display(_currentDatabase)" />
-            <FieldBox Label="Authentication Mode" Value="@Display(_currentAuthMode)" />
-            <FieldBox Label="Username" Value="@Mask(_currentUsername)" />
-            <FieldBox Label="Connection String" Value="@_maskedConnectionString" />
-            <FieldBox Label="EF Provider" Value="@Display(_efProviderName)" />
-            <FieldBox Label="Migrations Assembly" Value="@Display(_migrationsAssembly)" />
-            <FieldBox Label="Last Startup Validation" Value="@_lastStartupValidation" />
+            <div class="config-grid">
+                <ConfigItem Label="SQL Server" Value="@Display(_currentServer)" />
+                <ConfigItem Label="Database" Value="@Display(_currentDatabase)" />
+                <ConfigItem Label="Authentication Mode" Value="@Display(_currentAuthMode)" />
+                <ConfigItem Label="Username" Value="@Mask(_currentUsername)" />
+                <ConfigItem Label="Connection String" Value="@_maskedConnectionString" />
+                <ConfigItem Label="EF Provider" Value="@Display(_efProviderName)" />
+                <ConfigItem Label="Migrations Assembly" Value="@Display(_migrationsAssembly)" />
+                <ConfigItem Label="Last Startup Validation" Value="@_lastStartupValidation" />
+            </div>
         </div>
     </div>
 

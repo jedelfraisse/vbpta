@@ -107,6 +107,33 @@
                 <dd class="col-sm-9">@_selectedUser.LoginCount</dd>
             </dl>
 
+            <h6>Roles &amp; Memberships</h6>
+            @if (_selectedUserMemberships.Count == 0)
+            {
+                <p class="text-muted small">Not a member of any Division or Local Unit.</p>
+            }
+            else
+            {
+                <ul class="list-group list-group-flush mb-3">
+                    @foreach (var m in _selectedUserMemberships)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            <div>
+                                <span class="fw-semibold">@m.SiteName</span>
+                                <span class="badge text-bg-secondary">@m.SiteType</span>
+                                <span class="text-muted small">@m.SchoolYear</span>
+                            </div>
+                            <div class="d-flex gap-1">
+                                @foreach (var label in m.RoleLabels)
+                                {
+                                    <span class="badge text-bg-info">@label</span>
+                                }
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+
             <h6>Recent Logins</h6>
             <div class="table-responsive">
                 <table class="table table-sm">
@@ -190,6 +217,7 @@
     private UserSummary? _selectedUser;
     private string? _selectedUserId;
     private List<UserLoginEntry> _selectedUserHistory = new();
+    private List<MembershipSummary> _selectedUserMemberships = new();
 
     private bool _isSuperAdmin;
     private string _actingUserId = "";
@@ -237,6 +265,7 @@
         _selectedUser = u;
         _selectedUserId = u.IdentityUserId;
         _selectedUserHistory = await LoginAnalyticsService.GetUserLoginHistoryAsync(u.IdentityUserId);
+        _selectedUserMemberships = await DashboardService.GetMembershipsAsync(u.IdentityUserId);
     }
 
     private void ClearSelectedUser()
@@ -244,6 +273,7 @@
         _selectedUser = null;
         _selectedUserId = null;
         _selectedUserHistory = new();
+        _selectedUserMemberships = new();
     }
 
     private void RequestBan(string userId, string email)

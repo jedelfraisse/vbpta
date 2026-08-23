@@ -34,13 +34,21 @@
             <ul class="list-group list-group-flush mb-0">
                 @foreach (var m in _filteredMemberships)
                 {
-                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                    <li class="list-group-item d-flex justify-content-between align-items-center gap-2 px-0">
                         <div>
                             <div class="fw-semibold">@m.SiteName</div>
                             <span class="badge text-bg-secondary">@m.SiteType</span>
                             <span class="text-muted small">@m.SchoolYear</span>
+                            @foreach (var label in m.RoleLabels)
+                            {
+                                <span class="badge text-bg-info">@label</span>
+                            }
                         </div>
-                        <span class="badge text-bg-info">@(m.CustomRoleName ?? m.Role?.ToString() ?? "Member")</span>
+                        @{ var url = SiteUrl(m.SiteId, m.Hostname, m.Domain); }
+                        @if (url is not null)
+                        {
+                            <a class="btn btn-sm btn-outline-secondary flex-shrink-0" href="@url" target="_blank" rel="noopener noreferrer">Visit site &rarr;</a>
+                        }
                     </li>
                 }
             </ul>
@@ -60,12 +68,17 @@
                 <ul class="list-group list-group-flush mt-2">
                     @foreach (var v in VisitedSites)
                     {
-                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <li class="list-group-item d-flex justify-content-between align-items-center gap-2 px-0">
                             <div>
                                 <div class="fw-semibold">@v.SiteName</div>
                                 <span class="badge text-bg-secondary">@v.SiteType</span>
+                                <span class="text-muted small">Last visited @v.LastLoginUtc.ToLocalTime().ToString("MMM d, yyyy")</span>
                             </div>
-                            <span class="text-muted small">Last visited @v.LastLoginUtc.ToLocalTime().ToString("MMM d, yyyy")</span>
+                            @{ var url = SiteUrl(v.SiteId, v.Hostname, v.Domain); }
+                            @if (url is not null)
+                            {
+                                <a class="btn btn-sm btn-outline-secondary flex-shrink-0" href="@url" target="_blank" rel="noopener noreferrer">Visit site &rarr;</a>
+                            }
                         </li>
                     }
                 </ul>
@@ -83,26 +96,43 @@
     [Parameter, EditorRequired] public List<MembershipSummary> Memberships { get; set; } = new();
     [Parameter] public List<VisitedSiteSummary> VisitedSites { get; set; } = new();
 
+    // Used to build each row's "Visit site" link (SiteUrlHelper needs the
+    // portal's domain to turn a bare Hostname into a full subdomain URL).
+    [Parameter] public string? PortalDomain { get; set; }
+
+    // The site the Dashboard is currently being viewed from — its own row
+    // (if any) gets no "Visit site" link, since the viewer is already there.
+    [Parameter] public Guid? CurrentSiteId { get; set; }
+
     private string _roleFilter = "";
     private bool _showVisited;
 
     // Only roles the user actually holds populate the filter — not every
-    // possible SiteRole value.
-    private List<SiteRole> _availableRoles =>
+    // possible SiteRole value — and custom role names are included too.
+    private List<string> _availableRoles =>
         Memberships
-            .Where(m => m.Role is not null)
-            .Select(m => m.Role!.Value)
+            .SelectMany(m => m.RoleLabels)
             .Distinct()
-            .OrderByDescending(r => r)
+            .OrderByDescending(label => Enum.TryParse<SiteRole>(label, out var role) ? (int)role : -1)
+            .ThenBy(label => label)
             .ToList();
 
     private List<MembershipSummary> _filteredMemberships =>
         string.IsNullOrEmpty(_roleFilter)
             ? Memberships
-            : Memberships.Where(m => m.Role?.ToString() == _roleFilter).ToList();
+            : Memberships.Where(m => m.RoleLabels.Contains(_roleFilter)).ToList();
 
     // Drives the "Manage Sites & Settings" link (formerly its own Site Admin
     // card) — computed from the full list, not the role filter, so it
     // doesn't disappear just because the viewer filtered to a lower role.
     private List<MembershipSummary> AdminSites => Memberships.Where(m => m.Role >= SiteRole.SiteAdmin).ToList();
+
+    private string? SiteUrl(Guid siteId, string hostname, string domain)
+    {
+        if (siteId == CurrentSiteId)
+            return null;
+
+        var url = SiteUrlHelper.BuildPublicUrl(hostname, domain, PortalDomain);
+        return string.IsNullOrEmpty(url) ? null : url;
+    }
 }

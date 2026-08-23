@@ -8,6 +8,7 @@
 @inject NavigationManager NavigationManager
 @inject SiteRoleResolver SiteRoleResolver
 @inject DashboardService DashboardService
+@inject RuntimeSiteContext RuntimeSiteContext
 
 <PageTitle>Dashboard</PageTitle>
 
@@ -24,7 +25,7 @@
 
         <ProfileBox />
 
-        <MembershipsBox Memberships="_memberships" VisitedSites="_visitedSites" />
+        <MembershipsBox Memberships="_memberships" VisitedSites="_visitedSites" PortalDomain="_portalDomain" CurrentSiteId="RuntimeSiteContext.CurrentSite?.Id" />
     </div>
 }
 
@@ -35,6 +36,7 @@
     private SiteRole? CurrentRole;
     private List<MembershipSummary> _memberships = new();
     private List<VisitedSiteSummary> _visitedSites = new();
+    private string? _portalDomain;
     private bool _loaded;
 
     // The Portal-scoped CurrentRole misses privilege a user holds only on a
@@ -61,6 +63,7 @@
         CurrentRole = await SiteRoleResolver.ResolveAsync(_identityUserId, SeedData.DefaultPortalSiteId);
         _memberships = await DashboardService.GetMembershipsAsync(_identityUserId);
         _visitedSites = await DashboardService.GetVisitedSitesAsync(_identityUserId, _memberships.Select(m => m.SiteId));
+        _portalDomain = (await DashboardService.GetPortalConfigAsync())?.PortalDomain;
 
         _loaded = true;
     }

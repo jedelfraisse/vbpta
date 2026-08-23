@@ -5,10 +5,15 @@ using SiteEngine.Enums;
 
 namespace WebApp.Services;
 
-public record MembershipSummary(Guid SiteId, string SiteName, SiteType SiteType, SiteRole? Role, string? CustomRoleName, string SchoolYear);
+// One row per site the user holds any role on — RoleLabels carries every
+// role/custom-role they hold there (e.g. the wizard-created admin holds both
+// SuperAdmin and SiteAdmin on the Portal); Role is the highest of those, used
+// for admin-gating and the role filter. Hostname/Domain back the "Visit
+// site" link (SiteUrlHelper.BuildPublicUrl).
+public record MembershipSummary(Guid SiteId, string SiteName, SiteType SiteType, SiteRole? Role, List<string> RoleLabels, string SchoolYear, string Hostname, string Domain);
 // A site the user has actually logged into (LoginHistory) but doesn't hold a
 // role on — distinct from MembershipSummary, which comes from SiteUserRoles.
-public record VisitedSiteSummary(Guid SiteId, string SiteName, SiteType SiteType, DateTimeOffset LastLoginUtc);
+public record VisitedSiteSummary(Guid SiteId, string SiteName, SiteType SiteType, DateTimeOffset LastLoginUtc, string Hostname, string Domain);
 public record SystemStats(int DivisionCount, int UnitCount, int UserCount, int MembershipCount);
 public record UserSummary(
 	string IdentityUserId,
@@ -51,16 +56,42 @@ public class DashboardService(IDbContextFactory<AppDbContext> dbFactory)
 	{
 		await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
 
-		return await db.SiteUserRoles
+		var rows = await db.SiteUserRoles
 			.Where(r => r.SiteUser.IdentityUserId == identityUserId)
-			.Select(r => new MembershipSummary(
+			.Select(r => new
+			{
 				r.SiteId,
 				r.Site.SiteName,
 				r.Site.SiteType,
+				r.Site.Hostname,
+				r.Site.Domain,
 				r.Role,
-				r.CustomRole != null ? r.CustomRole.Name : null,
-				r.SchoolYear))
+				RoleLabel = r.CustomRole != null ? r.CustomRole.Name : (r.Role != null ? r.Role.Value.ToString() : "Member"),
+				r.SchoolYear
+			})
 			.ToListAsync(cancellationToken);
+
+		// A user can hold more than one role on the same site for the same
+		// school year (e.g. the wizard-created admin gets both SuperAdmin and
+		// SiteAdmin on the Portal) — SiteUserRoles has one row per role, so
+		// group those into a single row per (site, school year) rather than
+		// showing the same site once per role.
+		return rows
+			.GroupBy(r => (r.SiteId, r.SchoolYear))
+			.Select(g =>
+			{
+				var first = g.First();
+				return new MembershipSummary(
+					first.SiteId,
+					first.SiteName,
+					first.SiteType,
+					g.Max(r => r.Role),
+					g.Select(r => r.RoleLabel).Distinct().ToList(),
+					first.SchoolYear,
+					first.Hostname,
+					first.Domain);
+			})
+			.ToList();
 	}
 
 	// Backs the Dashboard's "Also show sites you've logged into" toggle on
@@ -92,7 +123,9 @@ public class DashboardService(IDbContextFactory<AppDbContext> dbFactory)
 
 		return visited
 			.Where(v => sites.ContainsKey(v.SiteId))
-			.Select(v => new VisitedSiteSummary(v.SiteId, sites[v.SiteId].SiteName, sites[v.SiteId].SiteType, v.LastLoginUtc))
+			.Select(v => new VisitedSiteSummary(
+				v.SiteId, sites[v.SiteId].SiteName, sites[v.SiteId].SiteType, v.LastLoginUtc,
+				sites[v.SiteId].Hostname, sites[v.SiteId].Domain))
 			.OrderByDescending(v => v.LastLoginUtc)
 			.ToList();
 	}

@@ -51,6 +51,7 @@ jobs:
             **/bin/**
             **/logs/**
             **/SiteEngine/Migrations/**
+            appsettings.json
 
       - name: Delete app-offline.htm
         if: always()

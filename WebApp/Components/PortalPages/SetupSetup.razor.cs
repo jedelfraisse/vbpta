@@ -146,14 +146,9 @@ public partial class SetupSetup : ComponentBase
 		{
 			await SetupService.SaveStepAsync(_model);
 
+			// RefreshStatus() itself triggers the restart flow once this
+			// makes the wizard fully configured — see its comment.
 			RefreshStatus();
-
-			if (_status.IsFullyConfigured)
-			{
-				_isFinishing = true;
-				_finishMessage = "Thank you! Your PTA Portal setup is complete. The system will now restart.";
-				_ = RestartNow();
-			}
 		}
 		catch (Exception ex)
 		{
@@ -196,6 +191,23 @@ public partial class SetupSetup : ComponentBase
 	{
 		SetupState.Refresh();
 		_status = SetupState.GetStatus();
+
+		// Normally only Step 4 (Portal Info) can make IsFullyConfigured true —
+		// a fresh database has no SMTP/admin/portal info until each step fills
+		// it in. But pointing Step 1 at an *existing*, already-configured
+		// database (SMTP, admin user, and portal info all already present)
+		// can jump straight to "fully configured" after just one step. Without
+		// this check here, none of the four step conditions in SetupSetup.razor
+		// match anymore and nothing renders — a blank screen instead of the
+		// restart flow. Centralizing the check here (rather than duplicating
+		// it in every step handler) means whichever step happens to complete
+		// the wizard triggers the same restart.
+		if (_status.IsFullyConfigured && !_isFinishing && !_finalReady)
+		{
+			_isFinishing = true;
+			_finishMessage = "Thank you! Your PTA Portal setup is complete. The system will now restart.";
+			_ = RestartNow();
+		}
 	}
 
 	private void ResetMessage()

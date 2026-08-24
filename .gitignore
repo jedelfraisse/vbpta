@@ -213,6 +213,18 @@ publish-local/
 # Local dev TLS certs (e.g. mkcert wildcard certs for *.localhost)
 *.pem
 
+# Written by the Setup Wizard (SetupService.SaveStepAsync/SaveDatabaseConnection)
+# with a real SQL connection string and (locally) whatever secrets the
+# developer enters — never committed. See WebApp/appsettings.example.json for
+# the blank template shape; the app also creates this file itself on first
+# save if it doesn't exist.
+WebApp/appsettings.json
+
+# ASP.NET Data Protection key ring (Program.cs) — generated per-environment
+# on first run and used to encrypt secrets like PortalConfig.SmtpPassword.
+# Never shared between environments and never committed.
+WebApp/DataProtection-Keys/
+
 # Publish Web Output
 *.[Pp]ublish.xml
 *.azurePubxml

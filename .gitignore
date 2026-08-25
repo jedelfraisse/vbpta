@@ -225,6 +225,11 @@ WebApp/appsettings.json
 # Never shared between environments and never committed.
 WebApp/DataProtection-Keys/
 
+# Admin-uploaded logos/banners/backgrounds and generated PTA logos
+# (FileUploadService/PtaLogoGenerationService) — per-environment runtime
+# content, not source. Never committed.
+WebApp/wwwroot/uploads/
+
 # Publish Web Output
 *.[Pp]ublish.xml
 *.azurePubxml

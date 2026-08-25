@@ -1,4 +1,28 @@
 /* --------------------------------------------------
+   Site-wide type — National PTA Brand Kit (2026)
+   https://www.pta.org/docs/default-source/files/runyourpta/branding/2026/pta_brandkit_2026_mainbrand.pdf
+   The brand kit's primary/secondary faces are Myriad Pro/Minion Pro,
+   which are commercial Adobe fonts with no license here to embed them
+   for web delivery. Using the brand kit's own listed "Alternate Fonts —
+   For web content" instead: Arial (primary, body text) and Georgia
+   (secondary, headings) — both web-safe, no font files or licensing
+   needed. Swap these two variables if real Myriad/Minion Pro web access
+   (e.g. an Adobe Fonts kit) becomes available later.
+-------------------------------------------------- */
+:root {
+    --font-primary: Arial, Helvetica, sans-serif;
+    --font-secondary: Georgia, "Times New Roman", serif;
+}
+
+body {
+    font-family: var(--font-primary);
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-secondary);
+}
+
+/* --------------------------------------------------
    Global Block System (SmallBox / FullBox)
 -------------------------------------------------- */
 

@@ -56,7 +56,10 @@ public abstract class SiteLayoutBase : LayoutComponentBase
 	// Centralized here so Division and Local Unit layouts resolve/name the
 	// same theme variables identically. Returns "" (no inline style) while
 	// site is still null/loading — CSS var() fallbacks cover that gap.
-	protected static string ThemeStyle(Site? site)
+	// Public (not just protected) so admin pages that don't inherit this base
+	// — e.g. SiteDetail.razor's live Branding preview — can reuse the exact
+	// same variable names a real masthead consumes.
+	public static string ThemeStyle(Site? site)
 	{
 		if (site is null)
 			return string.Empty;
@@ -68,5 +71,20 @@ public abstract class SiteLayoutBase : LayoutComponentBase
 			$"--footer-color-2:{site.ResolvedFooterColor2()};" +
 			$"--footer-color-3:{site.ResolvedFooterColor3()};" +
 			$"--footer-color-4:{site.ResolvedFooterColor4()};";
+	}
+
+	// Each masthead logo needs its own width/height/fit behavior (not just a
+	// shared color/size CSS var), so unlike ThemeStyle this is computed
+	// per-<img> rather than once for the whole shell — see DivisionLayout.razor.
+	// width/height fall back to the site's masthead default box (88x220) when
+	// a logo has no size of its own; explicit width+height plus object-fit is
+	// what actually enforces "the logo is exactly this size" — a CSS
+	// max-width/max-height alone only caps it, it doesn't fix it.
+	public static string LogoBoxStyle(Site? site, int? width, int? height, bool preserveAspectRatio)
+	{
+		var w = width ?? site?.MastheadLogoDefaultWidth ?? 260;
+		var h = height ?? site?.MastheadLogoDefaultHeight ?? 110;
+		var fit = preserveAspectRatio ? "contain" : "fill";
+		return $"width:{w}px;height:{h}px;object-fit:{fit};";
 	}
 }

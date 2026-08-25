@@ -61,6 +61,34 @@ public class Site
 	public string? FooterColor3 { get; set; }
 	public string? FooterColor4 { get; set; }
 
+	// Masthead logo sizing (Division only for now — Local Unit masthead logos
+	// stay a fixed size). Each logo slot in the row (the generated PTA logo,
+	// the uploaded variant, the district logo, the partner logo) gets its own
+	// explicit width/height box in pixels; unset falls back to
+	// MastheadLogoDefaultWidth/Height (88x220 if that's unset too — see
+	// SiteLayoutBase.LogoBoxStyle). PreserveAspectRatio picks how the image
+	// fills that box: true = scaled down to fit without distortion (CSS
+	// object-fit:contain — some empty space in the box is possible), false =
+	// stretched to exactly fill it (object-fit:fill — may distort).
+	public int? MastheadLogoDefaultWidth { get; set; }
+	public int? MastheadLogoDefaultHeight { get; set; }
+
+	public int? GeneratedLogoWidth { get; set; }
+	public int? GeneratedLogoHeight { get; set; }
+	public bool GeneratedLogoPreserveAspectRatio { get; set; } = true;
+
+	public int? PtaVariantLogoWidth { get; set; }
+	public int? PtaVariantLogoHeight { get; set; }
+	public bool PtaVariantLogoPreserveAspectRatio { get; set; } = true;
+
+	public int? DistrictLogoWidth { get; set; }
+	public int? DistrictLogoHeight { get; set; }
+	public bool DistrictLogoPreserveAspectRatio { get; set; } = true;
+
+	public int? PartnerLogoWidth { get; set; }
+	public int? PartnerLogoHeight { get; set; }
+	public bool PartnerLogoPreserveAspectRatio { get; set; } = true;
+
 	// Background images. Nullable, same inheritance chain as the theme
 	// colors above but with no global default — unset means no image.
 	public string? MenuBackgroundImageUrl { get; set; }

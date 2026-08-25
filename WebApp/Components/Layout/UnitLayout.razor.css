@@ -15,13 +15,18 @@
     align-items: center;
     gap: 1rem;
     padding: 0.9rem 1.25rem;
-    background: var(--primary-color, #1F3A5F);
+    background: #fff;
     border-bottom: 3px solid var(--accent-color, #2E86AB);
-    color: #fff;
+    color: #111;
 }
 
+/* No separate colored nav band here (unlike Division's .primary-nav) — the
+   nav sits directly in the now-white masthead, so it needs its own color
+   instead of inheriting white-on-white. Reuses --accent-color, matching the
+   masthead border directly above it. */
 .local-shell .page-header nav a {
-    color: #fff;
+    color: var(--accent-color, #2E86AB);
+    font-weight: 600;
 }
 
 .brand-block {

@@ -1,8 +1,395 @@
-@page "/globaladmin/sites/branding"
-@layout SitesContentLayout
-@using WebApp.Components.Dashboard
+@page "/globaladmin/branding"
+@layout BrandingLayout
+@using System.Security.Claims
+@using SiteEngine.Data
+@using SiteEngine.Entities
+@using SiteEngine.Enums
+@using WebApp.Services
+@implements IAsyncDisposable
+@inject DashboardService DashboardService
+@inject SetupService SetupService
+@inject SiteRoleResolver SiteRoleResolver
+@inject PtaLogoGenerationService LogoGenerator
+@inject SiteAdminService SiteAdminService
+@inject IJSRuntime JS
 
 <PageTitle>Branding — Global Admin</PageTitle>
 
 <h5 class="mb-3">Branding</h5>
-<ComingSoonBox Title="Branding" Description="Customize the portal's logo, colors, and theming." />
+
+<p class="mb-3">
+    <a href="https://www.pta.org/docs/default-source/files/runyourpta/branding/2026/pta_brandkit_2026_mainbrand.pdf" target="_blank" rel="noopener noreferrer">
+        <i class="fa-solid fa-file-pdf"></i> National PTA Brand Kit (2026, PDF)
+    </a>
+</p>
+
+@if (!_loaded)
+{
+    <p class="text-muted">Loading…</p>
+}
+else if (!_hasAccess)
+{
+    <div class="alert alert-warning">This page is restricted to SuperAdmins.</div>
+}
+else
+{
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h6 class="card-title">Logo Template</h6>
+            <p class="text-muted small">
+                Upload your real logo design (exported from Canva, PowerPoint, or Word as a PNG) once, draw a box
+                over the "type your name here" spot, and every Division/Local Unit's "Generate PTA Logo" button
+                will stamp its own name into that box on this same image — no more editing each one by hand.
+            </p>
+
+            <ImageUploadField Label="Template Image" CurrentUrl="@_logoTemplateUrl" UploadFolder="logo-templates"
+                               OnUploaded="OnTemplateUploadedAsync" />
+
+            @if (!string.IsNullOrWhiteSpace(_logoTemplateUrl))
+            {
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Name Box</label>
+                    <p class="text-muted small mb-2">Click and drag on the image to mark where the name goes.</p>
+                    <div class="logo-template-wrapper" style="position:relative; display:inline-block; touch-action:none;
+                                border:1px solid #6c757d; background:#f8f9fa;"
+                         @onpointerdown="OnBoxPointerDown" @onpointermove="OnBoxPointerMove" @onpointerup="OnBoxPointerUp">
+                        <img @ref="_imgRef" src="@_logoTemplateUrl" alt="Logo template"
+                             style="max-width:640px; width:100%; display:block; user-select:none;" draggable="false" />
+                        @if (_boxW > 0 && _boxH > 0)
+                        {
+                            <div style="position:absolute; pointer-events:none; border:2px dashed #dc3545; background:rgba(220,53,69,0.15);
+                                        left:@(_boxX.ToString("0.##"))%; top:@(_boxY.ToString("0.##"))%;
+                                        width:@(_boxW.ToString("0.##"))%; height:@(_boxH.ToString("0.##"))%;"></div>
+                        }
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-6 col-md-3">
+                        <label class="form-label">Box X %</label>
+                        <input type="number" min="0" max="100" step="0.5" class="form-control" @bind="_boxX" />
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label">Box Y %</label>
+                        <input type="number" min="0" max="100" step="0.5" class="form-control" @bind="_boxY" />
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label">Box Width %</label>
+                        <input type="number" min="0" max="100" step="0.5" class="form-control" @bind="_boxW" />
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label">Box Height %</label>
+                        <input type="number" min="0" max="100" step="0.5" class="form-control" @bind="_boxH" />
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Font</label>
+                        <input class="form-control" value="Arial Black" disabled />
+                        <p class="text-muted small mt-1 mb-0">Fixed per the PTA brand kit — not editable.</p>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Text Color</label>
+                        <input type="color" class="form-control form-control-color" @bind="_fontColor" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Alignment</label>
+                        <select class="form-select" @bind="_textAlign">
+                            <option value="Left">Left</option>
+                            <option value="Center">Center</option>
+                            <option value="Right">Right</option>
+                        </select>
+                    </div>
+                </div>
+
+                @if (_templateError is not null)
+                {
+                    <div class="alert alert-danger">@_templateError</div>
+                }
+                @if (_templateSuccess is not null)
+                {
+                    <div class="alert alert-success">@_templateSuccess</div>
+                }
+
+                <button class="btn btn-outline-secondary me-2" disabled="@_templateBusy" @onclick="PreviewAsync">Preview with sample name</button>
+                <button class="btn btn-primary" disabled="@_templateBusy" @onclick="SaveTemplateAsync">Save Template Settings</button>
+
+                @if (!string.IsNullOrWhiteSpace(_previewUrl))
+                {
+                    <div class="mt-3">
+                        <label class="form-label fw-semibold d-block">Preview</label>
+                        <img src="@(_previewUrl)?t=@_previewCacheBust" alt="Logo preview" class="img-thumbnail" style="max-width:640px;" />
+                    </div>
+                }
+            }
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h6 class="card-title">Apply to Existing Sites</h6>
+            <p class="text-muted small">
+                New Divisions and Local Units get their logo generated automatically as soon as they're created.
+                Sites that already existed before you set up (or changed) the template above won't pick it up on
+                their own — use this to stamp every one of them with the current template right now.
+            </p>
+
+            @if (_regenerateError is not null)
+            {
+                <div class="alert alert-danger">@_regenerateError</div>
+            }
+            @if (_regenerateSuccess is not null)
+            {
+                <div class="alert alert-success">@_regenerateSuccess</div>
+            }
+
+            <button class="btn btn-outline-primary" disabled="@_regenerating" @onclick="RegenerateAllAsync">
+                @(_regenerating ? "Regenerating…" : "Create/Recreate Logos for Existing Sites")
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private bool _loaded;
+    private bool _hasAccess;
+
+    private PortalConfig? _config;
+
+    // Logo template panel state — mirrors PortalConfig.LogoTemplate* but kept
+    // separate so a template box can be dragged live without round-tripping
+    // to the database on every pointer move.
+    private string? _logoTemplateUrl;
+    private double _boxX;
+    private double _boxY;
+    private double _boxW;
+    private double _boxH;
+    // Fixed per the PTA brand kit — never user-editable (no dropdown for
+    // this one). Still round-tripped through PortalConfig.LogoTemplateFontFamily
+    // so PtaLogoGenerationService doesn't need a separate hardcoded copy.
+    private const string FontFamily = "Arial Black";
+    private string _fontColor = "#000000";
+    private string _textAlign = "Center";
+    private string? _previewUrl;
+    private long _previewCacheBust;
+    private bool _templateBusy;
+    private string? _templateError;
+    private string? _templateSuccess;
+
+    private bool _regenerating;
+    private string? _regenerateError;
+    private string? _regenerateSuccess;
+
+    private bool _dragging;
+    private double _dragStartX;
+    private double _dragStartY;
+    private double _renderedWidth;
+    private double _renderedHeight;
+    private ElementReference _imgRef;
+    private IJSObjectReference? _jsModule;
+
+    private record ElementRect(double Width, double Height);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthState is null ? null : (await AuthState).User;
+        var identityUserId = user?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+
+        var portalRole = string.IsNullOrEmpty(identityUserId)
+            ? SiteRole.Viewer
+            : await SiteRoleResolver.ResolveAsync(identityUserId, SeedData.DefaultPortalSiteId);
+
+        _hasAccess = portalRole == SiteRole.SuperAdmin;
+
+        if (_hasAccess)
+            await LoadCurrentAsync();
+
+        _loaded = true;
+    }
+
+    private async Task LoadCurrentAsync()
+    {
+        _config = await DashboardService.GetPortalConfigAsync();
+
+        if (_config is not null)
+        {
+            _logoTemplateUrl = _config.LogoTemplateUrl;
+            _boxX = _config.LogoTemplateBoxXPct;
+            _boxY = _config.LogoTemplateBoxYPct;
+            _boxW = _config.LogoTemplateBoxWidthPct;
+            _boxH = _config.LogoTemplateBoxHeightPct;
+            _fontColor = string.IsNullOrWhiteSpace(_config.LogoTemplateFontColor) ? "#000000" : _config.LogoTemplateFontColor;
+            _textAlign = string.IsNullOrWhiteSpace(_config.LogoTemplateTextAlign) ? "Center" : _config.LogoTemplateTextAlign;
+        }
+    }
+
+    private Task OnTemplateUploadedAsync(string url)
+    {
+        _logoTemplateUrl = url;
+        // A newly uploaded template is a different image — any box drawn
+        // against the old one is meaningless now, so clear it and make the
+        // admin re-draw it.
+        _boxX = _boxY = _boxW = _boxH = 0;
+        _previewUrl = null;
+        _templateSuccess = null;
+        return Task.CompletedTask;
+    }
+
+    private async Task<IJSObjectReference> GetJsModuleAsync()
+    {
+        _jsModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/logoTemplateEditor.js");
+        return _jsModule;
+    }
+
+    private async Task OnBoxPointerDown(PointerEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_logoTemplateUrl))
+            return;
+
+        var module = await GetJsModuleAsync();
+        var rect = await module.InvokeAsync<ElementRect>("getRect", _imgRef);
+        if (rect.Width <= 0 || rect.Height <= 0)
+            return;
+
+        _renderedWidth = rect.Width;
+        _renderedHeight = rect.Height;
+        _dragStartX = Clamp(e.OffsetX / _renderedWidth * 100);
+        _dragStartY = Clamp(e.OffsetY / _renderedHeight * 100);
+        _boxX = _dragStartX;
+        _boxY = _dragStartY;
+        _boxW = 0;
+        _boxH = 0;
+        _dragging = true;
+    }
+
+    private void OnBoxPointerMove(PointerEventArgs e)
+    {
+        if (!_dragging)
+            return;
+
+        var curX = Clamp(e.OffsetX / _renderedWidth * 100);
+        var curY = Clamp(e.OffsetY / _renderedHeight * 100);
+        _boxX = Math.Min(_dragStartX, curX);
+        _boxY = Math.Min(_dragStartY, curY);
+        _boxW = Math.Abs(curX - _dragStartX);
+        _boxH = Math.Abs(curY - _dragStartY);
+    }
+
+    private void OnBoxPointerUp(PointerEventArgs e) => _dragging = false;
+
+    private static double Clamp(double value) => Math.Max(0, Math.Min(100, value));
+
+    private PortalConfig BuildPreviewConfig() => new()
+    {
+        LogoTemplateUrl = _logoTemplateUrl,
+        LogoTemplateBoxXPct = _boxX,
+        LogoTemplateBoxYPct = _boxY,
+        LogoTemplateBoxWidthPct = _boxW,
+        LogoTemplateBoxHeightPct = _boxH,
+        LogoTemplateFontFamily = FontFamily,
+        LogoTemplateFontColor = _fontColor,
+        LogoTemplateTextAlign = _textAlign,
+    };
+
+    private async Task PreviewAsync()
+    {
+        _templateError = null;
+        _templateSuccess = null;
+
+        if (_boxW <= 0 || _boxH <= 0)
+        {
+            _templateError = "Drag a box on the template first.";
+            return;
+        }
+
+        _templateBusy = true;
+        try
+        {
+            _previewUrl = await LogoGenerator.GenerateTemplatePreviewAsync("Sample Local Unit PTA", BuildPreviewConfig());
+            _previewCacheBust = DateTimeOffset.UtcNow.Ticks;
+            if (_previewUrl is null)
+                _templateError = "Couldn't render a preview — is the template file still on disk?";
+        }
+        catch (Exception ex)
+        {
+            _templateError = ex.Message;
+        }
+        finally
+        {
+            _templateBusy = false;
+        }
+    }
+
+    private async Task SaveTemplateAsync()
+    {
+        _templateError = null;
+        _templateSuccess = null;
+
+        if (_boxW <= 0 || _boxH <= 0)
+        {
+            _templateError = "Drag a box on the template first.";
+            return;
+        }
+
+        _templateBusy = true;
+        try
+        {
+            await SetupService.SaveLogoTemplateAsync(
+                _logoTemplateUrl, _boxX, _boxY, _boxW, _boxH, FontFamily, _fontColor, _textAlign);
+
+            _templateSuccess = "Logo template saved. Every site's \"Generate PTA Logo\" button will use it from now on.";
+            await LoadCurrentAsync();
+        }
+        catch (Exception ex)
+        {
+            _templateError = ex.Message;
+        }
+        finally
+        {
+            _templateBusy = false;
+        }
+    }
+
+    private async Task RegenerateAllAsync()
+    {
+        _regenerateError = null;
+        _regenerateSuccess = null;
+        _regenerating = true;
+        try
+        {
+            var count = await SiteAdminService.RegenerateAllLogosAsync();
+            _regenerateSuccess = count switch
+            {
+                0 => "No Divisions or Local Units exist yet.",
+                1 => "Regenerated the logo for 1 site.",
+                _ => $"Regenerated logos for {count} sites.",
+            };
+        }
+        catch (Exception ex)
+        {
+            _regenerateError = ex.Message;
+        }
+        finally
+        {
+            _regenerating = false;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_jsModule is not null)
+        {
+            try
+            {
+                await _jsModule.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // Circuit already gone — nothing to clean up client-side.
+            }
+        }
+    }
+}

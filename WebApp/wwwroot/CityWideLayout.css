@@ -30,10 +30,10 @@ html, body {
    MASTHEAD
 ------------------------------------------------------- */
 .masthead {
-    padding: 0.75rem 1rem 0.5rem;
-    background: var(--primary-color, #1F3A5F);
+    padding: 1rem 1rem 0.85rem;
+    background: #fff;
     border-bottom: 3px solid var(--accent-color, #2E86AB);
-    color: #fff;
+    color: #111;
 }
 
 .masthead-logos {
@@ -52,15 +52,12 @@ html, body {
     object-fit: contain;
 }
 
-/* Horizontal masthead logo row (PTA logo, district logo, partner logo) —
-   height-matched and proportionally scaled, per-logo spacing instead of
-   relying solely on the flex gap so a wrapped row still reads cleanly. */
+/* Horizontal masthead logo row (PTA logo, district logo, partner logo).
+   Each <img>'s actual width/height/object-fit is set inline per logo (see
+   DivisionLayout.razor + SiteLayoutBase.LogoBoxStyle) since every logo can
+   have its own size — this class only handles spacing between them. */
 .masthead-logo {
-    max-height: 48px;
-    width: auto;
-    height: auto;
-    object-fit: contain;
-    margin-right: 12px;
+    margin-right: 16px;
 }
 
 .masthead-logo:last-child {

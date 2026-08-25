@@ -19,6 +19,52 @@ public record SiteSummary(int UserCount, int ChildSiteCount);
 // one place a "who do we contact for this site" answer can come from.
 public record SiteActivity(string? ContactAdminName, string? ContactAdminEmail, DateTimeOffset? LastLogin, DateTimeOffset? LastAdminLogin);
 
+// Backs the Site Detail page's Branding edit card. Property-initializer
+// record rather than a positional one — it's grown past what's safe to pass
+// positionally (27 fields, several same-typed int?s back to back) — see
+// SaveBrandingAsync's object-initializer construction. Blank strings are
+// normalized to null by UpdateBrandingAsync (an unset color/image falls
+// through to the parent Division or the global default — see SiteTheme.cs —
+// rather than pinning an explicit value); the per-logo width/height/aspect
+// fields have no such inheritance, just the site's own masthead default box.
+public record BrandingUpdate
+{
+	public string? BannerUrl { get; init; }
+	public string? HeaderText { get; init; }
+	public string? PrimaryColor { get; init; }
+	public string? AccentColor { get; init; }
+	public string? TopBarColor { get; init; }
+	public string? FooterColor1 { get; init; }
+	public string? FooterColor2 { get; init; }
+	public string? FooterColor3 { get; init; }
+	public string? FooterColor4 { get; init; }
+	public string? MenuBackgroundImageUrl { get; init; }
+	public string? PageBackgroundImageUrl { get; init; }
+	public string? PTALogoVariantUrl { get; init; }
+	public string? DistrictLogoUrl { get; init; }
+	public string? SchoolCrestUrl { get; init; }
+	public string? PartnerLogoUrl { get; init; }
+
+	public int? MastheadLogoDefaultWidth { get; init; }
+	public int? MastheadLogoDefaultHeight { get; init; }
+
+	public int? GeneratedLogoWidth { get; init; }
+	public int? GeneratedLogoHeight { get; init; }
+	public bool GeneratedLogoPreserveAspectRatio { get; init; } = true;
+
+	public int? PtaVariantLogoWidth { get; init; }
+	public int? PtaVariantLogoHeight { get; init; }
+	public bool PtaVariantLogoPreserveAspectRatio { get; init; } = true;
+
+	public int? DistrictLogoWidth { get; init; }
+	public int? DistrictLogoHeight { get; init; }
+	public bool DistrictLogoPreserveAspectRatio { get; init; } = true;
+
+	public int? PartnerLogoWidth { get; init; }
+	public int? PartnerLogoHeight { get; init; }
+	public bool PartnerLogoPreserveAspectRatio { get; init; } = true;
+}
+
 // Admin-editable logo fields shared by Division and Local Unit sites (every
 // value but SchoolCrest applies to both site types — see UpdateSiteLogoAsync).
 // Deliberately excludes LogoUrl, which is never hand-uploaded — see
@@ -171,6 +217,13 @@ public class SiteAdminService(
 			CreatedAtUtc = DateTimeOffset.UtcNow,
 			UpdatedAtUtc = DateTimeOffset.UtcNow,
 		};
+
+		// Generate the masthead logo up front (site.Id is already assigned —
+		// Site.Id is a client-generated Guid, not identity/sequence-based) so
+		// a brand-new site shows its name-stamped logo immediately in the
+		// Sites list, instead of waiting for EnsureGeneratedLogoAsync's lazy
+		// first-page-visit fallback.
+		site.LogoUrl = await GenerateLogoAsync(db, site, cancellationToken);
 
 		db.Sites.Add(site);
 
@@ -376,6 +429,152 @@ public class SiteAdminService(
 		return new SiteAdminResult(true, null, site);
 	}
 
+	// Site Name and PTA ID # — the two identity fields CreateSiteAsync
+	// validates at creation but nothing since has let an admin revisit. A
+	// SiteName change makes the already-generated LogoUrl stale (the old
+	// name is baked into its pixels), so this regenerates it in the same
+	// request instead of leaving an admin to notice and click "Regenerate"
+	// separately.
+	public async Task<SiteAdminResult> UpdateSiteInfoAsync(
+		Guid siteId, string siteName, string ptaId, string? externalUrl, string? lastActiveYear,
+		CancellationToken cancellationToken = default)
+	{
+		siteName = siteName.Trim();
+		ptaId = ptaId.Trim();
+		externalUrl = string.IsNullOrWhiteSpace(externalUrl) ? null : externalUrl.Trim();
+		lastActiveYear = string.IsNullOrWhiteSpace(lastActiveYear) ? null : lastActiveYear.Trim();
+
+		if (string.IsNullOrWhiteSpace(siteName))
+			return new SiteAdminResult(false, "Site name is required.");
+		if (string.IsNullOrWhiteSpace(ptaId))
+			return new SiteAdminResult(false, "PTA ID # is required.");
+		if (ptaId.Length > 8)
+			return new SiteAdminResult(false, "PTA ID # must be 8 characters or fewer.");
+
+		await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+		var site = await db.Sites.FirstOrDefaultAsync(s => s.Id == siteId, cancellationToken);
+		if (site is null)
+			return new SiteAdminResult(false, "Site not found.");
+
+		if (await db.Sites.AnyAsync(s => s.Id != siteId && s.PtaId == ptaId, cancellationToken))
+			return new SiteAdminResult(false, $"PTA ID \"{ptaId}\" is already in use.");
+
+		var nameChanged = !string.Equals(site.SiteName, siteName, StringComparison.Ordinal);
+
+		site.SiteName = siteName;
+		site.PtaId = ptaId;
+		site.ExternalUrl = externalUrl;
+		site.LastActiveYear = lastActiveYear;
+		site.UpdatedAtUtc = DateTimeOffset.UtcNow;
+
+		if (nameChanged)
+		{
+			var previousLogoUrl = site.LogoUrl;
+			site.LogoUrl = await GenerateLogoAsync(db, site, cancellationToken);
+			_logoGenerator.DeleteIfGenerated(previousLogoUrl);
+		}
+
+		try
+		{
+			await db.SaveChangesAsync(cancellationToken);
+		}
+		catch (DbUpdateException)
+		{
+			return new SiteAdminResult(false, "Could not save — the PTA ID may already be in use.");
+		}
+
+		return new SiteAdminResult(true, null, site);
+	}
+
+	// Every color/image field the masthead/footer render (see SiteTheme.cs's
+	// Resolved* extensions) plus the two background image slots. SchoolCrestUrl
+	// is silently ignored for a Division (it has no crest slot — the same rule
+	// UpdateSiteLogoAsync already enforces for hand-uploaded crests).
+	public async Task<SiteAdminResult> UpdateBrandingAsync(
+		Guid siteId, BrandingUpdate branding, CancellationToken cancellationToken = default)
+	{
+		await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+		var site = await db.Sites.FirstOrDefaultAsync(s => s.Id == siteId, cancellationToken);
+		if (site is null)
+			return new SiteAdminResult(false, "Site not found.");
+
+		site.BannerUrl = branding.BannerUrl?.Trim() ?? string.Empty;
+		site.HeaderText = branding.HeaderText?.Trim() ?? string.Empty;
+		site.PrimaryColor = NullIfBlank(branding.PrimaryColor);
+		site.AccentColor = NullIfBlank(branding.AccentColor);
+		site.TopBarColor = NullIfBlank(branding.TopBarColor);
+		site.FooterColor1 = NullIfBlank(branding.FooterColor1);
+		site.FooterColor2 = NullIfBlank(branding.FooterColor2);
+		site.FooterColor3 = NullIfBlank(branding.FooterColor3);
+		site.FooterColor4 = NullIfBlank(branding.FooterColor4);
+		site.MenuBackgroundImageUrl = NullIfBlank(branding.MenuBackgroundImageUrl);
+		site.PageBackgroundImageUrl = NullIfBlank(branding.PageBackgroundImageUrl);
+		site.PTALogoVariantUrl = NullIfBlank(branding.PTALogoVariantUrl);
+		site.DistrictLogoUrl = NullIfBlank(branding.DistrictLogoUrl);
+		if (site.SiteType == SiteType.LocalUnit)
+			site.SchoolCrestUrl = NullIfBlank(branding.SchoolCrestUrl);
+		site.PartnerLogoUrl = NullIfBlank(branding.PartnerLogoUrl);
+
+		site.MastheadLogoDefaultWidth = ClampLogoSize(branding.MastheadLogoDefaultWidth);
+		site.MastheadLogoDefaultHeight = ClampLogoSize(branding.MastheadLogoDefaultHeight);
+
+		site.GeneratedLogoWidth = ClampLogoSize(branding.GeneratedLogoWidth);
+		site.GeneratedLogoHeight = ClampLogoSize(branding.GeneratedLogoHeight);
+		site.GeneratedLogoPreserveAspectRatio = branding.GeneratedLogoPreserveAspectRatio;
+
+		site.PtaVariantLogoWidth = ClampLogoSize(branding.PtaVariantLogoWidth);
+		site.PtaVariantLogoHeight = ClampLogoSize(branding.PtaVariantLogoHeight);
+		site.PtaVariantLogoPreserveAspectRatio = branding.PtaVariantLogoPreserveAspectRatio;
+
+		site.DistrictLogoWidth = ClampLogoSize(branding.DistrictLogoWidth);
+		site.DistrictLogoHeight = ClampLogoSize(branding.DistrictLogoHeight);
+		site.DistrictLogoPreserveAspectRatio = branding.DistrictLogoPreserveAspectRatio;
+
+		site.PartnerLogoWidth = ClampLogoSize(branding.PartnerLogoWidth);
+		site.PartnerLogoHeight = ClampLogoSize(branding.PartnerLogoHeight);
+		site.PartnerLogoPreserveAspectRatio = branding.PartnerLogoPreserveAspectRatio;
+
+		site.UpdatedAtUtc = DateTimeOffset.UtcNow;
+
+		await db.SaveChangesAsync(cancellationToken);
+
+		return new SiteAdminResult(true, null, site);
+	}
+
+	// A null value means "use the site's masthead default box (260x110 if
+	// that's unset too)" — see SiteLayoutBase.LogoBoxStyle — so only clamp
+	// real values, don't invent one. Bounds keep a fat-fingered entry from
+	// wrecking the masthead: too small to read, or big enough to push the
+	// nav bar off-screen.
+	private static int? ClampLogoSize(int? pixels) =>
+		pixels is null ? null : Math.Clamp(pixels.Value, 20, 400);
+
+	public async Task<SiteAdminResult> UpdateSocialLinksAsync(
+		Guid siteId, string? faceBookUrl, string? giveBacksUrl, string? instagramUrl, string? twitterUrl, string? signUpGeniusUrl,
+		CancellationToken cancellationToken = default)
+	{
+		await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+		var site = await db.Sites.FirstOrDefaultAsync(s => s.Id == siteId, cancellationToken);
+		if (site is null)
+			return new SiteAdminResult(false, "Site not found.");
+
+		site.FaceBookURL = faceBookUrl?.Trim() ?? string.Empty;
+		site.GiveBacksURL = giveBacksUrl?.Trim() ?? string.Empty;
+		site.InstagramURL = instagramUrl?.Trim() ?? string.Empty;
+		site.TwitterURL = twitterUrl?.Trim() ?? string.Empty;
+		site.SignUpGeniusURL = signUpGeniusUrl?.Trim() ?? string.Empty;
+		site.UpdatedAtUtc = DateTimeOffset.UtcNow;
+
+		await db.SaveChangesAsync(cancellationToken);
+
+		return new SiteAdminResult(true, null, site);
+	}
+
+	private static string? NullIfBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
 	// Backs every admin-uploaded logo field except LogoUrl (which is always
 	// generated, never uploaded — see GeneratePtaLogoAsync). SchoolCrest is
 	// the only field actually restricted to a SiteType; the others apply to
@@ -427,7 +626,7 @@ public class SiteAdminService(
 			return new SiteAdminResult(false, "Site not found.");
 
 		var previousUrl = site.LogoUrl;
-		site.LogoUrl = await _logoGenerator.GenerateAsync(site.Id, site.SiteName, cancellationToken);
+		site.LogoUrl = await GenerateLogoAsync(db, site, cancellationToken);
 		site.UpdatedAtUtc = DateTimeOffset.UtcNow;
 		await db.SaveChangesAsync(cancellationToken);
 
@@ -452,11 +651,60 @@ public class SiteAdminService(
 		if (!string.IsNullOrWhiteSpace(site.LogoUrl))
 			return site.LogoUrl;
 
-		site.LogoUrl = await _logoGenerator.GenerateAsync(site.Id, site.SiteName, cancellationToken);
+		site.LogoUrl = await GenerateLogoAsync(db, site, cancellationToken);
 		site.UpdatedAtUtc = DateTimeOffset.UtcNow;
 		await db.SaveChangesAsync(cancellationToken);
 
 		return site.LogoUrl;
+	}
+
+	// Regenerates LogoUrl for every Division and Local Unit (never the Portal
+	// site itself — it isn't a PTA/PTSA org and the template isn't meant for
+	// it) using whatever template/fallback is currently configured. Backs the
+	// Branding page's "Create/Recreate Logos for Existing Sites" button — the
+	// one place an admin can re-stamp every already-created site after
+	// uploading a template for the first time, or after replacing one.
+	public async Task<int> RegenerateAllLogosAsync(CancellationToken cancellationToken = default)
+	{
+		await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+		var config = await db.PortalConfigs.FirstOrDefaultAsync(c => c.Id == SeedData.DefaultGlobalConfigId, cancellationToken);
+		var sites = await db.Sites.Where(s => s.SiteType != SiteType.Portal).ToListAsync(cancellationToken);
+
+		foreach (var site in sites)
+		{
+			var previousUrl = site.LogoUrl;
+			site.LogoUrl = await GenerateLogoAsync(site, config, cancellationToken);
+			site.UpdatedAtUtc = DateTimeOffset.UtcNow;
+			_logoGenerator.DeleteIfGenerated(previousUrl);
+		}
+
+		await db.SaveChangesAsync(cancellationToken);
+
+		return sites.Count;
+	}
+
+	// Single-site callers (GeneratePtaLogoAsync, EnsureGeneratedLogoAsync,
+	// CreateSiteAsync) fetch PortalConfig fresh each time; RegenerateAllLogosAsync
+	// fetches it once and passes it straight to the config-taking overload below,
+	// so a bulk run doesn't re-query the same singleton row per site.
+	private async Task<string?> GenerateLogoAsync(AppDbContext db, Site site, CancellationToken cancellationToken)
+	{
+		var config = await db.PortalConfigs.FirstOrDefaultAsync(c => c.Id == SeedData.DefaultGlobalConfigId, cancellationToken);
+		return await GenerateLogoAsync(site, config, cancellationToken);
+	}
+
+	// Prefers the global logo template (an admin-calibrated design with the
+	// site name stamped on) when one is configured in Global Settings; falls
+	// back to the code-drawn badge otherwise, including when the template
+	// exists in PortalConfig but its file has gone missing from disk.
+	private async Task<string?> GenerateLogoAsync(Site site, PortalConfig? config, CancellationToken cancellationToken)
+	{
+		var fromTemplate = config is null
+			? null
+			: await _logoGenerator.GenerateFromTemplateAsync(site.Id, site.SiteName, config, cancellationToken);
+
+		return fromTemplate ?? await _logoGenerator.GenerateAsync(site.Id, site.SiteName, cancellationToken);
 	}
 
 	public static string SlugifyHostname(string siteName)

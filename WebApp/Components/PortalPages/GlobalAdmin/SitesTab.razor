@@ -148,13 +148,28 @@ else
         var config = await DashboardService.GetPortalConfigAsync();
         _portalDomain = config?.PortalDomain?.Trim() ?? string.Empty;
 
-        var allSiteIds = _divisions
-            .SelectMany(d => d.ChildSites.Select(c => c.Id).Append(d.Id))
-            .Concat(_independentUnits.Select(u => u.Id))
+        var allSites = _divisions
+            .SelectMany(d => d.ChildSites.Append(d))
+            .Concat(_independentUnits)
             .ToList();
-        _siteActivity = await SiteAdminService.GetSiteActivityAsync(allSiteIds);
+        _siteActivity = await SiteAdminService.GetSiteActivityAsync(allSites.Select(s => s.Id).ToList());
+
+        await EnsureLogosAsync(allSites);
 
         _loaded = true;
+    }
+
+    // Backfills LogoUrl for any site that's never had one generated (e.g.
+    // created before a template existed, or before its masthead was ever
+    // rendered) so the Sites list can show a thumbnail for every row right
+    // after an admin configures a new template — without this, a site would
+    // stay blank here until someone happened to visit its public page.
+    // Skips sites that already have a LogoUrl, so this costs nothing once
+    // every site has been generated at least once.
+    private async Task EnsureLogosAsync(List<Site> sites)
+    {
+        foreach (var site in sites.Where(s => string.IsNullOrWhiteSpace(s.LogoUrl)))
+            site.LogoUrl = await SiteAdminService.EnsureGeneratedLogoAsync(site.Id);
     }
 
     private void ToggleSort() => _sortAscending = !_sortAscending;

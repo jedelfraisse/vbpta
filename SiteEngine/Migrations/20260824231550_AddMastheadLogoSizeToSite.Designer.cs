@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SiteEngine.Data;
 
@@ -11,9 +12,11 @@ using SiteEngine.Data;
 namespace SiteEngine.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260824231550_AddMastheadLogoSizeToSite")]
+    partial class AddMastheadLogoSizeToSite
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -430,18 +433,9 @@ namespace SiteEngine.Migrations
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<int?>("DistrictLogoHeight")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("DistrictLogoPreserveAspectRatio")
-                        .HasColumnType("bit");
-
                     b.Property<string>("DistrictLogoUrl")
                         .HasMaxLength(512)
                         .HasColumnType("nvarchar(512)");
-
-                    b.Property<int?>("DistrictLogoWidth")
-                        .HasColumnType("int");
 
                     b.Property<string>("Domain")
                         .IsRequired()
@@ -472,15 +466,6 @@ namespace SiteEngine.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("nvarchar(32)");
 
-                    b.Property<int?>("GeneratedLogoHeight")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("GeneratedLogoPreserveAspectRatio")
-                        .HasColumnType("bit");
-
-                    b.Property<int?>("GeneratedLogoWidth")
-                        .HasColumnType("int");
-
                     b.Property<string>("GiveBacksURL")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -506,10 +491,10 @@ namespace SiteEngine.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("nvarchar(512)");
 
-                    b.Property<int?>("MastheadLogoDefaultHeight")
+                    b.Property<int?>("MastheadLogoMaxHeight")
                         .HasColumnType("int");
 
-                    b.Property<int?>("MastheadLogoDefaultWidth")
+                    b.Property<int?>("MastheadLogoMaxWidth")
                         .HasColumnType("int");
 
                     b.Property<string>("MenuBackgroundImageUrl")
@@ -527,18 +512,9 @@ namespace SiteEngine.Migrations
                     b.Property<Guid?>("ParentSiteId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<int?>("PartnerLogoHeight")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("PartnerLogoPreserveAspectRatio")
-                        .HasColumnType("bit");
-
                     b.Property<string>("PartnerLogoUrl")
                         .HasMaxLength(512)
                         .HasColumnType("nvarchar(512)");
-
-                    b.Property<int?>("PartnerLogoWidth")
-                        .HasColumnType("int");
 
                     b.Property<string>("PrimaryColor")
                         .HasMaxLength(32)
@@ -547,15 +523,6 @@ namespace SiteEngine.Migrations
                     b.Property<string>("PtaId")
                         .IsRequired()
                         .HasColumnType("char(8)");
-
-                    b.Property<int?>("PtaVariantLogoHeight")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("PtaVariantLogoPreserveAspectRatio")
-                        .HasColumnType("bit");
-
-                    b.Property<int?>("PtaVariantLogoWidth")
-                        .HasColumnType("int");
 
                     b.Property<string>("SchoolCrestUrl")
                         .HasMaxLength(512)

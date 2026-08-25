@@ -34,24 +34,28 @@
         <div class="masthead-logos">
             @if (!string.IsNullOrWhiteSpace(Site?.LogoUrl))
             {
-                <img class="masthead-logo pta-generated-logo" src="@Site.LogoUrl" alt="@Site?.SiteName" />
+                <img class="masthead-logo pta-generated-logo" src="@Site.LogoUrl" alt="@Site?.SiteName"
+                     style="@LogoBoxStyle(Site, Site?.GeneratedLogoWidth, Site?.GeneratedLogoHeight, Site?.GeneratedLogoPreserveAspectRatio ?? true)" />
             }
 
             @if (!string.IsNullOrWhiteSpace(Site?.PTALogoVariantUrl))
             {
-                <img class="masthead-logo pta-variant-logo" src="@Site.PTALogoVariantUrl" alt="@Site?.SiteName PTA logo" />
+                <img class="masthead-logo pta-variant-logo" src="@Site.PTALogoVariantUrl" alt="@Site?.SiteName PTA logo"
+                     style="@LogoBoxStyle(Site, Site?.PtaVariantLogoWidth, Site?.PtaVariantLogoHeight, Site?.PtaVariantLogoPreserveAspectRatio ?? true)" />
             }
 
             @{ var districtLogoUrl = Site?.ResolvedDistrictLogoUrl(); }
             @if (!string.IsNullOrWhiteSpace(districtLogoUrl))
             {
-                <img class="masthead-logo district-logo" src="@districtLogoUrl" alt="@Site?.SiteName district logo" />
+                <img class="masthead-logo district-logo" src="@districtLogoUrl" alt="@Site?.SiteName district logo"
+                     style="@LogoBoxStyle(Site, Site?.DistrictLogoWidth, Site?.DistrictLogoHeight, Site?.DistrictLogoPreserveAspectRatio ?? true)" />
             }
 
             @{ var partnerLogoUrl = Site?.ResolvedPartnerLogoUrl(); }
             @if (!string.IsNullOrWhiteSpace(partnerLogoUrl))
             {
-                <img class="masthead-logo partner-logo" src="@partnerLogoUrl" alt="@Site?.SiteName partner logo" />
+                <img class="masthead-logo partner-logo" src="@partnerLogoUrl" alt="@Site?.SiteName partner logo"
+                     style="@LogoBoxStyle(Site, Site?.PartnerLogoWidth, Site?.PartnerLogoHeight, Site?.PartnerLogoPreserveAspectRatio ?? true)" />
             }
         </div>
     </header>

@@ -113,6 +113,11 @@ public DbSet<BannedEmail> BannedEmails => Set<BannedEmail>();
 			entity.Property(x => x.SmtpUsername).HasMaxLength(255).IsRequired();
 			entity.Property(x => x.SmtpPassword).HasMaxLength(255).IsRequired();
 			entity.Property(x => x.UseSsl).IsRequired();
+
+			entity.Property(x => x.LogoTemplateUrl).HasMaxLength(512);
+			entity.Property(x => x.LogoTemplateFontFamily).HasMaxLength(100).IsRequired();
+			entity.Property(x => x.LogoTemplateFontColor).HasMaxLength(20).IsRequired();
+			entity.Property(x => x.LogoTemplateTextAlign).HasMaxLength(20).IsRequired();
 		});
 
 		// ---------------------------

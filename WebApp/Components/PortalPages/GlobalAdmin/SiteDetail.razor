@@ -3,14 +3,64 @@
 @using SiteEngine.Data
 @using SiteEngine.Entities
 @using SiteEngine.Enums
+@using WebApp.Components.Layout
 @using WebApp.Components.SharedPages
+@using WebApp.Components.Shared
 @using WebApp.Services
 @inject NavigationManager NavigationManager
 @inject SiteRoleResolver SiteRoleResolver
 @inject SiteAdminService SiteAdminService
 @inject DashboardService DashboardService
+@inject FileUploadService FileUploadService
 
 <PageTitle>Site Details</PageTitle>
+
+<style>
+    /* Self-contained "as close as we can get" masthead mockup for the
+       Branding card's live preview — deliberately doesn't reuse
+       CityWideLayout.css/UnitLayout.razor.css (the latter is Blazor
+       component-scoped to UnitLayout.razor and can't be borrowed from here),
+       but drives its colors off the exact same --primary-color/--accent-color/
+       etc. custom properties via SiteLayoutBase.ThemeStyle, and mirrors the
+       real masthead/footer structure (see DivisionLayout.razor/UnitLayout.razor +
+       CityWideLayout.css) — a logos-only row, no site name/header text (neither
+       layout renders those today), and a 4-band stacked footer, not a stripe. */
+    .site-preview-shell { border: 1px solid #dee2e6; border-radius: 6px; overflow: hidden; }
+    .site-preview-topbar { height: 8px; background: var(--top-bar-color); }
+    /* Both site types now render a white masthead band (see CityWideLayout.css
+       .masthead / UnitLayout.razor.css .page-header) — but the two layouts put
+       the nav in different places: Division has its own colored band below
+       the masthead (.primary-nav, background var(--accent-color)); a Local
+       Unit's nav sits inline inside the masthead itself, right of the logos,
+       with --accent-color used for the link text instead (there's no separate
+       band to color). The .division/.local-unit modifiers below reproduce
+       that structural difference, not just a color difference. */
+    .site-preview-masthead { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 12px 16px; background: #fff; border-bottom: 3px solid var(--accent-color); min-height: 30px; }
+    .site-preview-masthead.division { justify-content: center; }
+    .site-preview-masthead.local-unit { justify-content: space-between; }
+    /* Local Unit logos: fixed 48px, not yet admin-configurable, so a plain
+       CSS rule is fine. Division logos are sized per-logo (each can be a
+       different width/height/fit) via an inline style computed by the exact
+       same SiteLayoutBase.LogoBoxStyle() the real masthead uses — see
+       SiteAdminService, so no separate CSS rule for those here. */
+    .site-preview-masthead.local-unit img { height: 40px; max-width: 140px; object-fit: contain; background: #fff; border-radius: 4px; padding: 2px; }
+    .site-preview-masthead.division img { background: #fff; border-radius: 4px; padding: 2px; }
+    .site-preview-masthead .text-muted.small { width: 100%; text-align: center; }
+    .site-preview-masthead-logos { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+    .site-preview-unit-nav { display: flex; flex-wrap: wrap; gap: 10px; font-size: 0.78rem; font-weight: 600; color: var(--accent-color); }
+    .site-preview-navbar { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; padding: 8px 16px; background: var(--accent-color); font-size: 0.78rem; font-weight: 600; color: #fff; }
+    .site-preview-banner { display: block; width: 100%; max-height: 90px; object-fit: cover; }
+    .site-preview-body { padding: 18px 16px; color: #adb5bd; font-size: 0.8rem; min-height: 50px; background: #fff; text-align: center; }
+    /* Named per-band instead of :nth-child — the footer bands are nowhere
+       near the first 4 children of .site-preview-shell (topbar/masthead/
+       nav/banner/body all come first), so a position-based selector never
+       actually matched any of them. */
+    .site-preview-footer-band { padding: 6px 16px; font-size: 0.7rem; color: rgba(255,255,255,0.75); text-align: center; }
+    .site-preview-footer-band.band-1 { background: var(--footer-color-1); }
+    .site-preview-footer-band.band-2 { background: var(--footer-color-2); }
+    .site-preview-footer-band.band-3 { background: var(--footer-color-3); }
+    .site-preview-footer-band.band-4 { background: var(--footer-color-4); height: 10px; padding: 0; }
+</style>
 
 @if (_loaded)
 {
@@ -73,60 +123,116 @@
                 </div>
             </div>
 
+            @* ---------------- Status ---------------- *@
             <div class="card shadow-sm mb-4">
                 <div class="card-body">
-                    <h6 class="card-title">Site Information</h6>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="card-title mb-0">Status</h6>
+                        @if (!_editingStatus)
+                        {
+                            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="EnterEditStatus">Edit</button>
+                        }
+                    </div>
 
                     @if (!string.IsNullOrEmpty(_statusError))
                     {
-                        <div class="alert alert-danger">@_statusError</div>
-                    }
-                    @if (!string.IsNullOrEmpty(_statusSuccessMessage))
-                    {
-                        <div class="alert alert-success">@_statusSuccessMessage</div>
+                        <div class="alert alert-danger mt-2">@_statusError</div>
                     }
 
-                    <div class="row mb-3 align-items-center">
-                        <label class="col-sm-3 col-form-label">Status</label>
-                        <div class="col-sm-9 d-flex gap-2">
-                            <select class="form-select" style="max-width: 220px;" @bind="_status">
+                    @if (!_editingStatus)
+                    {
+                        <span class="badge @StatusBadgeClass(_site.SiteStatus) mt-2">@_site.SiteStatus</span>
+                    }
+                    else
+                    {
+                        <div class="d-flex gap-2 align-items-center mt-2">
+                            <select class="form-select" style="max-width: 220px;" @bind="_editStatus">
                                 @foreach (var status in Enum.GetValues<SiteStatus>())
                                 {
                                     <option value="@status">@status</option>
                                 }
                             </select>
-                            <button type="button" class="btn btn-sm btn-outline-primary" disabled="@_savingStatus" @onclick="SaveStatusAsync">Save</button>
+                            <button type="button" class="btn btn-sm btn-primary" disabled="@_savingStatus" @onclick="SaveStatusAsync">Save</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_savingStatus" @onclick="() => _editingStatus = false">Cancel</button>
                         </div>
+                    }
+                </div>
+            </div>
+
+            @* ---------------- Site Information ---------------- *@
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="card-title mb-0">Site Information</h6>
+                        @if (!_editingInfo)
+                        {
+                            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="EnterEditInfo">Edit</button>
+                        }
                     </div>
+
+                    @if (!string.IsNullOrEmpty(_infoError))
+                    {
+                        <div class="alert alert-danger mt-2">@_infoError</div>
+                    }
+
+                    @if (!_editingInfo)
+                    {
+                        <dl class="row mb-0 mt-2">
+                            <dt class="col-sm-3">Site Name</dt>
+                            <dd class="col-sm-9">@_site.SiteName</dd>
+
+                            <dt class="col-sm-3">PTA ID #</dt>
+                            <dd class="col-sm-9">@_site.PtaId</dd>
+
+                            <dt class="col-sm-3">Hostname</dt>
+                            <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.Hostname) ? "—" : _site.Hostname)</dd>
+
+                            <dt class="col-sm-3">Domain</dt>
+                            <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.Domain) ? "—" : _site.Domain)</dd>
+
+                            <dt class="col-sm-3">External URL</dt>
+                            <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.ExternalUrl) ? "—" : _site.ExternalUrl)</dd>
+
+                            <dt class="col-sm-3">Last Active Year</dt>
+                            <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.LastActiveYear) ? "—" : _site.LastActiveYear)</dd>
+                        </dl>
+                    }
+                    else
+                    {
+                        <div class="row mb-3 mt-2">
+                            <label class="col-sm-3 col-form-label">Site Name</label>
+                            <div class="col-sm-9"><input class="form-control" @bind="_editSiteName" /></div>
+                        </div>
+                        <div class="row mb-3">
+                            <label class="col-sm-3 col-form-label">PTA ID #</label>
+                            <div class="col-sm-9"><input class="form-control" maxlength="8" @bind="_editPtaId" /></div>
+                        </div>
+                        <div class="row mb-3">
+                            <label class="col-sm-3 col-form-label">Hostname</label>
+                            <div class="col-sm-9"><input class="form-control" @bind="_editHostname" /></div>
+                        </div>
+                        <div class="row mb-3">
+                            <label class="col-sm-3 col-form-label">Domain</label>
+                            <div class="col-sm-9"><input class="form-control" @bind="_editDomain" placeholder="(optional)" /></div>
+                        </div>
+                        <div class="row mb-3">
+                            <label class="col-sm-3 col-form-label">External URL</label>
+                            <div class="col-sm-9"><input class="form-control" @bind="_editExternalUrl" placeholder="(optional)" /></div>
+                        </div>
+                        <div class="row mb-3">
+                            <label class="col-sm-3 col-form-label">Last Active Year</label>
+                            <div class="col-sm-9"><input class="form-control" @bind="_editLastActiveYear" placeholder="(optional)" /></div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-sm-9 offset-sm-3 d-flex gap-2">
+                                <button type="button" class="btn btn-sm btn-primary" disabled="@_savingInfo" @onclick="SaveInfoAsync">Save</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_savingInfo" @onclick="() => _editingInfo = false">Cancel</button>
+                            </div>
+                        </div>
+                        <p class="text-muted small">Changing Site Name regenerates the PTA logo automatically.</p>
+                    }
 
                     <hr />
-
-                    @if (!string.IsNullOrEmpty(_domainError))
-                    {
-                        <div class="alert alert-danger">@_domainError</div>
-                    }
-                    @if (!string.IsNullOrEmpty(_domainSuccessMessage))
-                    {
-                        <div class="alert alert-success">@_domainSuccessMessage</div>
-                    }
-
-                    <div class="row mb-3">
-                        <label class="col-sm-3 col-form-label">Hostname</label>
-                        <div class="col-sm-9">
-                            <input class="form-control" @bind="_hostname" />
-                        </div>
-                    </div>
-                    <div class="row mb-3">
-                        <label class="col-sm-3 col-form-label">Domain</label>
-                        <div class="col-sm-9">
-                            <input class="form-control" @bind="_domain" placeholder="(optional)" />
-                        </div>
-                    </div>
-                    <div class="row mb-3">
-                        <div class="col-sm-9 offset-sm-3">
-                            <button type="button" class="btn btn-sm btn-primary" disabled="@_savingDomain" @onclick="SaveDomainAsync">Save Domain Settings</button>
-                        </div>
-                    </div>
 
                     <dl class="row mb-0">
                         <dt class="col-sm-3">Public Home Page</dt>
@@ -147,6 +253,15 @@
                             <dd class="col-sm-9"><a href="@($"/globaladmin/sites/{_site.ParentSite.Id}")">@_site.ParentSite.SiteName</a></dd>
                         }
 
+                        <dt class="col-sm-3">Contact Admin</dt>
+                        <dd class="col-sm-9">@ContactAdminDisplay</dd>
+
+                        <dt class="col-sm-3">Last Admin Login</dt>
+                        <dd class="col-sm-9">@FormatDateOrDash(CurrentActivity?.LastAdminLogin)</dd>
+
+                        <dt class="col-sm-3">Last Login</dt>
+                        <dd class="col-sm-9">@FormatDateOrDash(CurrentActivity?.LastLogin)</dd>
+
                         <dt class="col-sm-3">Created</dt>
                         <dd class="col-sm-9">@FormatDate(_site.CreatedAtUtc)</dd>
 
@@ -156,80 +271,387 @@
                 </div>
             </div>
 
+            @* ---------------- Branding ---------------- *@
             <div class="card shadow-sm mb-4">
                 <div class="card-body">
-                    <h6 class="card-title">All Fields (Read-Only)</h6>
-                    <dl class="row mb-0">
-                        <dt class="col-sm-3">Name</dt>
-                        <dd class="col-sm-9">@_site.SiteName</dd>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="card-title mb-0">Branding</h6>
+                        @if (!_editingBranding)
+                        {
+                            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="EnterEditBranding">Edit</button>
+                        }
+                    </div>
+                    <p class="small mb-2">
+                        <a href="https://www.pta.org/docs/default-source/files/runyourpta/branding/2026/pta_brandkit_2026_mainbrand.pdf" target="_blank" rel="noopener noreferrer">
+                            <i class="fa-solid fa-file-pdf"></i> National PTA Brand Kit (2026, PDF)
+                        </a>
+                    </p>
 
-                        <dt class="col-sm-3">Status</dt>
-                        <dd class="col-sm-9">@_site.SiteStatus</dd>
+                    <div class="mb-3 mt-2">
+                        @if (!string.IsNullOrWhiteSpace(_site.LogoUrl))
+                        {
+                            <img src="@_site.LogoUrl" alt="@_site.SiteName logo" class="img-thumbnail d-block mb-2" style="max-height:100px;max-width:320px;object-fit:contain;" />
+                        }
+                        <button type="button" class="btn btn-sm btn-primary" disabled="@_generatingLogo" @onclick="GenerateLogoAsync">
+                            @(string.IsNullOrWhiteSpace(_site.LogoUrl) ? "Generate PTA Logo" : "Regenerate PTA Logo")
+                        </button>
+                        @if (_generatingLogo)
+                        {
+                            <span class="text-muted small ms-2">Generating…</span>
+                        }
+                        @if (!string.IsNullOrEmpty(_logoError))
+                        {
+                            <div class="text-danger small mt-2">@_logoError</div>
+                        }
+                    </div>
 
-                        <dt class="col-sm-3">Hostname</dt>
-                        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.Hostname) ? "---" : _site.Hostname)</dd>
+                    @if (!string.IsNullOrEmpty(_brandingError))
+                    {
+                        <div class="alert alert-danger">@_brandingError</div>
+                    }
 
-                        <dt class="col-sm-3">Domain</dt>
-                        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.Domain) ? "---" : _site.Domain)</dd>
+                    @if (!_editingBranding)
+                    {
+                        <dl class="row mb-0">
+                            <dt class="col-sm-3">Banner</dt>
+                            <dd class="col-sm-9">@BrandingThumb(_site.BannerUrl)</dd>
 
-                        <dt class="col-sm-3">Internal URL</dt>
-                        <dd class="col-sm-9">@(string.IsNullOrEmpty(_publicUrl) ? "---" : _publicUrl)</dd>
+                            <dt class="col-sm-3">Header Text</dt>
+                            <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.HeaderText) ? "—" : _site.HeaderText)</dd>
 
-                        <dt class="col-sm-3">Admin URL</dt>
-                        <dd class="col-sm-9">@(string.IsNullOrEmpty(_adminUrl) ? "---" : _adminUrl)</dd>
+                            <dt class="col-sm-3">Top Bar Color</dt>
+                            <dd class="col-sm-9">@ColorSwatch(_site.TopBarColor) <span class="text-muted small">— the thin strip along the very top of the page</span></dd>
 
-                        <dt class="col-sm-3">Contact Admin</dt>
-                        <dd class="col-sm-9">---</dd>
+                            <dt class="col-sm-3">Navigation Color</dt>
+                            <dd class="col-sm-9">@ColorSwatch(_site.AccentColor) <span class="text-muted small">— the nav bar (Division) or masthead border/nav text (Local Unit)</span></dd>
 
-                        <dt class="col-sm-3">Last Admin Login</dt>
-                        <dd class="col-sm-9">---</dd>
+                            <dt class="col-sm-3">Highlight Color</dt>
+                            <dd class="col-sm-9">@ColorSwatch(_site.PrimaryColor) <span class="text-muted small">— sub-nav tab highlight (Division only, for now)</span></dd>
 
-                        <dt class="col-sm-3">Last Login</dt>
-                        <dd class="col-sm-9">---</dd>
+                            <dt class="col-sm-3">Footer Navigation</dt>
+                            <dd class="col-sm-9">@ColorSwatch(_site.FooterColor1)</dd>
 
-                        <dt class="col-sm-3">Facebook URL</dt>
-                        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.FaceBookURL) ? "---" : _site.FaceBookURL)</dd>
+                            <dt class="col-sm-3">Footer Quick Links</dt>
+                            <dd class="col-sm-9">@ColorSwatch(_site.FooterColor2)</dd>
 
-                        <dt class="col-sm-3">GiveBack URL</dt>
-                        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.GiveBacksURL) ? "---" : _site.GiveBacksURL)</dd>
+                            <dt class="col-sm-3">Footer Legal</dt>
+                            <dd class="col-sm-9">@ColorSwatch(_site.FooterColor3)</dd>
 
-                        <dt class="col-sm-3">Instagram URL</dt>
-                        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.InstagramURL) ? "---" : _site.InstagramURL)</dd>
+                            <dt class="col-sm-3">Footer Bottom Strip</dt>
+                            <dd class="col-sm-9">@ColorSwatch(_site.FooterColor4)</dd>
 
-                        <dt class="col-sm-3">Twitter/X URL</dt>
-                        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.TwitterURL) ? "---" : _site.TwitterURL)</dd>
+                            <dt class="col-sm-3">PTA Logo Variant</dt>
+                            <dd class="col-sm-9">@BrandingThumb(_site.PTALogoVariantUrl)</dd>
 
-                        <dt class="col-sm-3">Sign Up Genius URL</dt>
-                        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.SignUpGeniusURL) ? "---" : _site.SignUpGeniusURL)</dd>
+                            <dt class="col-sm-3">District Logo</dt>
+                            <dd class="col-sm-9">@BrandingThumb(_site.DistrictLogoUrl)</dd>
 
-                        <dt class="col-sm-3">MemberHub URL</dt>
-                        <dd class="col-sm-9">---</dd>
+                            @if (_site.SiteType == SiteType.LocalUnit)
+                            {
+                                <dt class="col-sm-3">School Crest</dt>
+                                <dd class="col-sm-9">@BrandingThumb(_site.SchoolCrestUrl)</dd>
+                            }
 
-                        <dt class="col-sm-3">Store URL</dt>
-                        <dd class="col-sm-9">---</dd>
-                    </dl>
+                            <dt class="col-sm-3">Partner Logo</dt>
+                            <dd class="col-sm-9">@BrandingThumb(_site.PartnerLogoUrl)</dd>
+
+                            @if (_site.SiteType == SiteType.Division)
+                            {
+                                <dt class="col-sm-3">Masthead Logo Size</dt>
+                                <dd class="col-sm-9">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm mb-0">
+                                            <thead><tr><th>Logo</th><th>Width</th><th>Height</th><th>Fit</th></tr></thead>
+                                            <tbody>
+                                                <tr><td>Default (unset logos)</td><td>@(_site.MastheadLogoDefaultWidth?.ToString() ?? "260") px</td><td>@(_site.MastheadLogoDefaultHeight?.ToString() ?? "110") px</td><td>—</td></tr>
+                                                <tr><td>Generated PTA Logo</td><td>@LogoSizeCell(_site.GeneratedLogoWidth, _site.MastheadLogoDefaultWidth, 260)</td><td>@LogoSizeCell(_site.GeneratedLogoHeight, _site.MastheadLogoDefaultHeight, 110)</td><td>@(_site.GeneratedLogoPreserveAspectRatio ? "Keep ratio" : "Stretch")</td></tr>
+                                                <tr><td>PTA Logo Variant</td><td>@LogoSizeCell(_site.PtaVariantLogoWidth, _site.MastheadLogoDefaultWidth, 260)</td><td>@LogoSizeCell(_site.PtaVariantLogoHeight, _site.MastheadLogoDefaultHeight, 110)</td><td>@(_site.PtaVariantLogoPreserveAspectRatio ? "Keep ratio" : "Stretch")</td></tr>
+                                                <tr><td>District Logo</td><td>@LogoSizeCell(_site.DistrictLogoWidth, _site.MastheadLogoDefaultWidth, 260)</td><td>@LogoSizeCell(_site.DistrictLogoHeight, _site.MastheadLogoDefaultHeight, 110)</td><td>@(_site.DistrictLogoPreserveAspectRatio ? "Keep ratio" : "Stretch")</td></tr>
+                                                <tr><td>Partner Logo</td><td>@LogoSizeCell(_site.PartnerLogoWidth, _site.MastheadLogoDefaultWidth, 260)</td><td>@LogoSizeCell(_site.PartnerLogoHeight, _site.MastheadLogoDefaultHeight, 110)</td><td>@(_site.PartnerLogoPreserveAspectRatio ? "Keep ratio" : "Stretch")</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <p class="text-muted small mb-0">Blank cells use the default box above.</p>
+                                </dd>
+                            }
+
+                            <dt class="col-sm-3">Menu Background</dt>
+                            <dd class="col-sm-9">@BrandingThumb(_site.MenuBackgroundImageUrl)</dd>
+
+                            <dt class="col-sm-3">Page Background</dt>
+                            <dd class="col-sm-9">@BrandingThumb(_site.PageBackgroundImageUrl)</dd>
+                        </dl>
+                    }
+                    else
+                    {
+                        <ImageUploadField Label="Banner" CurrentUrl="@_editBannerUrl" UploadFolder="site-banners" OnUploaded="@(url => _editBannerUrl = url)" />
+
+                        <div class="row mb-3">
+                            <label class="col-sm-3 col-form-label">Header Text</label>
+                            <div class="col-sm-9"><input class="form-control" @bind="_editHeaderText" /></div>
+                        </div>
+                        <div class="row mb-1 align-items-center">
+                            <label class="col-sm-3 col-form-label">Top Bar Color</label>
+                            <div class="col-sm-9"><input type="color" class="form-control form-control-color" @bind="_editTopBarColor" /></div>
+                        </div>
+                        <p class="text-muted small mb-3">The thin strip along the very top of the page.</p>
+
+                        <div class="row mb-1 align-items-center">
+                            <label class="col-sm-3 col-form-label">Navigation Color</label>
+                            <div class="col-sm-9"><input type="color" class="form-control form-control-color" @bind="_editAccentColor" /></div>
+                        </div>
+                        <p class="text-muted small mb-3">The nav bar background (Division) or the masthead border and nav link text (Local Unit).</p>
+
+                        <div class="row mb-1 align-items-center">
+                            <label class="col-sm-3 col-form-label">Highlight Color</label>
+                            <div class="col-sm-9"><input type="color" class="form-control form-control-color" @bind="_editPrimaryColor" /></div>
+                        </div>
+                        <p class="text-muted small mb-3">Currently only visible as the active sub-nav tab on Division pages.</p>
+
+                        <div class="row mb-1 align-items-center">
+                            <label class="col-sm-3 col-form-label">Footer Navigation</label>
+                            <div class="col-sm-9"><input type="color" class="form-control form-control-color" @bind="_editFooterColor1" /></div>
+                        </div>
+                        <div class="row mb-1 align-items-center">
+                            <label class="col-sm-3 col-form-label">Footer Quick Links</label>
+                            <div class="col-sm-9"><input type="color" class="form-control form-control-color" @bind="_editFooterColor2" /></div>
+                        </div>
+                        <div class="row mb-1 align-items-center">
+                            <label class="col-sm-3 col-form-label">Footer Legal</label>
+                            <div class="col-sm-9"><input type="color" class="form-control form-control-color" @bind="_editFooterColor3" /></div>
+                        </div>
+                        <div class="row mb-3 align-items-center">
+                            <label class="col-sm-3 col-form-label">Footer Bottom Strip</label>
+                            <div class="col-sm-9"><input type="color" class="form-control form-control-color" @bind="_editFooterColor4" /></div>
+                        </div>
+
+                        @if (_site.SiteType == SiteType.Division)
+                        {
+                            <label class="form-label fw-semibold mt-2">Masthead Logos</label>
+                            <p class="text-muted small">
+                                Upload each logo and size it right here. Width/Height default to the image's own
+                                pixel size the first time you upload it (or open this form) — adjust from there.
+                                Leave a logo's boxes blank to fall back to the default box below. "Keep ratio"
+                                scales the logo down to fit without distorting it (it may not fill the whole box);
+                                unchecked stretches it to fill the box exactly.
+                            </p>
+                            @if (_logoSizeResetError is not null)
+                            {
+                                <div class="alert alert-warning py-1 px-2 small">@_logoSizeResetError</div>
+                            }
+                            <div class="table-responsive mb-3">
+                                <table class="table table-sm align-middle">
+                                    <thead><tr><th>Logo</th><th>Width (px)</th><th>Height (px)</th><th>Keep ratio</th><th></th></tr></thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>Default box<br /><span class="text-muted small">(unset logos)</span></td>
+                                            <td><input type="number" min="20" max="400" class="form-control form-control-sm" placeholder="260" @bind="_editMastheadLogoDefaultWidth" /></td>
+                                            <td><input type="number" min="20" max="400" class="form-control form-control-sm" placeholder="110" @bind="_editMastheadLogoDefaultHeight" /></td>
+                                            <td>—</td>
+                                            <td></td>
+                                        </tr>
+
+                                        <tr>
+                                            <td rowspan="2">Generated<br />PTA Logo</td>
+                                            <td colspan="4">
+                                                @if (!string.IsNullOrWhiteSpace(_site.LogoUrl))
+                                                {
+                                                    <img src="@_site.LogoUrl" alt="" class="img-thumbnail" style="max-height:48px;max-width:160px;object-fit:contain;" />
+                                                }
+                                                <span class="text-muted small">Generated above — not uploaded here.</span>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td><input type="number" min="20" max="400" class="form-control form-control-sm" @bind:get="_editGeneratedLogoWidth" @bind:set="OnGeneratedLogoWidthChanged" /></td>
+                                            <td><input type="number" min="20" max="400" class="form-control form-control-sm" @bind:get="_editGeneratedLogoHeight" @bind:set="OnGeneratedLogoHeightChanged" /></td>
+                                            <td><input type="checkbox" class="form-check-input" @bind="_editGeneratedLogoPreserveAspectRatio" /></td>
+                                            <td><button type="button" class="btn btn-sm btn-outline-secondary" @onclick="ResetGeneratedLogoSize">Use Original Size</button></td>
+                                        </tr>
+
+                                        <tr>
+                                            <td rowspan="2">PTA Logo<br />Variant</td>
+                                            <td colspan="4"><ImageUploadField Label="" CurrentUrl="@_editPtaLogoVariantUrl" UploadFolder="pta-variant-logos" OnUploaded="OnPtaVariantLogoUploaded" /></td>
+                                        </tr>
+                                        <tr>
+                                            <td><input type="number" min="20" max="400" class="form-control form-control-sm" @bind:get="_editPtaVariantLogoWidth" @bind:set="OnPtaVariantLogoWidthChanged" /></td>
+                                            <td><input type="number" min="20" max="400" class="form-control form-control-sm" @bind:get="_editPtaVariantLogoHeight" @bind:set="OnPtaVariantLogoHeightChanged" /></td>
+                                            <td><input type="checkbox" class="form-check-input" @bind="_editPtaVariantLogoPreserveAspectRatio" /></td>
+                                            <td><button type="button" class="btn btn-sm btn-outline-secondary" @onclick="ResetPtaVariantLogoSize">Use Original Size</button></td>
+                                        </tr>
+
+                                        <tr>
+                                            <td rowspan="2">District<br />Logo</td>
+                                            <td colspan="4"><ImageUploadField Label="" CurrentUrl="@_editDistrictLogoUrl" UploadFolder="district-logos" OnUploaded="OnDistrictLogoUploaded" /></td>
+                                        </tr>
+                                        <tr>
+                                            <td><input type="number" min="20" max="400" class="form-control form-control-sm" @bind:get="_editDistrictLogoWidth" @bind:set="OnDistrictLogoWidthChanged" /></td>
+                                            <td><input type="number" min="20" max="400" class="form-control form-control-sm" @bind:get="_editDistrictLogoHeight" @bind:set="OnDistrictLogoHeightChanged" /></td>
+                                            <td><input type="checkbox" class="form-check-input" @bind="_editDistrictLogoPreserveAspectRatio" /></td>
+                                            <td><button type="button" class="btn btn-sm btn-outline-secondary" @onclick="ResetDistrictLogoSize">Use Original Size</button></td>
+                                        </tr>
+
+                                        <tr>
+                                            <td rowspan="2">Partner<br />Logo</td>
+                                            <td colspan="4"><ImageUploadField Label="" CurrentUrl="@_editPartnerLogoUrl" UploadFolder="partner-logos" OnUploaded="OnPartnerLogoUploaded" /></td>
+                                        </tr>
+                                        <tr>
+                                            <td><input type="number" min="20" max="400" class="form-control form-control-sm" @bind:get="_editPartnerLogoWidth" @bind:set="OnPartnerLogoWidthChanged" /></td>
+                                            <td><input type="number" min="20" max="400" class="form-control form-control-sm" @bind:get="_editPartnerLogoHeight" @bind:set="OnPartnerLogoHeightChanged" /></td>
+                                            <td><input type="checkbox" class="form-check-input" @bind="_editPartnerLogoPreserveAspectRatio" /></td>
+                                            <td><button type="button" class="btn btn-sm btn-outline-secondary" @onclick="ResetPartnerLogoSize">Use Original Size</button></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                        else
+                        {
+                            <ImageUploadField Label="PTA Logo (uploaded variant, optional)" CurrentUrl="@_editPtaLogoVariantUrl" UploadFolder="pta-variant-logos" OnUploaded="@(url => _editPtaLogoVariantUrl = url)" />
+                            <ImageUploadField Label="District Logo" CurrentUrl="@_editDistrictLogoUrl" UploadFolder="district-logos" OnUploaded="@(url => _editDistrictLogoUrl = url)" />
+                            <ImageUploadField Label="School Crest" CurrentUrl="@_editSchoolCrestUrl" UploadFolder="school-crests" OnUploaded="@(url => _editSchoolCrestUrl = url)" />
+                            <ImageUploadField Label="Partner Logo" CurrentUrl="@_editPartnerLogoUrl" UploadFolder="partner-logos" OnUploaded="@(url => _editPartnerLogoUrl = url)" />
+                        }
+
+                        <ImageUploadField Label="Menu Background" CurrentUrl="@_editMenuBackgroundImageUrl" UploadFolder="menu-backgrounds" OnUploaded="@(url => _editMenuBackgroundImageUrl = url)" />
+                        <ImageUploadField Label="Page Background" CurrentUrl="@_editPageBackgroundImageUrl" UploadFolder="page-backgrounds" OnUploaded="@(url => _editPageBackgroundImageUrl = url)" />
+
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-primary" disabled="@_savingBranding" @onclick="SaveBrandingAsync">Save</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_savingBranding" @onclick="() => _editingBranding = false">Cancel</button>
+                        </div>
+                    }
+
+                    <hr />
+
+                    <label class="form-label fw-semibold d-block">Website Preview</label>
+                    <p class="text-muted small">
+                        A mockup of the real masthead/footer structure — logos, colors, and (for a Local Unit) the
+                        banner image all match what @(_site.SiteType == SiteType.Division ? "DivisionLayout.razor" : "UnitLayout.razor")
+                        actually renders. @(_editingBranding ? "Updates as you edit." : "")
+                        Header Text, Menu Background, and Page Background aren't wired into either live layout yet,
+                        so they're saved here but won't appear below or on the real site.
+                    </p>
+                    @{ var previewSite = BuildPreviewSite(); }
+                    <div class="site-preview-shell" style="@SiteLayoutBase.ThemeStyle(previewSite)">
+                        <div class="site-preview-topbar"></div>
+                        <div class="site-preview-masthead @(_site.SiteType == SiteType.Division ? "division" : "local-unit")">
+                            <div class="site-preview-masthead-logos">
+                                @if (!string.IsNullOrWhiteSpace(previewSite.LogoUrl))
+                                {
+                                    <img src="@previewSite.LogoUrl" alt="Generated PTA logo"
+                                         style="@(_site.SiteType == SiteType.Division ? SiteLayoutBase.LogoBoxStyle(previewSite, previewSite.GeneratedLogoWidth, previewSite.GeneratedLogoHeight, previewSite.GeneratedLogoPreserveAspectRatio) : "")" />
+                                }
+                                @if (!string.IsNullOrWhiteSpace(previewSite.PTALogoVariantUrl))
+                                {
+                                    <img src="@previewSite.PTALogoVariantUrl" alt="PTA logo variant"
+                                         style="@(_site.SiteType == SiteType.Division ? SiteLayoutBase.LogoBoxStyle(previewSite, previewSite.PtaVariantLogoWidth, previewSite.PtaVariantLogoHeight, previewSite.PtaVariantLogoPreserveAspectRatio) : "")" />
+                                }
+                                @if (_site.SiteType == SiteType.LocalUnit && !string.IsNullOrWhiteSpace(previewSite.ResolvedSchoolCrestUrl()))
+                                {
+                                    <img src="@previewSite.ResolvedSchoolCrestUrl()" alt="School crest" />
+                                }
+                                @if (!string.IsNullOrWhiteSpace(previewSite.ResolvedDistrictLogoUrl()))
+                                {
+                                    <img src="@previewSite.ResolvedDistrictLogoUrl()" alt="District logo"
+                                         style="@(_site.SiteType == SiteType.Division ? SiteLayoutBase.LogoBoxStyle(previewSite, previewSite.DistrictLogoWidth, previewSite.DistrictLogoHeight, previewSite.DistrictLogoPreserveAspectRatio) : "")" />
+                                }
+                                @if (!string.IsNullOrWhiteSpace(previewSite.ResolvedPartnerLogoUrl()))
+                                {
+                                    <img src="@previewSite.ResolvedPartnerLogoUrl()" alt="Partner logo"
+                                         style="@(_site.SiteType == SiteType.Division ? SiteLayoutBase.LogoBoxStyle(previewSite, previewSite.PartnerLogoWidth, previewSite.PartnerLogoHeight, previewSite.PartnerLogoPreserveAspectRatio) : "")" />
+                                }
+                                @if (string.IsNullOrWhiteSpace(previewSite.LogoUrl) && string.IsNullOrWhiteSpace(previewSite.PTALogoVariantUrl)
+                                    && string.IsNullOrWhiteSpace(previewSite.ResolvedDistrictLogoUrl()) && string.IsNullOrWhiteSpace(previewSite.ResolvedPartnerLogoUrl()))
+                                {
+                                    <span class="text-muted small">No logos yet — this row is empty on the real site too.</span>
+                                }
+                            </div>
+                            @if (_site.SiteType == SiteType.LocalUnit)
+                            {
+                                <nav class="site-preview-unit-nav"><span>Home</span><span>Announcements</span></nav>
+                            }
+                        </div>
+                        @if (_site.SiteType == SiteType.Division)
+                        {
+                            <div class="site-preview-navbar">
+                                <span>Home</span><span>Our Local Units</span><span>Programs</span><span>Events</span><span>News/Announcements</span>
+                            </div>
+                        }
+                        @if (_site.SiteType == SiteType.LocalUnit && !string.IsNullOrWhiteSpace(previewSite.BannerUrl))
+                        {
+                            <img class="site-preview-banner" src="@previewSite.BannerUrl" alt="Banner" />
+                        }
+                        <div class="site-preview-body">Page content goes here…</div>
+                        <div class="site-preview-footer-band band-1">@FooterNavText()</div>
+                        <div class="site-preview-footer-band band-2">@FooterQuickLinksText()</div>
+                        <div class="site-preview-footer-band band-3">@FooterLegalText()</div>
+                        <div class="site-preview-footer-band band-4"></div>
+                    </div>
                 </div>
             </div>
 
+            @* ---------------- Social Links ---------------- *@
             <div class="card shadow-sm mb-4">
                 <div class="card-body">
-                    <h6 class="card-title">Branding</h6>
-                    <dl class="row mb-0">
-                        <dt class="col-sm-3">Logo URL</dt>
-                        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.LogoUrl) ? "—" : _site.LogoUrl)</dd>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="card-title mb-0">Social Links</h6>
+                        @if (!_editingSocial)
+                        {
+                            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="EnterEditSocial">Edit</button>
+                        }
+                    </div>
 
-                        <dt class="col-sm-3">Banner URL</dt>
-                        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.BannerUrl) ? "—" : _site.BannerUrl)</dd>
+                    @if (!string.IsNullOrEmpty(_socialError))
+                    {
+                        <div class="alert alert-danger mt-2">@_socialError</div>
+                    }
 
-                        <dt class="col-sm-3">Primary Color</dt>
-                        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.PrimaryColor) ? "—" : _site.PrimaryColor)</dd>
+                    @if (!_editingSocial)
+                    {
+                        <dl class="row mb-0 mt-2">
+                            <dt class="col-sm-3">Facebook URL</dt>
+                            <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.FaceBookURL) ? "—" : _site.FaceBookURL)</dd>
 
-                        <dt class="col-sm-3">Accent Color</dt>
-                        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.AccentColor) ? "—" : _site.AccentColor)</dd>
+                            <dt class="col-sm-3">GiveBacks URL</dt>
+                            <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.GiveBacksURL) ? "—" : _site.GiveBacksURL)</dd>
 
-                        <dt class="col-sm-3">Header Text</dt>
-                        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.HeaderText) ? "—" : _site.HeaderText)</dd>
-                    </dl>
+                            <dt class="col-sm-3">Instagram URL</dt>
+                            <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.InstagramURL) ? "—" : _site.InstagramURL)</dd>
+
+                            <dt class="col-sm-3">Twitter/X URL</dt>
+                            <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.TwitterURL) ? "—" : _site.TwitterURL)</dd>
+
+                            <dt class="col-sm-3">Sign Up Genius URL</dt>
+                            <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(_site.SignUpGeniusURL) ? "—" : _site.SignUpGeniusURL)</dd>
+                        </dl>
+                    }
+                    else
+                    {
+                        <div class="row mb-3 mt-2">
+                            <label class="col-sm-3 col-form-label">Facebook URL</label>
+                            <div class="col-sm-9"><input class="form-control" @bind="_editFacebookUrl" /></div>
+                        </div>
+                        <div class="row mb-3">
+                            <label class="col-sm-3 col-form-label">GiveBacks URL</label>
+                            <div class="col-sm-9"><input class="form-control" @bind="_editGiveBacksUrl" /></div>
+                        </div>
+                        <div class="row mb-3">
+                            <label class="col-sm-3 col-form-label">Instagram URL</label>
+                            <div class="col-sm-9"><input class="form-control" @bind="_editInstagramUrl" /></div>
+                        </div>
+                        <div class="row mb-3">
+                            <label class="col-sm-3 col-form-label">Twitter/X URL</label>
+                            <div class="col-sm-9"><input class="form-control" @bind="_editTwitterUrl" /></div>
+                        </div>
+                        <div class="row mb-3">
+                            <label class="col-sm-3 col-form-label">Sign Up Genius URL</label>
+                            <div class="col-sm-9"><input class="form-control" @bind="_editSignUpGeniusUrl" /></div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-primary" disabled="@_savingSocial" @onclick="SaveSocialAsync">Save</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_savingSocial" @onclick="() => _editingSocial = false">Cancel</button>
+                        </div>
+                    }
                 </div>
             </div>
 
@@ -299,16 +721,74 @@
     private SiteSummary? _summary;
     private Dictionary<Guid, SiteActivity> _siteActivity = new();
 
-    private SiteStatus _status;
+    private SiteActivity? CurrentActivity => _site is null ? null : _siteActivity.GetValueOrDefault(_site.Id);
+    private string ContactAdminDisplay => CurrentActivity?.ContactAdminEmail is { Length: > 0 } email
+        ? (string.IsNullOrWhiteSpace(CurrentActivity.ContactAdminName) ? email : $"{CurrentActivity.ContactAdminName} ({email})")
+        : "—";
+
+    // ---- Status ----
+    private bool _editingStatus;
+    private SiteStatus _editStatus;
     private bool _savingStatus;
     private string? _statusError;
-    private string? _statusSuccessMessage;
 
-    private string _hostname = string.Empty;
-    private string _domain = string.Empty;
-    private bool _savingDomain;
-    private string? _domainError;
-    private string? _domainSuccessMessage;
+    // ---- Site Information ----
+    private bool _editingInfo;
+    private string _editSiteName = string.Empty;
+    private string _editPtaId = string.Empty;
+    private string _editHostname = string.Empty;
+    private string _editDomain = string.Empty;
+    private string _editExternalUrl = string.Empty;
+    private string _editLastActiveYear = string.Empty;
+    private bool _savingInfo;
+    private string? _infoError;
+
+    // ---- Branding ----
+    private bool _editingBranding;
+    private string _editBannerUrl = string.Empty;
+    private string _editHeaderText = string.Empty;
+    private string _editPrimaryColor = SiteThemeDefaults.PrimaryColor;
+    private string _editAccentColor = SiteThemeDefaults.AccentColor;
+    private string _editTopBarColor = SiteThemeDefaults.TopBarColor;
+    private string _editFooterColor1 = SiteThemeDefaults.FooterColor1;
+    private string _editFooterColor2 = SiteThemeDefaults.FooterColor2;
+    private string _editFooterColor3 = SiteThemeDefaults.FooterColor3;
+    private string _editFooterColor4 = SiteThemeDefaults.FooterColor4;
+    private string _editPtaLogoVariantUrl = string.Empty;
+    private string _editDistrictLogoUrl = string.Empty;
+    private string _editSchoolCrestUrl = string.Empty;
+    private string _editPartnerLogoUrl = string.Empty;
+    private string _editMenuBackgroundImageUrl = string.Empty;
+    private string _editPageBackgroundImageUrl = string.Empty;
+    private int? _editMastheadLogoDefaultWidth;
+    private int? _editMastheadLogoDefaultHeight;
+    private int? _editGeneratedLogoWidth;
+    private int? _editGeneratedLogoHeight;
+    private bool _editGeneratedLogoPreserveAspectRatio = true;
+    private int? _editPtaVariantLogoWidth;
+    private int? _editPtaVariantLogoHeight;
+    private bool _editPtaVariantLogoPreserveAspectRatio = true;
+    private int? _editDistrictLogoWidth;
+    private int? _editDistrictLogoHeight;
+    private bool _editDistrictLogoPreserveAspectRatio = true;
+    private int? _editPartnerLogoWidth;
+    private int? _editPartnerLogoHeight;
+    private bool _editPartnerLogoPreserveAspectRatio = true;
+    private bool _savingBranding;
+    private string? _brandingError;
+
+    private bool _generatingLogo;
+    private string? _logoError;
+
+    // ---- Social Links ----
+    private bool _editingSocial;
+    private string _editFacebookUrl = string.Empty;
+    private string _editGiveBacksUrl = string.Empty;
+    private string _editInstagramUrl = string.Empty;
+    private string _editTwitterUrl = string.Empty;
+    private string _editSignUpGeniusUrl = string.Empty;
+    private bool _savingSocial;
+    private string? _socialError;
 
     private static readonly SiteStatus[] _statusOptions = Enum.GetValues<SiteStatus>();
 
@@ -354,9 +834,6 @@
         _adminUrl = SiteUrlHelper.BuildAdminUrl(_site, _portalDomain);
         _publicUrl = SiteUrlHelper.BuildPublicUrl(_site, _portalDomain);
         _summary = await SiteAdminService.GetSiteSummaryAsync(_site.Id);
-        _status = _site.SiteStatus;
-        _hostname = _site.Hostname;
-        _domain = _site.Domain;
 
         var activitySiteIds = _site.ChildSites.Select(c => c.Id).Append(_site.Id).ToList();
         _siteActivity = await SiteAdminService.GetSiteActivityAsync(activitySiteIds);
@@ -377,6 +854,14 @@
         .Where(u => _selectedUnitStatuses.Contains(u.SiteStatus))
         .OrderBy(u => u.SiteName, StringComparer.OrdinalIgnoreCase);
 
+    // ---- Status ----
+    private void EnterEditStatus()
+    {
+        _editStatus = _site!.SiteStatus;
+        _statusError = null;
+        _editingStatus = true;
+    }
+
     private async Task SaveStatusAsync()
     {
         if (_site is null)
@@ -384,9 +869,8 @@
 
         _savingStatus = true;
         _statusError = null;
-        _statusSuccessMessage = null;
 
-        var result = await SiteAdminService.UpdateSiteStatusAsync(_site.Id, _status);
+        var result = await SiteAdminService.UpdateSiteStatusAsync(_site.Id, _editStatus);
 
         _savingStatus = false;
 
@@ -397,39 +881,439 @@
         }
 
         _site.SiteStatus = result.Site!.SiteStatus;
-        _statusSuccessMessage = "Status saved.";
+        _editingStatus = false;
     }
 
-    private async Task SaveDomainAsync()
+    // ---- Site Information ----
+    private void EnterEditInfo()
+    {
+        _editSiteName = _site!.SiteName;
+        _editPtaId = _site.PtaId;
+        _editHostname = _site.Hostname;
+        _editDomain = _site.Domain;
+        _editExternalUrl = _site.ExternalUrl ?? string.Empty;
+        _editLastActiveYear = _site.LastActiveYear ?? string.Empty;
+        _infoError = null;
+        _editingInfo = true;
+    }
+
+    private async Task SaveInfoAsync()
     {
         if (_site is null)
             return;
 
-        _savingDomain = true;
-        _domainError = null;
-        _domainSuccessMessage = null;
+        _savingInfo = true;
+        _infoError = null;
 
-        var result = await SiteAdminService.UpdateDomainSettingsAsync(_site.Id, _hostname, _domain);
+        var infoResult = await SiteAdminService.UpdateSiteInfoAsync(
+            _site.Id, _editSiteName, _editPtaId, _editExternalUrl, _editLastActiveYear);
 
-        _savingDomain = false;
-
-        if (!result.Success)
+        if (!infoResult.Success)
         {
-            _domainError = result.Error;
+            _infoError = infoResult.Error;
+            _savingInfo = false;
             return;
         }
 
-        _hostname = result.Site!.Hostname;
-        _domain = result.Site.Domain;
-        _site.Hostname = _hostname;
-        _site.Domain = _domain;
-        _adminUrl = SiteUrlHelper.BuildAdminUrl(_site, _portalDomain);
-        _publicUrl = SiteUrlHelper.BuildPublicUrl(_site, _portalDomain);
-        _domainSuccessMessage = "Domain settings saved.";
+        var domainResult = await SiteAdminService.UpdateDomainSettingsAsync(_site.Id, _editHostname, _editDomain);
+
+        _savingInfo = false;
+
+        // Site Name/PTA ID/etc. already saved above even if the domain half
+        // fails (e.g. hostname taken) — reload so the view reflects that
+        // partial save instead of silently discarding it, then let the admin
+        // fix just the domain field and retry.
+        await ReloadSiteAsync();
+
+        if (!domainResult.Success)
+        {
+            _infoError = domainResult.Error;
+            return;
+        }
+
+        _editingInfo = false;
+    }
+
+    // ---- Branding ----
+    private void EnterEditBranding()
+    {
+        _editBannerUrl = _site!.BannerUrl;
+        _editHeaderText = _site.HeaderText;
+        _editPrimaryColor = NormalizeColor(_site.PrimaryColor ?? _site.ResolvedPrimaryColor());
+        _editAccentColor = NormalizeColor(_site.AccentColor ?? _site.ResolvedAccentColor());
+        _editTopBarColor = NormalizeColor(_site.TopBarColor ?? _site.ResolvedTopBarColor());
+        _editFooterColor1 = NormalizeColor(_site.FooterColor1 ?? _site.ResolvedFooterColor1());
+        _editFooterColor2 = NormalizeColor(_site.FooterColor2 ?? _site.ResolvedFooterColor2());
+        _editFooterColor3 = NormalizeColor(_site.FooterColor3 ?? _site.ResolvedFooterColor3());
+        _editFooterColor4 = NormalizeColor(_site.FooterColor4 ?? _site.ResolvedFooterColor4());
+        _editPtaLogoVariantUrl = _site.PTALogoVariantUrl ?? string.Empty;
+        _editDistrictLogoUrl = _site.DistrictLogoUrl ?? string.Empty;
+        _editSchoolCrestUrl = _site.SchoolCrestUrl ?? string.Empty;
+        _editPartnerLogoUrl = _site.PartnerLogoUrl ?? string.Empty;
+        _editMenuBackgroundImageUrl = _site.MenuBackgroundImageUrl ?? string.Empty;
+        _editPageBackgroundImageUrl = _site.PageBackgroundImageUrl ?? string.Empty;
+        _editMastheadLogoDefaultWidth = _site.MastheadLogoDefaultWidth;
+        _editMastheadLogoDefaultHeight = _site.MastheadLogoDefaultHeight;
+        _editGeneratedLogoWidth = _site.GeneratedLogoWidth;
+        _editGeneratedLogoHeight = _site.GeneratedLogoHeight;
+        _editGeneratedLogoPreserveAspectRatio = _site.GeneratedLogoPreserveAspectRatio;
+        _editPtaVariantLogoWidth = _site.PtaVariantLogoWidth;
+        _editPtaVariantLogoHeight = _site.PtaVariantLogoHeight;
+        _editPtaVariantLogoPreserveAspectRatio = _site.PtaVariantLogoPreserveAspectRatio;
+        _editDistrictLogoWidth = _site.DistrictLogoWidth;
+        _editDistrictLogoHeight = _site.DistrictLogoHeight;
+        _editDistrictLogoPreserveAspectRatio = _site.DistrictLogoPreserveAspectRatio;
+        _editPartnerLogoWidth = _site.PartnerLogoWidth;
+        _editPartnerLogoHeight = _site.PartnerLogoHeight;
+        _editPartnerLogoPreserveAspectRatio = _site.PartnerLogoPreserveAspectRatio;
+
+        // A logo that's never had a size saved gets one now — its own actual
+        // pixel dimensions, not the generic default box — so the fields open
+        // with a real, meaningful starting point instead of blank inputs.
+        // Only when BOTH are unset: don't clobber a deliberate partial
+        // choice (e.g. an admin who set Width and left Height to inherit).
+        if (_editGeneratedLogoWidth is null && _editGeneratedLogoHeight is null)
+            ApplyNaturalSize(_site.LogoUrl, ref _editGeneratedLogoWidth, ref _editGeneratedLogoHeight);
+        if (_editPtaVariantLogoWidth is null && _editPtaVariantLogoHeight is null)
+            ApplyNaturalSize(_site.PTALogoVariantUrl, ref _editPtaVariantLogoWidth, ref _editPtaVariantLogoHeight);
+        if (_editDistrictLogoWidth is null && _editDistrictLogoHeight is null)
+            ApplyNaturalSize(_site.DistrictLogoUrl, ref _editDistrictLogoWidth, ref _editDistrictLogoHeight);
+        if (_editPartnerLogoWidth is null && _editPartnerLogoHeight is null)
+            ApplyNaturalSize(_site.PartnerLogoUrl, ref _editPartnerLogoWidth, ref _editPartnerLogoHeight);
+
+        _brandingError = null;
+        _logoSizeResetError = null;
+        _editingBranding = true;
+    }
+
+    // Backs the Width/Height inputs' @bind:set — when Keep Ratio is on,
+    // changing one recomputes the other off the CURRENT pair (whatever's in
+    // the boxes right now, whether that's the image's natural size or an
+    // earlier custom value) rather than some separately-remembered "original"
+    // ratio, matching how a typical image-size dialog's aspect lock behaves.
+    // With Keep Ratio off, or when the current pair has nothing to compute a
+    // ratio from yet (either box empty/zero), the two fields are simply
+    // independent — the new value is stored as-is, the other untouched.
+    private static void LinkedWidthChanged(int? newWidth, ref int? width, ref int? height, bool preserveAspectRatio)
+    {
+        if (preserveAspectRatio && width is > 0 && height is > 0 && newWidth is > 0)
+            height = (int)Math.Round(newWidth.Value * (double)height.Value / width.Value);
+
+        width = newWidth;
+    }
+
+    private static void LinkedHeightChanged(int? newHeight, ref int? width, ref int? height, bool preserveAspectRatio)
+    {
+        if (preserveAspectRatio && width is > 0 && height is > 0 && newHeight is > 0)
+            width = (int)Math.Round(newHeight.Value * (double)width.Value / height.Value);
+
+        height = newHeight;
+    }
+
+    private void OnGeneratedLogoWidthChanged(int? v) => LinkedWidthChanged(v, ref _editGeneratedLogoWidth, ref _editGeneratedLogoHeight, _editGeneratedLogoPreserveAspectRatio);
+    private void OnGeneratedLogoHeightChanged(int? v) => LinkedHeightChanged(v, ref _editGeneratedLogoWidth, ref _editGeneratedLogoHeight, _editGeneratedLogoPreserveAspectRatio);
+
+    private void OnPtaVariantLogoWidthChanged(int? v) => LinkedWidthChanged(v, ref _editPtaVariantLogoWidth, ref _editPtaVariantLogoHeight, _editPtaVariantLogoPreserveAspectRatio);
+    private void OnPtaVariantLogoHeightChanged(int? v) => LinkedHeightChanged(v, ref _editPtaVariantLogoWidth, ref _editPtaVariantLogoHeight, _editPtaVariantLogoPreserveAspectRatio);
+
+    private void OnDistrictLogoWidthChanged(int? v) => LinkedWidthChanged(v, ref _editDistrictLogoWidth, ref _editDistrictLogoHeight, _editDistrictLogoPreserveAspectRatio);
+    private void OnDistrictLogoHeightChanged(int? v) => LinkedHeightChanged(v, ref _editDistrictLogoWidth, ref _editDistrictLogoHeight, _editDistrictLogoPreserveAspectRatio);
+
+    private void OnPartnerLogoWidthChanged(int? v) => LinkedWidthChanged(v, ref _editPartnerLogoWidth, ref _editPartnerLogoHeight, _editPartnerLogoPreserveAspectRatio);
+    private void OnPartnerLogoHeightChanged(int? v) => LinkedHeightChanged(v, ref _editPartnerLogoWidth, ref _editPartnerLogoHeight, _editPartnerLogoPreserveAspectRatio);
+
+    private bool ApplyNaturalSize(string? url, ref int? width, ref int? height)
+    {
+        var dimensions = FileUploadService.TryGetImageDimensions(url);
+        if (dimensions is null)
+            return false;
+
+        width = dimensions.Value.Width;
+        height = dimensions.Value.Height;
+        return true;
+    }
+
+    // Backs each logo row's "Use Original Size" button — re-reads the
+    // CURRENT image (whatever's in the edit field right now, which may be a
+    // file just uploaded this session and not yet saved) and overwrites
+    // Width/Height with its real pixels, same as a fresh upload does
+    // automatically. Uses _site.LogoUrl for the generated logo since that
+    // one has no edit-field counterpart (it's never hand-uploaded here).
+    private string? _logoSizeResetError;
+
+    private void ResetLogoSize(string logoName, string? url, ref int? width, ref int? height)
+    {
+        _logoSizeResetError = ApplyNaturalSize(url, ref width, ref height)
+            ? null
+            : $"Couldn't read {logoName}'s size — is there an image uploaded, and is it a format with a fixed pixel size (not SVG)?";
+    }
+
+    private void ResetGeneratedLogoSize() =>
+        ResetLogoSize("Generated PTA Logo", _site?.LogoUrl, ref _editGeneratedLogoWidth, ref _editGeneratedLogoHeight);
+
+    private void ResetPtaVariantLogoSize() =>
+        ResetLogoSize("PTA Logo Variant", _editPtaLogoVariantUrl, ref _editPtaVariantLogoWidth, ref _editPtaVariantLogoHeight);
+
+    private void ResetDistrictLogoSize() =>
+        ResetLogoSize("District Logo", _editDistrictLogoUrl, ref _editDistrictLogoWidth, ref _editDistrictLogoHeight);
+
+    private void ResetPartnerLogoSize() =>
+        ResetLogoSize("Partner Logo", _editPartnerLogoUrl, ref _editPartnerLogoWidth, ref _editPartnerLogoHeight);
+
+    // A freshly uploaded image is a different file — its old size (if any)
+    // no longer describes it, so this always overwrites Width/Height with
+    // the new file's own pixels rather than only filling blanks like
+    // EnterEditBranding's initial seeding does.
+    private void OnPtaVariantLogoUploaded(string url)
+    {
+        _editPtaLogoVariantUrl = url;
+        ApplyNaturalSize(url, ref _editPtaVariantLogoWidth, ref _editPtaVariantLogoHeight);
+    }
+
+    private void OnDistrictLogoUploaded(string url)
+    {
+        _editDistrictLogoUrl = url;
+        ApplyNaturalSize(url, ref _editDistrictLogoWidth, ref _editDistrictLogoHeight);
+    }
+
+    private void OnPartnerLogoUploaded(string url)
+    {
+        _editPartnerLogoUrl = url;
+        ApplyNaturalSize(url, ref _editPartnerLogoWidth, ref _editPartnerLogoHeight);
+    }
+
+    private async Task SaveBrandingAsync()
+    {
+        if (_site is null)
+            return;
+
+        _savingBranding = true;
+        _brandingError = null;
+
+        var branding = new BrandingUpdate
+        {
+            BannerUrl = _editBannerUrl,
+            HeaderText = _editHeaderText,
+            PrimaryColor = _editPrimaryColor,
+            AccentColor = _editAccentColor,
+            TopBarColor = _editTopBarColor,
+            FooterColor1 = _editFooterColor1,
+            FooterColor2 = _editFooterColor2,
+            FooterColor3 = _editFooterColor3,
+            FooterColor4 = _editFooterColor4,
+            MenuBackgroundImageUrl = _editMenuBackgroundImageUrl,
+            PageBackgroundImageUrl = _editPageBackgroundImageUrl,
+            PTALogoVariantUrl = _editPtaLogoVariantUrl,
+            DistrictLogoUrl = _editDistrictLogoUrl,
+            SchoolCrestUrl = _editSchoolCrestUrl,
+            PartnerLogoUrl = _editPartnerLogoUrl,
+            MastheadLogoDefaultWidth = _editMastheadLogoDefaultWidth,
+            MastheadLogoDefaultHeight = _editMastheadLogoDefaultHeight,
+            GeneratedLogoWidth = _editGeneratedLogoWidth,
+            GeneratedLogoHeight = _editGeneratedLogoHeight,
+            GeneratedLogoPreserveAspectRatio = _editGeneratedLogoPreserveAspectRatio,
+            PtaVariantLogoWidth = _editPtaVariantLogoWidth,
+            PtaVariantLogoHeight = _editPtaVariantLogoHeight,
+            PtaVariantLogoPreserveAspectRatio = _editPtaVariantLogoPreserveAspectRatio,
+            DistrictLogoWidth = _editDistrictLogoWidth,
+            DistrictLogoHeight = _editDistrictLogoHeight,
+            DistrictLogoPreserveAspectRatio = _editDistrictLogoPreserveAspectRatio,
+            PartnerLogoWidth = _editPartnerLogoWidth,
+            PartnerLogoHeight = _editPartnerLogoHeight,
+            PartnerLogoPreserveAspectRatio = _editPartnerLogoPreserveAspectRatio,
+        };
+
+        var result = await SiteAdminService.UpdateBrandingAsync(_site.Id, branding);
+
+        _savingBranding = false;
+
+        if (!result.Success)
+        {
+            _brandingError = result.Error;
+            return;
+        }
+
+        _site = result.Site;
+        _editingBranding = false;
+    }
+
+    // Live preview source: the in-progress edit fields while the Branding
+    // card is open, otherwise whatever's actually saved. ParentSite/SiteType/
+    // LogoUrl always come from the real site — only the fields this card
+    // edits are swapped, so Resolved*Color()'s parent-Division fallback still
+    // works correctly for a Local Unit with nothing of its own set.
+    // The 3 footer text helpers below mirror DivisionLayout.razor's
+    // footer-nav/footer-links/footer-legal and UnitLayout.razor's
+    // unit-footer-nav/unit-footer-links/unit-footer-legal exactly (including
+    // the two static National/State PTA links Division has that Local Unit
+    // doesn't, and the trademark line Division has that Local Unit doesn't)
+    // — read from _site directly, not previewSite, since Social Links is a
+    // separate edit card with no live in-progress state feeding this preview.
+    private string FooterNavText() => _site!.SiteType == SiteType.Division
+        ? "Home | Our Local Units | Programs | Get Involved | Events | Sponsors | News/Announcements | Awards | Admin"
+        : "Home | Announcements | Admin";
+
+    private string FooterQuickLinksText()
+    {
+        var links = new List<string>();
+        if (!string.IsNullOrWhiteSpace(_site!.GiveBacksURL)) links.Add("GiveBacks");
+        if (!string.IsNullOrWhiteSpace(_site.FaceBookURL)) links.Add("Facebook");
+        if (!string.IsNullOrWhiteSpace(_site.TwitterURL)) links.Add("Twitter");
+        if (!string.IsNullOrWhiteSpace(_site.InstagramURL)) links.Add("Instagram");
+        if (!string.IsNullOrWhiteSpace(_site.SignUpGeniusURL)) links.Add("Sign Up Genius");
+
+        if (_site.SiteType == SiteType.Division)
+        {
+            links.Add("State PTA");
+            links.Add("National PTA");
+        }
+
+        return links.Count == 0 ? "Quick Links:" : $"Quick Links: {string.Join(" | ", links)}";
+    }
+
+    private string FooterLegalText()
+    {
+        var text = $"© {_site!.SiteName}";
+        if (!string.IsNullOrWhiteSpace(_site.PtaId) && _site.PtaId != "00000000")
+            text += $". PTA ID# {_site.PtaId}";
+        if (_site.SiteType == SiteType.Division)
+            text += " - PTA trademarks are acknowledged and respected.";
+        return text;
+    }
+
+    private Site BuildPreviewSite()
+    {
+        if (!_editingBranding || _site is null)
+            return _site ?? new Site();
+
+        return new Site
+        {
+            SiteType = _site.SiteType,
+            ParentSite = _site.ParentSite,
+            SiteName = _site.SiteName,
+            LogoUrl = _site.LogoUrl,
+            PTALogoVariantUrl = _editPtaLogoVariantUrl,
+            DistrictLogoUrl = _editDistrictLogoUrl,
+            SchoolCrestUrl = _editSchoolCrestUrl,
+            PartnerLogoUrl = _editPartnerLogoUrl,
+            BannerUrl = _editBannerUrl,
+            HeaderText = _editHeaderText,
+            PrimaryColor = _editPrimaryColor,
+            AccentColor = _editAccentColor,
+            TopBarColor = _editTopBarColor,
+            FooterColor1 = _editFooterColor1,
+            FooterColor2 = _editFooterColor2,
+            FooterColor3 = _editFooterColor3,
+            FooterColor4 = _editFooterColor4,
+            MastheadLogoDefaultWidth = _editMastheadLogoDefaultWidth,
+            MastheadLogoDefaultHeight = _editMastheadLogoDefaultHeight,
+            GeneratedLogoWidth = _editGeneratedLogoWidth,
+            GeneratedLogoHeight = _editGeneratedLogoHeight,
+            GeneratedLogoPreserveAspectRatio = _editGeneratedLogoPreserveAspectRatio,
+            PtaVariantLogoWidth = _editPtaVariantLogoWidth,
+            PtaVariantLogoHeight = _editPtaVariantLogoHeight,
+            PtaVariantLogoPreserveAspectRatio = _editPtaVariantLogoPreserveAspectRatio,
+            DistrictLogoWidth = _editDistrictLogoWidth,
+            DistrictLogoHeight = _editDistrictLogoHeight,
+            DistrictLogoPreserveAspectRatio = _editDistrictLogoPreserveAspectRatio,
+            PartnerLogoWidth = _editPartnerLogoWidth,
+            PartnerLogoHeight = _editPartnerLogoHeight,
+            PartnerLogoPreserveAspectRatio = _editPartnerLogoPreserveAspectRatio,
+        };
+    }
+
+    // View-mode table cell: shows the per-logo override if set, otherwise
+    // the site's own default box, otherwise the hardcoded fallback —
+    // mirrors the same 3-level fallback SiteLayoutBase.LogoBoxStyle applies
+    // on the real page, so this always describes what's actually rendered.
+    private static string LogoSizeCell(int? logoValue, int? siteDefault, int hardcodedFallback) =>
+        logoValue?.ToString() ?? (siteDefault?.ToString() ?? $"({hardcodedFallback})");
+
+    private static string NormalizeColor(string? hex) =>
+        !string.IsNullOrWhiteSpace(hex) && hex.Length == 7 && hex[0] == '#' ? hex : "#000000";
+
+    private static MarkupString BrandingThumb(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return new MarkupString("—");
+
+        var src = System.Net.WebUtility.HtmlEncode(url);
+        return new MarkupString(
+            "<div class=\"d-flex align-items-center gap-2\">" +
+            $"<img src=\"{src}\" alt=\"\" class=\"img-thumbnail\" style=\"max-height:60px;max-width:200px;object-fit:contain;\" />" +
+            "<span class=\"text-muted small\">Uploaded</span></div>");
+    }
+
+    private static MarkupString ColorSwatch(string? hex)
+    {
+        if (string.IsNullOrWhiteSpace(hex))
+            return new MarkupString("—");
+
+        return new MarkupString(
+            $"<span style=\"display:inline-block;width:14px;height:14px;border:1px solid #ced4da;border-radius:3px;background:{hex};vertical-align:middle;\"></span> {hex}");
+    }
+
+    private async Task GenerateLogoAsync()
+    {
+        if (_site is null)
+            return;
+
+        _generatingLogo = true;
+        _logoError = null;
+
+        var result = await SiteAdminService.GeneratePtaLogoAsync(_site.Id);
+
+        _generatingLogo = false;
+
+        if (!result.Success)
+        {
+            _logoError = result.Error;
+            return;
+        }
+
+        _site.LogoUrl = result.Site!.LogoUrl;
+    }
+
+    // ---- Social Links ----
+    private void EnterEditSocial()
+    {
+        _editFacebookUrl = _site!.FaceBookURL;
+        _editGiveBacksUrl = _site.GiveBacksURL;
+        _editInstagramUrl = _site.InstagramURL;
+        _editTwitterUrl = _site.TwitterURL;
+        _editSignUpGeniusUrl = _site.SignUpGeniusURL;
+        _socialError = null;
+        _editingSocial = true;
+    }
+
+    private async Task SaveSocialAsync()
+    {
+        if (_site is null)
+            return;
+
+        _savingSocial = true;
+        _socialError = null;
+
+        var result = await SiteAdminService.UpdateSocialLinksAsync(
+            _site.Id, _editFacebookUrl, _editGiveBacksUrl, _editInstagramUrl, _editTwitterUrl, _editSignUpGeniusUrl);
+
+        _savingSocial = false;
+
+        if (!result.Success)
+        {
+            _socialError = result.Error;
+            return;
+        }
+
+        _site = result.Site;
+        _editingSocial = false;
     }
 
     private static string FormatDate(DateTimeOffset value) =>
         value.ToLocalTime().ToString("MMM d, yyyy h:mm tt");
+
+    private static string FormatDateOrDash(DateTimeOffset? value) =>
+        value?.ToLocalTime().ToString("MMM d, yyyy h:mm tt") ?? "—";
 
     private static string StatusBadgeClass(SiteStatus status) => status switch
     {

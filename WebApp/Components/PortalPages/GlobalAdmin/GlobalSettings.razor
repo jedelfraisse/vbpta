@@ -1,29 +1,139 @@
 @page "/globaladmin/system/global-settings"
 @layout SystemDeveloperLayout
+@using System.Security.Claims
+@using SiteEngine.Data
 @using SiteEngine.Entities
+@using SiteEngine.Enums
 @using WebApp.Services
 @inject DashboardService DashboardService
+@inject SetupService SetupService
+@inject SiteRoleResolver SiteRoleResolver
 
 <PageTitle>Global Settings — Global Admin</PageTitle>
 
 <h5 class="mb-3">Global Settings</h5>
 
-@if (_config is not null)
+@if (!_loaded)
 {
-    <dl class="row mb-0">
-        <dt class="col-sm-3">Portal Name</dt><dd class="col-sm-9">@_config.PortalName</dd>
-        <dt class="col-sm-3">Portal Domain</dt><dd class="col-sm-9">@_config.PortalDomain</dd>
-        <dt class="col-sm-3">SMTP Host</dt><dd class="col-sm-9">@_config.SmtpHost:@_config.SmtpPort</dd>
-        <dt class="col-sm-3">SMTP From</dt><dd class="col-sm-9">@_config.SmtpFromAddress</dd>
-    </dl>
-    <p class="text-muted small mt-2 mb-0">Editing these lives in the setup wizard for now.</p>
+    <p class="text-muted">Loading…</p>
+}
+else if (!_hasAccess)
+{
+    <div class="alert alert-warning">This page is restricted to SuperAdmins.</div>
+}
+else
+{
+    <div class="card shadow-sm mb-4 config-panel">
+        <div class="card-body">
+            <h6 class="card-title">Current Configuration</h6>
+            <div class="config-grid">
+                <ConfigItem Label="Portal Name" Value="@Display(_config?.PortalName)" />
+                <ConfigItem Label="Portal Domain" Value="@Display(_config?.PortalDomain)" />
+                <ConfigItem Label="SMTP Host" Value="@Display(_config is null ? null : $"{_config.SmtpHost}:{_config.SmtpPort}")" />
+                <ConfigItem Label="SMTP From" Value="@Display(_config?.SmtpFromAddress)" />
+            </div>
+            <p class="text-muted small mt-3 mb-0">SMTP settings are edited on the <a href="/globaladmin/system/email">Email Server</a> page.</p>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h6 class="card-title">Edit Global Settings</h6>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">Portal Name</label>
+                    <input class="form-control" @bind="_portalName" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Portal Domain</label>
+                    <input class="form-control" @bind="_portalDomain" placeholder="e.g. centralportal.org" />
+                </div>
+            </div>
+
+            @if (_saveError is not null)
+            {
+                <div class="alert alert-danger">@_saveError</div>
+            }
+            @if (_saveSucceeded)
+            {
+                <div class="alert alert-success">Global settings saved.</div>
+            }
+
+            <button class="btn btn-primary" disabled="@_busy" @onclick="SaveAsync">Save Changes</button>
+            <p class="text-muted small mt-2 mb-0">Takes effect immediately — no restart needed.</p>
+        </div>
+    </div>
 }
 
 @code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private bool _loaded;
+    private bool _hasAccess;
+    private bool _busy;
+    private bool _saveSucceeded;
+    private string? _saveError;
+
     private PortalConfig? _config;
+    private string _portalName = "";
+    private string _portalDomain = "";
 
     protected override async Task OnInitializedAsync()
     {
-        _config = await DashboardService.GetPortalConfigAsync();
+        var user = AuthState is null ? null : (await AuthState).User;
+        var identityUserId = user?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+
+        var portalRole = string.IsNullOrEmpty(identityUserId)
+            ? SiteRole.Viewer
+            : await SiteRoleResolver.ResolveAsync(identityUserId, SeedData.DefaultPortalSiteId);
+
+        _hasAccess = portalRole == SiteRole.SuperAdmin;
+
+        if (_hasAccess)
+            await LoadCurrentAsync();
+
+        _loaded = true;
     }
+
+    private async Task LoadCurrentAsync()
+    {
+        _config = await DashboardService.GetPortalConfigAsync();
+
+        if (_config is not null)
+        {
+            _portalName = _config.PortalName;
+            _portalDomain = _config.PortalDomain;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _busy = true;
+        _saveError = null;
+        _saveSucceeded = false;
+        try
+        {
+            if (string.IsNullOrWhiteSpace(_portalName))
+            {
+                _saveError = "Portal Name is required.";
+                return;
+            }
+
+            await SetupService.SavePortalInfoAsync(_portalName.Trim(), _portalDomain.Trim());
+
+            _saveSucceeded = true;
+            await LoadCurrentAsync();
+        }
+        catch (Exception ex)
+        {
+            _saveError = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string Display(string? value) => string.IsNullOrEmpty(value) ? "—" : value;
 }

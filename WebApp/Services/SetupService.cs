@@ -469,6 +469,52 @@ public class SetupService
 		}
 	}
 
+	// Backs the Global Settings page's own edit form — independent of
+	// SaveStepAsync (the one-time wizard) and of the SQL/SMTP pages above, so
+	// fixing a mistyped Portal Name/Domain doesn't touch either of those.
+	// Unlike the connection string and SMTP settings, RuntimeSiteContext
+	// re-reads PortalConfig fresh from the database on every request — no
+	// restart needed for a change here to take effect.
+	public async Task SavePortalInfoAsync(string portalName, string portalDomain)
+	{
+		await using var db = await _dbFactory.CreateDbContextAsync();
+
+		var cfg = await db.PortalConfigs.FirstOrDefaultAsync(c => c.Id == SeedData.DefaultGlobalConfigId)
+			?? throw new InvalidOperationException("PortalConfig not found.");
+
+		cfg.PortalName = portalName;
+		cfg.PortalDomain = portalDomain;
+
+		await db.SaveChangesAsync();
+	}
+
+	// Backs the Global Settings "Logo Template" panel. Box coordinates are
+	// percentages (0-100) of the template image's own width/height — see
+	// PortalConfig.LogoTemplateUrl. Setting a new templateUrl (or clearing it
+	// with null) doesn't touch any site's already-generated LogoUrl; admins
+	// re-run "Generate PTA Logo" per site (or it lazily regenerates) to pick
+	// up a changed template.
+	public async Task SaveLogoTemplateAsync(
+		string? templateUrl, double boxXPct, double boxYPct, double boxWidthPct, double boxHeightPct,
+		string fontFamily, string fontColor, string textAlign)
+	{
+		await using var db = await _dbFactory.CreateDbContextAsync();
+
+		var cfg = await db.PortalConfigs.FirstOrDefaultAsync(c => c.Id == SeedData.DefaultGlobalConfigId)
+			?? throw new InvalidOperationException("PortalConfig not found.");
+
+		cfg.LogoTemplateUrl = templateUrl;
+		cfg.LogoTemplateBoxXPct = boxXPct;
+		cfg.LogoTemplateBoxYPct = boxYPct;
+		cfg.LogoTemplateBoxWidthPct = boxWidthPct;
+		cfg.LogoTemplateBoxHeightPct = boxHeightPct;
+		cfg.LogoTemplateFontFamily = string.IsNullOrWhiteSpace(fontFamily) ? "Arial Black" : fontFamily.Trim();
+		cfg.LogoTemplateFontColor = string.IsNullOrWhiteSpace(fontColor) ? "#000000" : fontColor.Trim();
+		cfg.LogoTemplateTextAlign = string.IsNullOrWhiteSpace(textAlign) ? "Center" : textAlign.Trim();
+
+		await db.SaveChangesAsync();
+	}
+
 	// ------------------------------------------------------------
 	// 8. TRIGGER RESTART
 	// ------------------------------------------------------------

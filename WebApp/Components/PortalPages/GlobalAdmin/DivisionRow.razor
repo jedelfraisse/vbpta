@@ -4,6 +4,10 @@
 
 <div class="small">
     <div class="d-flex flex-wrap align-items-center gap-2">
+        @if (!string.IsNullOrWhiteSpace(Division.LogoUrl))
+        {
+            <img src="@Division.LogoUrl" alt="" style="height:32px; max-width:120px; object-fit:contain; border:1px solid #dee2e6; border-radius:4px; background:#fff; padding:2px;" />
+        }
         <a href="@($"/globaladmin/sites/{Division.Id}")" class="fw-semibold text-decoration-none">@Division.SiteName</a>
         <span class="badge @StatusBadgeClass(Division.SiteStatus)">@Division.SiteStatus</span>
         <span class="text-muted">(Local Units: @Division.ChildSites.Count)</span>

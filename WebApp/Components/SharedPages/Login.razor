@@ -34,8 +34,16 @@
 
         @if (!_codeSent)
         {
-            <button class="btn btn-primary w-100" @onclick="SendCodeAsync">
-                Send sign‑in code
+            <button class="btn btn-primary w-100" disabled="@_sending" @onclick="SendCodeAsync">
+                @if (_sending)
+                {
+                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    <span>Sending…</span>
+                }
+                else
+                {
+                    <span>Send sign‑in code</span>
+                }
             </button>
         }
         else
@@ -66,6 +74,7 @@
     private string _email = string.Empty;
     private string _code = string.Empty;
     private bool _codeSent;
+    private bool _sending;
     private string _statusMessage = string.Empty;
 
     protected override void OnParametersSet()
@@ -76,6 +85,15 @@
 
     private async Task SendCodeAsync()
     {
+        // Without this, the button gives no feedback at all while the SMTP
+        // send is in flight — on a slow/misconfigured mail server that can
+        // be tens of seconds of apparent nothing happening. See
+        // EmailLoginSender's SmtpClient.Timeout for why that wait is now
+        // capped much lower than it used to be.
+        _sending = true;
+        _statusMessage = string.Empty;
+        StateHasChanged();
+
         try
         {
             await PasswordlessSignInService.RequestCodeAsync(_email);
@@ -102,6 +120,10 @@
             // though — log it rather than swallowing it outright.
             Logger.LogError(ex, "Failed to send a sign-in code to {Email}", _email);
             _statusMessage = "We couldn't send a sign‑in code right now. Please try again in a few minutes.";
+        }
+        finally
+        {
+            _sending = false;
         }
     }
 

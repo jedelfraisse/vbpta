@@ -7,8 +7,6 @@ using SiteEngine.Data;
 using SiteEngine.Entities;
 using SiteEngine.Enums;
 using SiteEngine.Identity;
-using System.Net;
-using System.Net.Mail;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using WebApp.Models;
@@ -93,22 +91,10 @@ public class SetupService
 	// ------------------------------------------------------------
 	public async Task TestSmtpAsync(SetupSetupModel model)
 	{
-		using var client = new SmtpClient(model.SmtpHost, model.SmtpPort)
-		{
-			EnableSsl = model.SmtpUseSsl,
-			Credentials = new NetworkCredential(model.SmtpUsername, model.SmtpPassword)
-		};
-
-		var msg = new MailMessage
-		{
-			From = new MailAddress(model.SmtpFrom),
-			Subject = "PTA Setup: SMTP Test",
-			Body = "SMTP configuration is working."
-		};
-
-		msg.To.Add(model.SmtpFrom);
-
-		await client.SendMailAsync(msg);
+		await SmtpMailSender.SendAsync(
+			model.SmtpHost, model.SmtpPort, model.SmtpUseSsl, model.SmtpUsername, model.SmtpPassword,
+			model.SmtpFrom, replyToAddress: null, toAddresses: [model.SmtpFrom],
+			"PTA Setup: SMTP Test", "SMTP configuration is working.");
 	}
 
 	// ------------------------------------------------------------
@@ -121,22 +107,10 @@ public class SetupService
 
 		var smtp = await LoadSmtpSettingsAsync();
 
-		using var client = new SmtpClient(smtp.Host, smtp.Port)
-		{
-			EnableSsl = smtp.UseSsl,
-			Credentials = new NetworkCredential(smtp.User, smtp.Password)
-		};
-
-		var msg = new MailMessage
-		{
-			From = new MailAddress(smtp.From),
-			Subject = "PTA Setup: Admin Verification Code",
-			Body = $"Your verification code is: {code}"
-		};
-
-		msg.To.Add(adminEmail);
-
-		await client.SendMailAsync(msg);
+		await SmtpMailSender.SendAsync(
+			smtp.Host, smtp.Port, smtp.UseSsl, smtp.User, smtp.Password,
+			smtp.From, replyToAddress: null, toAddresses: [adminEmail],
+			"PTA Setup: Admin Verification Code", $"Your verification code is: {code}");
 	}
 
 	private async Task<(string Host, int Port, string User, string Password, string From, bool UseSsl)> LoadSmtpSettingsAsync()
@@ -438,26 +412,12 @@ public class SetupService
 
 			var password = _protector.Unprotect(cfg.SmtpPassword);
 
-			using var client = new SmtpClient(cfg.SmtpHost, cfg.SmtpPort)
-			{
-				EnableSsl = cfg.UseSsl,
-				Credentials = new NetworkCredential(cfg.SmtpUsername, password)
-			};
-
-			var msg = new MailMessage
-			{
-				From = new MailAddress(cfg.SmtpFromAddress),
-				Subject = "Global Admin: SMTP test email",
-				Body = "This is a test message sent from Global Admin → System & Developer → System Settings → Email Server. " +
-					"If you received this, the saved SMTP configuration is working."
-			};
-
-			if (!string.IsNullOrWhiteSpace(cfg.SmtpReplyToAddress))
-				msg.ReplyToList.Add(new MailAddress(cfg.SmtpReplyToAddress));
-
-			msg.To.Add(toEmail);
-
-			await client.SendMailAsync(msg);
+			await SmtpMailSender.SendAsync(
+				cfg.SmtpHost, cfg.SmtpPort, cfg.UseSsl, cfg.SmtpUsername, password,
+				cfg.SmtpFromAddress, cfg.SmtpReplyToAddress, toAddresses: [toEmail],
+				"Global Admin: SMTP test email",
+				"This is a test message sent from Global Admin → System & Developer → System Settings → Email Server. " +
+					"If you received this, the saved SMTP configuration is working.");
 
 			_diagnostics.RecordEmailTest(succeeded: true);
 			return (true, null);

@@ -2,8 +2,6 @@
 using Microsoft.EntityFrameworkCore;
 using SiteEngine.Data;
 using SiteEngine.Entities;
-using System.Net;
-using System.Net.Mail;
 using WebApp.Services;
 
 namespace WebApp.Authentication;
@@ -33,12 +31,6 @@ public class EmailLoginSender : IEmailLoginSender
 		// Decrypt password
 		var smtpPassword = _protector.Unprotect(cfg.SmtpPassword);
 
-		using var client = new SmtpClient(cfg.SmtpHost, cfg.SmtpPort)
-		{
-			EnableSsl = cfg.UseSsl,
-			Credentials = new NetworkCredential(cfg.SmtpUsername, smtpPassword)
-		};
-
 		var (subject, intro) = template switch
 		{
 			LoginEmailTemplate.Welcome => ("Welcome — here's your sign-in code", "Welcome! We're glad you're here."),
@@ -46,15 +38,14 @@ public class EmailLoginSender : IEmailLoginSender
 			_ => throw new ArgumentOutOfRangeException(nameof(template), template, null)
 		};
 
-		var message = new MailMessage(cfg.SmtpFromAddress, email)
-		{
-			Subject = subject,
-			Body = $"{intro}\n\n" +
-				$"Your login code is: {code}\n\n" +
-				$"This code will expire in {PasswordlessCodeStore.Lifetime.TotalMinutes:0} minutes. " +
-				"If you didn't request this code, you can safely ignore this email."
-		};
+		var body = $"{intro}\n\n" +
+			$"Your login code is: {code}\n\n" +
+			$"This code will expire in {PasswordlessCodeStore.Lifetime.TotalMinutes:0} minutes. " +
+			"If you didn't request this code, you can safely ignore this email.";
 
-		await client.SendMailAsync(message, cancellationToken);
+		await SmtpMailSender.SendAsync(
+			cfg.SmtpHost, cfg.SmtpPort, cfg.UseSsl, cfg.SmtpUsername, smtpPassword,
+			cfg.SmtpFromAddress, replyToAddress: null, toAddresses: [email],
+			subject, body, cancellationToken);
 	}
 }

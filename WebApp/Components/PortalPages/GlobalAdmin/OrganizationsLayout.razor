@@ -1,0 +1,13 @@
+@layout GlobalAdminLayout
+@inherits LayoutComponentBase
+
+<div class="ga-section">
+    <nav class="ga-section-nav" aria-label="Organizations">
+        <NavLink class="ga-section-link" href="/globaladmin/organizations" Match="NavLinkMatch.All">Organization Types</NavLink>
+        <NavLink class="ga-section-link" href="/globaladmin/organizations/list">Organizations</NavLink>
+        <NavLink class="ga-section-link" href="/globaladmin/organizations/access">Parent Access Grants</NavLink>
+    </nav>
+    <div class="ga-section-content">
+        @Body
+    </div>
+</div>

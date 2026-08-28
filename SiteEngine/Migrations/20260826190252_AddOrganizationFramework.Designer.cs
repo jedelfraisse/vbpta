@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SiteEngine.Data;
 
@@ -11,9 +12,11 @@ using SiteEngine.Data;
 namespace SiteEngine.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260826190252_AddOrganizationFramework")]
+    partial class AddOrganizationFramework
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -318,10 +321,6 @@ namespace SiteEngine.Migrations
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<string>("IdentifierValue")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -353,10 +352,6 @@ namespace SiteEngine.Migrations
                     b.HasIndex("SiteId")
                         .IsUnique()
                         .HasFilter("[SiteId] IS NOT NULL");
-
-                    b.HasIndex("OrganizationTypeId", "IdentifierValue")
-                        .IsUnique()
-                        .HasFilter("[IdentifierValue] IS NOT NULL");
 
                     b.ToTable("Organizations", (string)null);
                 });
@@ -411,13 +406,6 @@ namespace SiteEngine.Migrations
                     b.Property<string>("IconClass")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("IdentifierLabel")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<int>("IdentifierRequirement")
-                        .HasColumnType("int");
 
                     b.Property<string>("Name")
                         .IsRequired()

@@ -1,0 +1,264 @@
+@page "/globaladmin/organizations/list/{Id:guid}"
+@layout OrganizationsLayout
+@using SiteEngine.Entities
+@using SiteEngine.Enums
+@using WebApp.Components.Dashboard
+@using WebApp.Services
+@inject OrganizationService OrganizationService
+@inject NavigationManager NavigationManager
+
+<PageTitle>@(_org?.Name ?? "Organization") — Global Admin</PageTitle>
+
+@if (!_loaded)
+{
+    <p class="text-muted">Loading...</p>
+}
+else if (_org is null)
+{
+    <p class="text-muted">Organization not found.</p>
+    <a href="/globaladmin/organizations/list">&larr; Back to Organizations</a>
+}
+else
+{
+    <div class="d-flex align-items-center gap-2 mb-1">
+        <a href="/globaladmin/organizations/list" class="text-muted small">&larr; Organizations</a>
+    </div>
+    <h5 class="mb-1">@_org.Name</h5>
+    <p class="text-muted small mb-3">
+        @_org.OrganizationTypeName &middot; @_org.OrganizationLevelName
+        @if (!string.IsNullOrWhiteSpace(_org.IdentifierValue))
+        {
+            <text> &middot; @(_type?.IdentifierLabel ?? "Identifier"): @_org.IdentifierValue</text>
+        }
+    </p>
+
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <button type="button" class="nav-link @(_activeTab == Tab.Description ? "active" : "")" @onclick='() => _activeTab = Tab.Description'>
+                Description
+            </button>
+        </li>
+        <li class="nav-item">
+            <button type="button" class="nav-link @(_activeTab == Tab.Branding ? "active" : "")" @onclick='() => _activeTab = Tab.Branding'>
+                Branding
+            </button>
+        </li>
+    </ul>
+
+    @if (_activeTab == Tab.Description)
+    {
+        @if (_error is not null)
+        {
+            <div class="alert alert-danger">@_error</div>
+        }
+
+        <div class="row g-2" style="max-width: 720px;">
+            <div class="col-md-6">
+                <label class="form-label">Name</label>
+                <input class="form-control" @bind="_name" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Level</label>
+                <select class="form-select" @bind="_levelId">
+                    @foreach (var level in _levels)
+                    {
+                        <option value="@level.Id">@level.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Parent (optional)</label>
+                <select class="form-select" @bind="_parentId">
+                    <option value="">(none — top of hierarchy)</option>
+                    @foreach (var candidate in _organizationsOfType.Where(o => o.Id != _org.Id))
+                    {
+                        <option value="@candidate.Id">@candidate.Name (@candidate.OrganizationLevelName)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Site (optional)</label>
+                <select class="form-select" @bind="_siteId">
+                    <option value="">(none)</option>
+                    @if (_org.SiteId is not null)
+                    {
+                        <option value="@_org.SiteId">@_org.SiteName (current)</option>
+                    }
+                    @foreach (var site in _unlinkedSites)
+                    {
+                        <option value="@site.Id">@site.SiteName</option>
+                    }
+                </select>
+            </div>
+            @if (_type is { IdentifierRequirement: not IdentifierRequirement.NotUsed })
+            {
+                <div class="col-md-6">
+                    <label class="form-label">
+                        @(_type.IdentifierLabel ?? "Identifier")
+                        @if (_type.IdentifierRequirement == IdentifierRequirement.Required)
+                        {
+                            <span class="text-danger">*</span>
+                        }
+                    </label>
+                    <input class="form-control" @bind="_identifierValue" />
+                </div>
+            }
+        </div>
+        <div class="mt-3 d-flex gap-2">
+            <button type="button" class="btn btn-primary btn-sm" disabled="@_saving" @onclick="SaveAsync">Save</button>
+            <button type="button" class="btn btn-outline-danger btn-sm" @onclick="DeleteAsync">Delete Organization</button>
+        </div>
+
+        @if (ChildOrganizations.Count > 0)
+        {
+            <hr class="my-4" />
+            <h6>Child Organizations (@ChildOrganizations.Count)</h6>
+            <p class="text-muted small">
+                Deleting this Organization is blocked while these exist — reparent or delete them first.
+            </p>
+            <div class="d-flex flex-wrap gap-2">
+                @foreach (var child in ChildOrganizations)
+                {
+                    <a class="badge text-bg-light border" href="@($"/globaladmin/organizations/list/{child.Id}")">
+                        @child.Name (@child.OrganizationLevelName)
+                    </a>
+                }
+            </div>
+        }
+
+        @if (_grants.Count > 0)
+        {
+            <hr class="my-4" />
+            <h6>Parent Access Grants (@_grants.Count)</h6>
+            <p class="text-muted small">
+                Deleting this Organization also removes these grants — they're not a separate blocker.
+            </p>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead>
+                        <tr><th>Direction</th><th>Other Organization</th><th>Access Level</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var grant in _grants)
+                        {
+                            var isParent = grant.ParentOrganizationId == _org.Id;
+                            <tr>
+                                <td>@(isParent ? "Grants access to" : "Receives access from")</td>
+                                <td>
+                                    <a href="@($"/globaladmin/organizations/list/{(isParent ? grant.ChildOrganizationId : grant.ParentOrganizationId)}")">
+                                        @(isParent ? grant.ChildOrganizationName : grant.ParentOrganizationName)
+                                    </a>
+                                </td>
+                                <td>@grant.AccessLevel</td>
+                                <td class="text-end">
+                                    <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => RevokeGrantAsync(grant.Id)">Revoke</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+    else if (_activeTab == Tab.Branding)
+    {
+        <ComingSoonBox Title="Branding" Description="Theme colors, logos, and other site branding for this Organization — coming in a later phase." />
+    }
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private enum Tab { Description, Branding }
+    private Tab _activeTab = Tab.Description;
+
+    private bool _loaded;
+    private bool _saving;
+    private string? _error;
+    private OrganizationSummary? _org;
+    private OrganizationTypeSummary? _type;
+    private List<OrganizationLevelSummary> _levels = new();
+    private List<OrganizationSummary> _organizationsOfType = new();
+    private List<Site> _unlinkedSites = new();
+    private List<ParentAccessGrantSummary> _grants = new();
+
+    private List<OrganizationSummary> ChildOrganizations =>
+        _org is null ? new() : _organizationsOfType.Where(o => o.ParentOrganizationId == _org.Id).ToList();
+
+    private string _name = "";
+    private Guid _levelId;
+    private string _parentId = "";
+    private string _siteId = "";
+    private string _identifierValue = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _org = await OrganizationService.GetOrganizationAsync(Id);
+        if (_org is not null)
+        {
+            _name = _org.Name;
+            _levelId = _org.OrganizationLevelId;
+            _parentId = _org.ParentOrganizationId?.ToString() ?? "";
+            _siteId = _org.SiteId?.ToString() ?? "";
+            _identifierValue = _org.IdentifierValue ?? "";
+
+            _type = await OrganizationService.GetOrganizationTypeAsync(_org.OrganizationTypeId);
+            _levels = await OrganizationService.GetLevelsAsync(_org.OrganizationTypeId);
+            _organizationsOfType = await OrganizationService.GetOrganizationsAsync(_org.OrganizationTypeId);
+            _unlinkedSites = await OrganizationService.GetUnlinkedSitesAsync();
+            _grants = await OrganizationService.GetGrantsInvolvingAsync(_org.Id);
+        }
+        _loaded = true;
+    }
+
+    private async Task RevokeGrantAsync(Guid grantId)
+    {
+        _error = null;
+        var result = await OrganizationService.DeleteGrantAsync(grantId);
+        if (!result.Success)
+        {
+            _error = result.Error;
+            return;
+        }
+        if (_org is not null)
+            _grants = await OrganizationService.GetGrantsInvolvingAsync(_org.Id);
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_org is null) return;
+
+        _saving = true;
+        _error = null;
+
+        Guid? parentOrganizationId = Guid.TryParse(_parentId, out var pid) ? pid : null;
+        Guid? siteId = Guid.TryParse(_siteId, out var sid) ? sid : null;
+
+        var result = await OrganizationService.UpdateOrganizationAsync(_org.Id, _name, _levelId, parentOrganizationId, siteId, _identifierValue);
+        _saving = false;
+
+        if (!result.Success)
+        {
+            _error = result.Error;
+            return;
+        }
+
+        _org = await OrganizationService.GetOrganizationAsync(Id);
+        _unlinkedSites = await OrganizationService.GetUnlinkedSitesAsync();
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (_org is null) return;
+
+        _error = null;
+        var result = await OrganizationService.DeleteOrganizationAsync(_org.Id);
+        if (!result.Success)
+        {
+            _error = result.Error;
+            return;
+        }
+
+        NavigationManager.NavigateTo("/globaladmin/organizations/list");
+    }
+}

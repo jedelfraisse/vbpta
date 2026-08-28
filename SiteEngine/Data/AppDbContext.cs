@@ -28,6 +28,11 @@ public DbSet<ToolPermission> ToolPermissions { get; set; }
 public DbSet<LoginHistory> LoginHistories => Set<LoginHistory>();
 public DbSet<LoginHistorySummary> LoginHistorySummaries => Set<LoginHistorySummary>();
 public DbSet<BannedEmail> BannedEmails => Set<BannedEmail>();
+public DbSet<OrganizationType> OrganizationTypes => Set<OrganizationType>();
+public DbSet<OrganizationLevel> OrganizationLevels => Set<OrganizationLevel>();
+public DbSet<Organization> Organizations => Set<Organization>();
+public DbSet<OperationalCycle> OperationalCycles => Set<OperationalCycle>();
+public DbSet<ParentAccessGrant> ParentAccessGrants => Set<ParentAccessGrant>();
 
 
 	protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -118,6 +123,20 @@ public DbSet<BannedEmail> BannedEmails => Set<BannedEmail>();
 			entity.Property(x => x.LogoTemplateFontFamily).HasMaxLength(100).IsRequired();
 			entity.Property(x => x.LogoTemplateFontColor).HasMaxLength(20).IsRequired();
 			entity.Property(x => x.LogoTemplateTextAlign).HasMaxLength(20).IsRequired();
+		});
+
+		// ---------------------------
+		// OrganizationType
+		// ---------------------------
+		modelBuilder.Entity<OrganizationType>(entity =>
+		{
+			entity.ToTable("OrganizationTypes");
+			entity.HasKey(x => x.Id);
+
+			entity.Property(x => x.Name).HasMaxLength(100).IsRequired();
+			entity.Property(x => x.Description).HasMaxLength(2000).IsRequired();
+			entity.Property(x => x.IconClass).HasMaxLength(100);
+			entity.Property(x => x.IdentifierLabel).HasMaxLength(100);
 		});
 
 		// ---------------------------
@@ -252,6 +271,120 @@ public DbSet<BannedEmail> BannedEmails => Set<BannedEmail>();
 				.WithMany()
 				.HasForeignKey(x => x.SiteId)
 				.OnDelete(DeleteBehavior.Restrict);
+		});
+
+		// ---------------------------
+		// OrganizationLevel
+		// ---------------------------
+		modelBuilder.Entity<OrganizationLevel>(entity =>
+		{
+			entity.ToTable("OrganizationLevels");
+			entity.HasKey(x => x.Id);
+
+			entity.Property(x => x.Name).HasMaxLength(128).IsRequired();
+
+			entity.HasOne(x => x.OrganizationType)
+				.WithMany()
+				.HasForeignKey(x => x.OrganizationTypeId)
+				.OnDelete(DeleteBehavior.Restrict);
+
+			// A level name only needs to be unique within its own Organization
+			// Type — "Council" can exist for both PTA and a different type.
+			entity.HasIndex(x => new { x.OrganizationTypeId, x.Name }).IsUnique();
+		});
+
+		// ---------------------------
+		// Organization
+		// ---------------------------
+		modelBuilder.Entity<Organization>(entity =>
+		{
+			entity.ToTable("Organizations");
+			entity.HasKey(x => x.Id);
+
+			entity.Property(x => x.Name).HasMaxLength(256).IsRequired();
+			entity.Property(x => x.IdentifierValue).HasMaxLength(64);
+
+			entity.HasOne(x => x.OrganizationType)
+				.WithMany()
+				.HasForeignKey(x => x.OrganizationTypeId)
+				.OnDelete(DeleteBehavior.Restrict);
+
+			entity.HasOne(x => x.OrganizationLevel)
+				.WithMany()
+				.HasForeignKey(x => x.OrganizationLevelId)
+				.OnDelete(DeleteBehavior.Restrict);
+
+			entity.HasOne(x => x.ParentOrganization)
+				.WithMany(x => x.ChildOrganizations)
+				.HasForeignKey(x => x.ParentOrganizationId)
+				.OnDelete(DeleteBehavior.Restrict);
+
+			// SetNull (not Restrict) — deleting a Site should orphan the
+			// Organization's SiteId, not block the delete or take the
+			// Organization down with it. An Organization outliving its Site is
+			// exactly the "0 or 1 Site" relationship this framework models.
+			entity.HasOne(x => x.Site)
+				.WithMany()
+				.HasForeignKey(x => x.SiteId)
+				.OnDelete(DeleteBehavior.SetNull);
+
+			// An Organization has at most one Site, so the reverse direction
+			// needs enforcing too — filtered so multiple NULLs (the common case
+			// for non-site-eligible Organizations) don't collide under the
+			// unique constraint.
+			entity.HasIndex(x => x.SiteId).IsUnique().HasFilter("[SiteId] IS NOT NULL");
+
+			// Unique within its own Organization Type, not globally — two
+			// different Types can run entirely separate numbering schemes
+			// without colliding (see Organization.IdentifierValue).
+			entity.HasIndex(x => new { x.OrganizationTypeId, x.IdentifierValue })
+				.IsUnique()
+				.HasFilter("[IdentifierValue] IS NOT NULL");
+
+			entity.HasIndex(x => x.ParentOrganizationId);
+			entity.HasIndex(x => x.OrganizationTypeId);
+		});
+
+		// ---------------------------
+		// OperationalCycle
+		// ---------------------------
+		modelBuilder.Entity<OperationalCycle>(entity =>
+		{
+			entity.ToTable("OperationalCycles");
+			entity.HasKey(x => x.Id);
+
+			entity.Property(x => x.CycleTypeName).HasMaxLength(128).IsRequired();
+			entity.Property(x => x.DisplayLabel).HasMaxLength(128).IsRequired();
+
+			entity.HasOne(x => x.OrganizationType)
+				.WithMany()
+				.HasForeignKey(x => x.OrganizationTypeId)
+				.OnDelete(DeleteBehavior.Restrict);
+
+			entity.HasIndex(x => x.OrganizationTypeId);
+		});
+
+		// ---------------------------
+		// ParentAccessGrant
+		// ---------------------------
+		modelBuilder.Entity<ParentAccessGrant>(entity =>
+		{
+			entity.ToTable("ParentAccessGrants");
+			entity.HasKey(x => x.Id);
+
+			entity.HasOne(x => x.ParentOrganization)
+				.WithMany()
+				.HasForeignKey(x => x.ParentOrganizationId)
+				.OnDelete(DeleteBehavior.Restrict);
+
+			entity.HasOne(x => x.ChildOrganization)
+				.WithMany()
+				.HasForeignKey(x => x.ChildOrganizationId)
+				.OnDelete(DeleteBehavior.Restrict);
+
+			// One grant per (parent, child) pair — revoking access deletes the
+			// row rather than leaving a second, conflicting one behind.
+			entity.HasIndex(x => new { x.ParentOrganizationId, x.ChildOrganizationId }).IsUnique();
 		});
 
 		// ---------------------------

@@ -1,0 +1,182 @@
+@page "/globaladmin/organizations/access"
+@layout OrganizationsLayout
+@using SiteEngine.Enums
+@using WebApp.Services
+@inject OrganizationService OrganizationService
+
+<PageTitle>Parent Access Grants — Global Admin</PageTitle>
+
+<h5 class="mb-3">Parent Access Grants</h5>
+<p class="text-muted">
+    The only mechanism for cross-organization access — nothing is inherited automatically. Deleting a
+    grant revokes access entirely; there's no separate "Disabled" state to set.
+</p>
+
+@if (_organizations.Count < 2)
+{
+    <p class="text-muted">Add at least two <a href="/globaladmin/organizations/list">Organizations</a> first.</p>
+}
+else
+{
+    @if (_error is not null)
+    {
+        <div class="alert alert-danger">@_error</div>
+    }
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <h6 class="card-title">Grant Access</h6>
+            <div class="row g-2">
+                <div class="col-md-4">
+                    <label class="form-label">Parent Organization</label>
+                    <select class="form-select" @bind="_parentId">
+                        @foreach (var org in _organizations)
+                        {
+                            <option value="@org.Id">@org.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Child Organization</label>
+                    <select class="form-select" @bind="_childId">
+                        @foreach (var org in _organizations)
+                        {
+                            <option value="@org.Id">@org.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Access Level</label>
+                    <select class="form-select" @bind="_accessLevel">
+                        @foreach (var level in Enum.GetValues<AccessLevel>())
+                        {
+                            <option value="@level">@level</option>
+                        }
+                    </select>
+                </div>
+            </div>
+            <div class="mt-3">
+                <button type="button" class="btn btn-primary btn-sm" disabled="@_saving" @onclick="GrantAsync">Grant</button>
+            </div>
+        </div>
+    </div>
+
+    @if (!_loaded)
+    {
+        <p class="text-muted">Loading...</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th>Parent</th>
+                        <th>Child</th>
+                        <th>Access Level</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var grant in _grants)
+                    {
+                        <tr>
+                            <td>@grant.ParentOrganizationName</td>
+                            <td>@grant.ChildOrganizationName</td>
+                            <td>
+                                <select class="form-select form-select-sm" style="width: auto;"
+                                        value="@grant.AccessLevel" @onchange="e => ChangeLevelAsync(grant.Id, e.Value)">
+                                    @foreach (var level in Enum.GetValues<AccessLevel>())
+                                    {
+                                        <option value="@level">@level</option>
+                                    }
+                                </select>
+                            </td>
+                            <td class="text-end">
+                                <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => RevokeAsync(grant.Id)">Revoke</button>
+                            </td>
+                        </tr>
+                    }
+                    @if (_grants.Count == 0)
+                    {
+                        <tr><td colspan="4" class="text-muted">None yet — no Organization has access to any other.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+@code {
+    private bool _loaded;
+    private bool _saving;
+    private string? _error;
+
+    private List<OrganizationSummary> _organizations = new();
+    private List<ParentAccessGrantSummary> _grants = new();
+
+    private Guid _parentId;
+    private Guid _childId;
+    private AccessLevel _accessLevel = AccessLevel.View;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _organizations = await OrganizationService.GetOrganizationsAsync();
+        if (_organizations.Count > 0)
+            _parentId = _organizations[0].Id;
+        if (_organizations.Count > 1)
+            _childId = _organizations[1].Id;
+
+        await ReloadGrantsAsync();
+    }
+
+    private async Task ReloadGrantsAsync()
+    {
+        _grants = await OrganizationService.GetGrantsAsync();
+        _loaded = true;
+    }
+
+    private async Task GrantAsync()
+    {
+        _saving = true;
+        _error = null;
+
+        var result = await OrganizationService.CreateGrantAsync(_parentId, _childId, _accessLevel);
+        _saving = false;
+
+        if (!result.Success)
+        {
+            _error = result.Error;
+            return;
+        }
+
+        await ReloadGrantsAsync();
+    }
+
+    private async Task ChangeLevelAsync(Guid grantId, object? value)
+    {
+        _error = null;
+        if (value is not string s || !Enum.TryParse<AccessLevel>(s, out var level))
+            return;
+
+        var result = await OrganizationService.UpdateGrantAsync(grantId, level);
+        if (!result.Success)
+        {
+            _error = result.Error;
+            return;
+        }
+        await ReloadGrantsAsync();
+    }
+
+    private async Task RevokeAsync(Guid grantId)
+    {
+        _error = null;
+        var result = await OrganizationService.DeleteGrantAsync(grantId);
+        if (!result.Success)
+        {
+            _error = result.Error;
+            return;
+        }
+        await ReloadGrantsAsync();
+    }
+}

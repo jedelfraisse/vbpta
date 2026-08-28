@@ -23,13 +23,36 @@ It must feel **inclusive**, **organizational**, and **open to all groups**.
 
 ## **1. Site Hierarchy**
 
-Only two site types exist (SiteEngine/Enums/SiteType.cs):
+`SiteType` (SiteEngine/Enums/SiteType.cs) still has exactly two real levels today, unchanged:
 
 Portal → Division → Local Unit
 
-Division — e.g., Chesapeake, Norfolk, VB  
-Local Unit — e.g., Luxford ES, Tallwood ES  
+Division — e.g., Chesapeake, Norfolk, VB
+Local Unit — e.g., Luxford ES, Tallwood ES
 “Group” is never a site type. Always say “Division” when referring to a site.
+
+This is still literally how hostname/site resolution works (`RuntimeSiteContext`, `SiteContextResolver`) — that hasn't changed. But it is **no longer the source of truth for organizational modeling**. See §1a — a PTA's real hierarchy (or a Scout troop's, or a billiards league's) is now expressed through `Organization`/`OrganizationLevel`, which supports any depth and any Organization Type, not just this fixed two-level shape. Don't add a third `SiteType` value to model a deeper hierarchy — that's what the Organization Framework is for.
+
+---
+
+## **1a. Organization Framework**
+
+As of Phase 1 (see [md/OrganizationFramework.md](md/OrganizationFramework.md) and [md/OrganizationFramework-Phase1.md](md/OrganizationFramework-Phase1.md)), the portal has a second, richer model layered on top of Site:
+
+- **Organization** (SiteEngine/Entities/Organization.cs) — the community itself: identity, self-referencing parent/child hierarchy, and an optional 0-or-1 link to a `Site`. Always exists once a community is created, regardless of whether it has a hosted website.
+- **OrganizationLevel** — a position within an Organization Type's hierarchy (data-driven, not an enum — "National", "Council", "Unit" for PTA; "Network", "League", "Team" for a billiards community). A level is a classification an Organization references, not a layer it lives under.
+- **OrganizationType** — enhanced from its original minimal form; now owns its Levels and Operational Cycles.
+- **OperationalCycle** — a structured, dated operating period (StartDate/EndDate/DisplayLabel/Type), generalizing what `SchoolYear` used to assume for everyone.
+- **ParentAccessGrant** — the *only* mechanism for cross-organization access (View/Participation/Administrative). There is no implicit privilege cascade — holding a role on a parent grants nothing on a child unless a grant row says so.
+
+Managed at Global Admin → Organizations (`/globaladmin/organizations/**`, `OrganizationService`).
+
+**What Phase 1 deliberately did NOT touch** — still working exactly as before, don't assume otherwise:
+- `SiteUser`/`SiteUserRole`/`CustomRole`/`BoardPosition` and `SiteRoleResolver` — still `Site`-scoped, still keyed by the `SchoolYear` string. Membership migration to Organization-scoping is analysis-only so far, a later phase's work.
+- Site/hostname resolution (`RuntimeSiteContext`, `SiteContextResolver`) — still resolves directly against `Site`, not through `Organization`.
+- §2's Groups (permission bundles) — still a documented-but-unimplemented concept, unrelated to `ParentAccessGrant`.
+
+Existing Division/Local Unit `Site` rows are backfilled into Organizations automatically on startup (`SeedData.BackfillOrganizations`) — the Portal site is deliberately excluded, since it isn't a community in this model.
 
 ---
 

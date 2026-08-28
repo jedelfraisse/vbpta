@@ -1,0 +1,176 @@
+@page "/globaladmin/organizations/types/{Id:int}"
+@layout OrganizationsLayout
+@using SiteEngine.Enums
+@using WebApp.Services
+@inject OrganizationService OrganizationService
+@inject NavigationManager NavigationManager
+
+<PageTitle>@(_type?.Name ?? "Organization Type") — Global Admin</PageTitle>
+
+@if (!_loaded)
+{
+    <p class="text-muted">Loading...</p>
+}
+else if (_type is null)
+{
+    <p class="text-muted">Organization Type not found.</p>
+    <a href="/globaladmin/organizations">&larr; Back to Organization Types</a>
+}
+else
+{
+    <div class="d-flex align-items-center gap-2 mb-1">
+        <a href="/globaladmin/organizations" class="text-muted small">&larr; Organization Types</a>
+    </div>
+    <h5 class="mb-3">
+        @if (!string.IsNullOrWhiteSpace(_type.IconClass))
+        {
+            <i class="@_type.IconClass me-2" aria-hidden="true"></i>
+        }
+        @_type.Name
+    </h5>
+
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <button type="button" class="nav-link @(_activeTab == Tab.Description ? "active" : "")" @onclick='() => _activeTab = Tab.Description'>
+                Description
+            </button>
+        </li>
+        <li class="nav-item">
+            <button type="button" class="nav-link @(_activeTab == Tab.Levels ? "active" : "")" @onclick='() => _activeTab = Tab.Levels'>
+                Levels (@_type.LevelCount)
+            </button>
+        </li>
+        <li class="nav-item">
+            <button type="button" class="nav-link @(_activeTab == Tab.Cycles ? "active" : "")" @onclick='() => _activeTab = Tab.Cycles'>
+                Operational Cycles
+            </button>
+        </li>
+    </ul>
+
+    @if (_activeTab == Tab.Description)
+    {
+        @if (_error is not null)
+        {
+            <div class="alert alert-danger">@_error</div>
+        }
+
+        <div class="row g-2" style="max-width: 640px;">
+            <div class="col-md-6">
+                <label class="form-label">Name</label>
+                <input class="form-control" @bind="_name" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Icon Class</label>
+                <input class="form-control" @bind="_iconClass" placeholder="fa-solid fa-..." />
+            </div>
+            <div class="col-md-9">
+                <label class="form-label">Description</label>
+                <textarea class="form-control" rows="3" @bind="_description"></textarea>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Sort Order</label>
+                <input class="form-control" type="number" @bind="_sortOrder" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Organization ID</label>
+                <select class="form-select" @bind="_identifierRequirement">
+                    <option value="@IdentifierRequirement.NotUsed">Not needed</option>
+                    <option value="@IdentifierRequirement.Optional">Optional</option>
+                    <option value="@IdentifierRequirement.Required">Required</option>
+                </select>
+                <div class="form-text">
+                    Whether Organizations of this Type carry their own external ID — like PTA's familiar "00000000" PTA ID #.
+                </div>
+            </div>
+            @if (_identifierRequirement != IdentifierRequirement.NotUsed)
+            {
+                <div class="col-md-6">
+                    <label class="form-label">ID Label</label>
+                    <input class="form-control" @bind="_identifierLabel" placeholder="PTA ID #" />
+                    <div class="form-text">What to call it on the Organization form. Defaults to "Identifier" if left blank.</div>
+                </div>
+            }
+        </div>
+        <div class="mt-3 d-flex gap-2">
+            <button type="button" class="btn btn-primary btn-sm" disabled="@_saving" @onclick="SaveDescriptionAsync">Save</button>
+            <button type="button" class="btn btn-outline-danger btn-sm" @onclick="DeleteAsync">Delete Organization Type</button>
+        </div>
+    }
+    else if (_activeTab == Tab.Levels)
+    {
+        <OrganizationLevelsPanel OrganizationTypeId="_type.Id" />
+    }
+    else if (_activeTab == Tab.Cycles)
+    {
+        <OperationalCyclesPanel OrganizationTypeId="_type.Id" />
+    }
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private enum Tab { Description, Levels, Cycles }
+    private Tab _activeTab = Tab.Description;
+
+    private bool _loaded;
+    private bool _saving;
+    private string? _error;
+    private OrganizationTypeSummary? _type;
+
+    private string _name = "";
+    private string _description = "";
+    private string _iconClass = "";
+    private int _sortOrder;
+    private IdentifierRequirement _identifierRequirement;
+    private string _identifierLabel = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _type = await OrganizationService.GetOrganizationTypeAsync(Id);
+        if (_type is not null)
+        {
+            _name = _type.Name;
+            _description = _type.Description;
+            _iconClass = _type.IconClass ?? "";
+            _sortOrder = _type.SortOrder;
+            _identifierRequirement = _type.IdentifierRequirement;
+            _identifierLabel = _type.IdentifierLabel ?? "";
+        }
+        _loaded = true;
+    }
+
+    private async Task SaveDescriptionAsync()
+    {
+        if (_type is null) return;
+
+        _saving = true;
+        _error = null;
+
+        var result = await OrganizationService.UpdateOrganizationTypeAsync(
+            _type.Id, _name, _description, _iconClass, _sortOrder, _identifierRequirement, _identifierLabel);
+        _saving = false;
+
+        if (!result.Success)
+        {
+            _error = result.Error;
+            return;
+        }
+
+        _type = await OrganizationService.GetOrganizationTypeAsync(Id);
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (_type is null) return;
+
+        _error = null;
+        var result = await OrganizationService.DeleteOrganizationTypeAsync(_type.Id);
+        if (!result.Success)
+        {
+            _error = result.Error;
+            return;
+        }
+
+        NavigationManager.NavigateTo("/globaladmin/organizations");
+    }
+}

@@ -1,0 +1,199 @@
+@* The "Levels" tab content on OrganizationTypeDetail — extracted so it's
+   reusable without its own route/page; the standalone page it used to be
+   is gone, this is embedded directly in the type detail tabs instead. *@
+@using WebApp.Services
+@inject OrganizationService OrganizationService
+
+<p class="text-muted">
+    The positions within this Organization Type's hierarchy — "National", "Council", "Unit" for PTA;
+    "Network", "League", "Team" for a billiards community. Rank orders them top-to-bottom (1 = top).
+</p>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+<div class="card mb-3">
+    <div class="card-body">
+        <h6 class="card-title">@(_editingId is null ? "Add Level" : "Edit Level")</h6>
+        <div class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">Name</label>
+                <input class="form-control" @bind="_name" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Rank</label>
+                <input class="form-control" type="number" @bind="_rank" />
+            </div>
+            <div class="col-md-3">
+                <div class="form-check mt-4">
+                    <input class="form-check-input" type="checkbox" id="siteEligible" @bind="_isSiteEligible" />
+                    <label class="form-check-label" for="siteEligible">Site-eligible</label>
+                </div>
+            </div>
+        </div>
+        <div class="form-text">
+            Site-eligible levels may have a hosted website (branding, subdomain). Others exist for
+            governance/hierarchy purposes only.
+        </div>
+        <div class="mt-3 d-flex gap-2">
+            <button type="button" class="btn btn-primary btn-sm" disabled="@_saving" @onclick="SaveAsync">
+                @(_editingId is null ? "Add" : "Save")
+            </button>
+            @if (_editingId is not null)
+            {
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ResetForm">Cancel</button>
+            }
+        </div>
+    </div>
+</div>
+
+@if (!_loaded)
+{
+    <p class="text-muted">Loading...</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm align-middle">
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>Name</th>
+                    <th>Site-eligible</th>
+                    <th>Organizations</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var level in _levels)
+                {
+                    <tr>
+                        <td>@level.Rank</td>
+                        <td>@level.Name</td>
+                        <td>@(level.IsSiteEligible ? "Yes" : "No")</td>
+                        <td>
+                            @if (level.OrganizationCount == 0)
+                            {
+                                @level.OrganizationCount
+                            }
+                            else
+                            {
+                                <button type="button" class="btn btn-link btn-sm p-0" @onclick="() => ToggleExpanded(level.Id)">
+                                    @level.OrganizationCount @(_expandedLevelId == level.Id ? "▲" : "▼")
+                                </button>
+                            }
+                        </td>
+                        <td class="text-end">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => Edit(level)">Edit</button>
+                            <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(level.Id)">Delete</button>
+                        </td>
+                    </tr>
+                    @if (_expandedLevelId == level.Id)
+                    {
+                        <tr>
+                            <td colspan="5" class="bg-light">
+                                <div class="d-flex flex-wrap gap-2 py-1">
+                                    @foreach (var org in _organizations.Where(o => o.OrganizationLevelId == level.Id))
+                                    {
+                                        <a class="badge text-bg-light border" href="@($"/globaladmin/organizations/list/{org.Id}")">
+                                            @org.Name
+                                        </a>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+                @if (_levels.Count == 0)
+                {
+                    <tr><td colspan="5" class="text-muted">None yet.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public int OrganizationTypeId { get; set; }
+
+    private bool _loaded;
+    private bool _saving;
+    private string? _error;
+    private List<OrganizationLevelSummary> _levels = new();
+    private List<OrganizationSummary> _organizations = new();
+    private Guid? _expandedLevelId;
+
+    private Guid? _editingId;
+    private string _name = "";
+    private int _rank;
+    private bool _isSiteEligible;
+
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        ResetForm();
+        _levels = await OrganizationService.GetLevelsAsync(OrganizationTypeId);
+        // Loaded alongside the Levels themselves (not lazily per-expand) since
+        // this is Phase 1 scale — a handful of Organizations per Type — and it
+        // keeps the expand/collapse toggle below purely a UI concern with no
+        // loading state of its own.
+        _organizations = await OrganizationService.GetOrganizationsAsync(OrganizationTypeId);
+        _loaded = true;
+    }
+
+    private void ToggleExpanded(Guid levelId) =>
+        _expandedLevelId = _expandedLevelId == levelId ? null : levelId;
+
+    private void Edit(OrganizationLevelSummary level)
+    {
+        _editingId = level.Id;
+        _name = level.Name;
+        _rank = level.Rank;
+        _isSiteEligible = level.IsSiteEligible;
+        _error = null;
+    }
+
+    private void ResetForm()
+    {
+        _editingId = null;
+        _name = "";
+        _rank = _levels.Count == 0 ? 1 : _levels.Max(l => l.Rank) + 1;
+        _isSiteEligible = false;
+        _error = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _error = null;
+
+        var result = _editingId is null
+            ? await OrganizationService.CreateLevelAsync(OrganizationTypeId, _name, _rank, _isSiteEligible)
+            : await OrganizationService.UpdateLevelAsync(_editingId.Value, _name, _rank, _isSiteEligible);
+
+        _saving = false;
+
+        if (!result.Success)
+        {
+            _error = result.Error;
+            return;
+        }
+
+        await ReloadAsync();
+    }
+
+    private async Task DeleteAsync(Guid id)
+    {
+        _error = null;
+        var result = await OrganizationService.DeleteLevelAsync(id);
+        if (!result.Success)
+        {
+            _error = result.Error;
+            return;
+        }
+        await ReloadAsync();
+    }
+}

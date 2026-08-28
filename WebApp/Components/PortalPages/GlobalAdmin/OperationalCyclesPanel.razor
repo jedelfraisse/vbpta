@@ -1,0 +1,166 @@
+@* The "Cycles" tab content on OrganizationTypeDetail — see OrganizationLevelsPanel
+   for why this is a plain component rather than a routed page. *@
+@using WebApp.Services
+@inject OrganizationService OrganizationService
+
+<p class="text-muted">
+    Dated operating periods for this Organization Type — a School Year for PTA, a League Session for a
+    billiards community, a Fiscal Year for a nonprofit.
+</p>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+<div class="card mb-3">
+    <div class="card-body">
+        <h6 class="card-title">@(_editingId is null ? "Add Operational Cycle" : "Edit Operational Cycle")</h6>
+        <div class="row g-2">
+            <div class="col-md-3">
+                <label class="form-label">Cycle Type</label>
+                <input class="form-control" @bind="_cycleTypeName" placeholder="School Year, League Session..." />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Display Label</label>
+                <input class="form-control" @bind="_displayLabel" placeholder="2026-2027" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Start Date</label>
+                <input class="form-control" type="date" @bind="_startDate" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">End Date</label>
+                <input class="form-control" type="date" @bind="_endDate" />
+            </div>
+        </div>
+        <div class="mt-3 d-flex gap-2">
+            <button type="button" class="btn btn-primary btn-sm" disabled="@_saving" @onclick="SaveAsync">
+                @(_editingId is null ? "Add" : "Save")
+            </button>
+            @if (_editingId is not null)
+            {
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ResetForm">Cancel</button>
+            }
+        </div>
+    </div>
+</div>
+
+@if (!_loaded)
+{
+    <p class="text-muted">Loading...</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm align-middle">
+            <thead>
+                <tr>
+                    <th>Cycle Type</th>
+                    <th>Display Label</th>
+                    <th>Start</th>
+                    <th>End</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var cycle in _cycles)
+                {
+                    <tr>
+                        <td>@cycle.CycleTypeName</td>
+                        <td>@cycle.DisplayLabel</td>
+                        <td>@cycle.StartDate.ToString("MM/dd/yyyy")</td>
+                        <td>@cycle.EndDate.ToString("MM/dd/yyyy")</td>
+                        <td class="text-end">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => Edit(cycle)">Edit</button>
+                            <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(cycle.Id)">Delete</button>
+                        </td>
+                    </tr>
+                }
+                @if (_cycles.Count == 0)
+                {
+                    <tr><td colspan="5" class="text-muted">None yet.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public int OrganizationTypeId { get; set; }
+
+    private bool _loaded;
+    private bool _saving;
+    private string? _error;
+    private List<OperationalCycleSummary> _cycles = new();
+
+    private Guid? _editingId;
+    private string _cycleTypeName = "";
+    private string _displayLabel = "";
+    private DateTime _startDate = DateTime.Today;
+    private DateTime _endDate = DateTime.Today.AddYears(1);
+
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        ResetForm();
+        _cycles = await OrganizationService.GetCyclesAsync(OrganizationTypeId);
+        _loaded = true;
+    }
+
+    private void Edit(OperationalCycleSummary cycle)
+    {
+        _editingId = cycle.Id;
+        _cycleTypeName = cycle.CycleTypeName;
+        _displayLabel = cycle.DisplayLabel;
+        _startDate = cycle.StartDate.Date;
+        _endDate = cycle.EndDate.Date;
+        _error = null;
+    }
+
+    private void ResetForm()
+    {
+        _editingId = null;
+        _cycleTypeName = "";
+        _displayLabel = "";
+        _startDate = DateTime.Today;
+        _endDate = DateTime.Today.AddYears(1);
+        _error = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _error = null;
+
+        var start = new DateTimeOffset(_startDate, TimeSpan.Zero);
+        var end = new DateTimeOffset(_endDate, TimeSpan.Zero);
+
+        var result = _editingId is null
+            ? await OrganizationService.CreateCycleAsync(OrganizationTypeId, _cycleTypeName, _displayLabel, start, end)
+            : await OrganizationService.UpdateCycleAsync(_editingId.Value, _cycleTypeName, _displayLabel, start, end);
+
+        _saving = false;
+
+        if (!result.Success)
+        {
+            _error = result.Error;
+            return;
+        }
+
+        await ReloadAsync();
+    }
+
+    private async Task DeleteAsync(Guid id)
+    {
+        _error = null;
+        var result = await OrganizationService.DeleteCycleAsync(id);
+        if (!result.Success)
+        {
+            _error = result.Error;
+            return;
+        }
+        await ReloadAsync();
+    }
+}

@@ -1,0 +1,244 @@
+@page "/globaladmin/organizations/list"
+@layout OrganizationsLayout
+@using SiteEngine.Entities
+@using SiteEngine.Enums
+@using WebApp.Services
+@inject OrganizationService OrganizationService
+
+<PageTitle>Organizations — Global Admin</PageTitle>
+
+<h5 class="mb-3">Organizations</h5>
+<p class="text-muted">
+    Communities placed within an Organization Type's hierarchy. Click one to manage its description,
+    hierarchy placement, and (in a later phase) branding.
+</p>
+
+@if (_types.Count == 0)
+{
+    <p class="text-muted">Add an <a href="/globaladmin/organizations">Organization Type</a> first.</p>
+}
+else
+{
+    @if (_error is not null)
+    {
+        <div class="alert alert-danger">@_error</div>
+    }
+    @if (_notice is not null)
+    {
+        <div class="alert alert-success">@_notice</div>
+    }
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <h6 class="card-title">Add Organization</h6>
+            <div class="row g-2">
+                <div class="col-md-3">
+                    <label class="form-label">Name</label>
+                    <input class="form-control" @bind="_name" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Organization Type</label>
+                    <select class="form-select" @bind="_formTypeId" @bind:after="OnFormTypeChangedAsync">
+                        @foreach (var type in _types)
+                        {
+                            <option value="@type.Id">@type.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Level</label>
+                    <select class="form-select" @bind="_levelId">
+                        @foreach (var level in _formLevels)
+                        {
+                            <option value="@level.Id">@level.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Parent (optional)</label>
+                    <select class="form-select" @bind="_parentId">
+                        <option value="">(none — top of hierarchy)</option>
+                        @foreach (var org in _formOrganizationsOfType)
+                        {
+                            <option value="@org.Id">@org.Name (@org.OrganizationLevelName)</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Site (optional)</label>
+                    <select class="form-select" @bind="_siteId">
+                        <option value="">(none)</option>
+                        @foreach (var site in _unlinkedSites)
+                        {
+                            <option value="@site.Id">@site.SiteName</option>
+                        }
+                    </select>
+                </div>
+                @if (SelectedType is { IdentifierRequirement: not IdentifierRequirement.NotUsed })
+                {
+                    <div class="col-md-3">
+                        <label class="form-label">
+                            @(SelectedType.IdentifierLabel ?? "Identifier")
+                            @if (SelectedType.IdentifierRequirement == IdentifierRequirement.Required)
+                            {
+                                <span class="text-danger">*</span>
+                            }
+                        </label>
+                        <input class="form-control" @bind="_identifierValue" />
+                    </div>
+                }
+            </div>
+            <div class="mt-3">
+                <button type="button" class="btn btn-primary btn-sm" disabled="@_saving" @onclick="AddAsync">Add</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="mb-3" style="max-width: 320px;">
+        <label class="form-label">Filter by Organization Type</label>
+        <select class="form-select" @bind="_filterTypeId" @bind:after="ReloadListAsync">
+            <option value="0">(all)</option>
+            @foreach (var type in _types)
+            {
+                <option value="@type.Id">@type.Name</option>
+            }
+        </select>
+    </div>
+
+    @if (!_loaded)
+    {
+        <p class="text-muted">Loading...</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>ID</th>
+                        <th>Type</th>
+                        <th>Level</th>
+                        <th>Parent</th>
+                        <th>Site</th>
+                        <th>Children</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var org in _organizations)
+                    {
+                        <tr>
+                            <td><a href="@($"/globaladmin/organizations/list/{org.Id}")">@org.Name</a></td>
+                            <td>@(org.IdentifierValue ?? "—")</td>
+                            <td>@org.OrganizationTypeName</td>
+                            <td>@org.OrganizationLevelName <span class="text-muted">(@org.LevelRank)</span></td>
+                            <td>@(org.ParentOrganizationName ?? "—")</td>
+                            <td>@(org.SiteName ?? "—")</td>
+                            <td>@org.ChildCount</td>
+                            <td class="text-end">
+                                <a class="btn btn-sm btn-outline-secondary" href="@($"/globaladmin/organizations/list/{org.Id}")">Manage</a>
+                            </td>
+                        </tr>
+                    }
+                    @if (_organizations.Count == 0)
+                    {
+                        <tr><td colspan="8" class="text-muted">None yet.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+@code {
+    private bool _loaded;
+    private bool _saving;
+    private string? _error;
+    private string? _notice;
+
+    private List<OrganizationTypeSummary> _types = new();
+    private List<OrganizationSummary> _organizations = new();
+    private List<Site> _unlinkedSites = new();
+    private int _filterTypeId;
+
+    private string _name = "";
+    private int _formTypeId;
+    private Guid _levelId;
+    private string _parentId = "";
+    private string _siteId = "";
+    private string _identifierValue = "";
+    private List<OrganizationLevelSummary> _formLevels = new();
+    private List<OrganizationSummary> _formOrganizationsOfType = new();
+
+    private OrganizationTypeSummary? SelectedType => _types.FirstOrDefault(t => t.Id == _formTypeId);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _types = await OrganizationService.GetOrganizationTypeSummariesAsync();
+        _unlinkedSites = await OrganizationService.GetUnlinkedSitesAsync();
+
+        if (_types.Count > 0)
+        {
+            _formTypeId = _types[0].Id;
+            await OnFormTypeChangedAsync();
+        }
+
+        await ReloadListAsync();
+    }
+
+    private async Task OnFormTypeChangedAsync()
+    {
+        _formLevels = await OrganizationService.GetLevelsAsync(_formTypeId);
+        _formOrganizationsOfType = await OrganizationService.GetOrganizationsAsync(_formTypeId);
+        if (_levelId == Guid.Empty || !_formLevels.Any(l => l.Id == _levelId))
+            _levelId = _formLevels.Count > 0 ? _formLevels[0].Id : Guid.Empty;
+    }
+
+    private async Task ReloadListAsync()
+    {
+        _organizations = await OrganizationService.GetOrganizationsAsync(_filterTypeId == 0 ? null : _filterTypeId);
+        _loaded = true;
+    }
+
+    private async Task AddAsync()
+    {
+        _saving = true;
+        _error = null;
+        _notice = null;
+
+        Guid? parentOrganizationId = Guid.TryParse(_parentId, out var pid) ? pid : null;
+        Guid? siteId = Guid.TryParse(_siteId, out var sid) ? sid : null;
+
+        var result = await OrganizationService.CreateOrganizationAsync(_name, _formTypeId, _levelId, parentOrganizationId, siteId, _identifierValue);
+        _saving = false;
+
+        if (!result.Success)
+        {
+            _error = result.Error;
+            return;
+        }
+
+        // Phase 1's "Parent Access Recommendation": a parent receives View
+        // Access by default when it creates a child. Kept as a separate,
+        // visible grant (revocable on the Parent Access Grants tab) rather
+        // than an implicit cascade — see ParentAccessGrant's doc comment.
+        if (parentOrganizationId is not null)
+        {
+            var created = (await OrganizationService.GetOrganizationsAsync(_formTypeId))
+                .FirstOrDefault(o => o.Name == _name.Trim() && o.ParentOrganizationId == parentOrganizationId);
+            if (created is not null)
+                await OrganizationService.GrantDefaultParentAccessAsync(parentOrganizationId.Value, created.Id);
+
+            _notice = "Organization created. Its parent was granted View Access by default — adjust or revoke it on the Parent Access Grants tab.";
+        }
+
+        _name = "";
+        _parentId = "";
+        _siteId = "";
+        _identifierValue = "";
+        await OnFormTypeChangedAsync();
+        _unlinkedSites = await OrganizationService.GetUnlinkedSitesAsync();
+        await ReloadListAsync();
+    }
+}

@@ -101,6 +101,7 @@ builder.Services.AddScoped<ProfileService>();
 builder.Services.AddScoped<MembershipLookupService>();
 builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<SiteAdminService>();
+builder.Services.AddScoped<OrganizationService>();
 builder.Services.AddScoped<FileUploadService>();
 builder.Services.AddScoped<PtaLogoGenerationService>();
 builder.Services.AddScoped<LoginTrackingService>();
@@ -203,6 +204,14 @@ using (var startupScope = app.Services.CreateScope())
 
 					startupLogger.LogInformation("Pending migrations applied successfully.");
 				}
+
+				// SeedData.EnsureSeedData is fully idempotent (checks existence
+				// before adding anything) and runs on every startup, not just
+				// through the setup wizard — an already-configured install
+				// still needs it, e.g. to backfill Organization rows for
+				// Division/Local Unit Sites created before the Organization
+				// Framework existed (see SeedData.BackfillOrganizations).
+				SiteEngine.Data.SeedData.EnsureSeedData(startupDb);
 			}
 			catch (Exception ex)
 			{

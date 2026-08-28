@@ -1,4 +1,7 @@
 @* Loaded by SharedPages/Home.razor when SiteContext.CurrentSite.SiteType == SiteType.Portal *@
+@using SiteEngine.Entities
+@using WebApp.Services
+@inject DashboardService DashboardService
 
 <div class="home-container container py-4">
 
@@ -34,13 +37,41 @@
     <section class="mb-5">
         <h2>One Platform, Many Communities</h2>
         <p>
-            Every organization here is different — a citywide council, a single school's
-            booster club, a neighborhood association — but they all need the same basics:
-            a place to share news, welcome new members, and keep their community organized.
-            This portal brings those groups together under one roof, while still giving each
-            one its own space, its own look, and its own voice.
+            Central Portal is a community management platform that helps organizations govern, organize, communicate, and engage with their members while providing each community its own branded space and specialized tools.
         </p>
     </section>
+
+    <!-- ============================================================ -->
+    <!-- WHO WE SERVE                                                  -->
+    <!-- ============================================================ -->
+    @if (_organizationTypes.Count > 0)
+    {
+        <section class="mb-5">
+            <h2>Who We Serve</h2>
+            <div class="row g-3 mt-1">
+                @foreach (var org in _organizationTypes)
+                {
+                    <div class="col-md-4">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h3 class="h6 card-title">
+                                    @if (!string.IsNullOrWhiteSpace(org.IconClass))
+                                    {
+                                        <i class="@org.IconClass me-2" aria-hidden="true"></i>
+                                    }
+                                    @org.Name
+                                </h3>
+                                <p class="card-text text-muted small">@Excerpt(org.Description)</p>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+            <p class="mt-3">
+                <a href="/organizations">Learn more about who we serve &rarr;</a>
+            </p>
+        </section>
+    }
 
     <!-- ============================================================ -->
     <!-- HOW IT'S ORGANIZED                                            -->
@@ -147,5 +178,25 @@
 </div>
 
 @code {
+    private List<OrganizationType> _organizationTypes = new();
 
+    protected override async Task OnInitializedAsync()
+    {
+        _organizationTypes = await DashboardService.GetOrganizationTypesAsync();
+    }
+
+    // Home page teaser card gets a short excerpt, not the full description —
+    // the full text is what /organizations is for.
+    private static string Excerpt(string description, int maxLength = 110)
+    {
+        if (description.Length <= maxLength)
+            return description;
+
+        var trimmed = description[..maxLength];
+        var lastSpace = trimmed.LastIndexOf(' ');
+        if (lastSpace > 0)
+            trimmed = trimmed[..lastSpace];
+
+        return trimmed + "…";
+    }
 }

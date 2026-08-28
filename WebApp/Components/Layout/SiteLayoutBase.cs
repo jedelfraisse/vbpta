@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
+using SiteEngine.Data;
 using SiteEngine.Entities;
 using SiteEngine.Enums;
 using WebApp.Services;
@@ -49,6 +50,52 @@ public abstract class SiteLayoutBase : LayoutComponentBase
 			: SiteRole.Viewer;
 
 		ShowAdminLink = CurrentRole is SiteRole.SiteAdmin or SiteRole.DivisionAdmin or SiteRole.SuperAdmin;
+	}
+
+	// True once RefreshMembersOnlyGateAsync has run and decided the current
+	// visitor should NOT see this site's real content — call sites render a
+	// gate page instead of @Body in that case. IsAuthenticated (already set
+	// by RefreshUserStateAsync) tells the gate page which message to show:
+	// "log in" vs. "you're logged in, but not a member of this site."
+	protected bool IsBlockedByMembersOnly { get; private set; }
+
+	// A MembersOnly site hides ALL of its content — public and private alike
+	// — from everyone except an actual member of THAT site (and a global
+	// SuperAdmin, who needs to be able to review a site before it goes live
+	// without first being enrolled as one of its members). This is
+	// deliberately stricter than "logged in": CurrentRole already reflects
+	// SiteRoleResolver scoped to this exact site (Viewer is the floor for
+	// any authenticated user with no real SiteUserRole here at all — see
+	// RefreshUserStateAsync), so "genuinely a member" is CurrentRole > Viewer.
+	// Call after RefreshUserStateAsync(site.Id) has set CurrentRole for THIS
+	// site — resolving SuperAdmin separately against the Portal site's own id,
+	// since SiteRoleResolver only ever looks at SiteUserRole rows for the
+	// site id it's given, and a SuperAdmin has no reason to hold one for
+	// every site they might need to preview.
+	protected async Task RefreshMembersOnlyGateAsync(Site? site)
+	{
+		IsBlockedByMembersOnly = false;
+
+		if (site is not { SiteStatus: SiteStatus.MembersOnly })
+			return;
+
+		if (!IsAuthenticated)
+		{
+			IsBlockedByMembersOnly = true;
+			return;
+		}
+
+		if (CurrentRole > SiteRole.Viewer)
+			return;
+
+		var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+		var identityUserId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+		var portalRole = identityUserId is not null
+			? await SiteRoleResolver.ResolveAsync(identityUserId, SeedData.DefaultPortalSiteId)
+			: SiteRole.Viewer;
+
+		IsBlockedByMembersOnly = portalRole != SiteRole.SuperAdmin;
 	}
 
 	// CSS custom properties consumed by CityWideLayout.css / UnitLayout.razor.css

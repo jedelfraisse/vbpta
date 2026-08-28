@@ -37,4 +37,16 @@ public static class SiteUrlHelper
 		var baseUrl = BuildPublicUrl(site, portalDomain);
 		return string.IsNullOrEmpty(baseUrl) ? string.Empty : $"{baseUrl}/admin";
 	}
+
+	// The portal-side directory stub for a site that isn't meant to render
+	// live hosted content (see RuntimeSiteContext.GetDirectoryRedirectUrl) —
+	// same destination UnitSites/Details.razor is reachable at directly.
+	public static string BuildDirectoryDetailUrl(string ptaId, string? portalDomain)
+	{
+		var portal = portalDomain?.Trim().Split(':')[0] ?? string.Empty;
+		if (string.IsNullOrEmpty(portal) || string.IsNullOrEmpty(ptaId))
+			return string.Empty;
+
+		return $"https://{portal}/unit-sites/{ptaId}";
+	}
 }

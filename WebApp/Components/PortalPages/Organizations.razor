@@ -1,0 +1,64 @@
+@page "/organizations"
+@using SiteEngine.Entities
+@using WebApp.Services
+@inject DashboardService DashboardService
+
+<PageTitle>Who We Serve</PageTitle>
+
+<div class="container py-4">
+    <div class="text-center mb-5">
+        <h1 class="display-6 fw-bold">Who We Serve</h1>
+        <p class="lead col-lg-8 mx-auto">
+            This portal isn't built for just one kind of group — it's a shared home for any
+            organization that follows a Division &rarr; Local Unit structure. Here's who's
+            already here, and who we're building room for.
+        </p>
+    </div>
+
+    @if (!_loaded)
+    {
+        <p class="text-muted text-center">Loading&hellip;</p>
+    }
+    else if (_organizationTypes.Count == 0)
+    {
+        <p class="text-muted text-center">Nothing to show yet.</p>
+    }
+    else
+    {
+        <div class="row g-4">
+            @foreach (var org in _organizationTypes)
+            {
+                <div class="col-md-6">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body">
+                            <h2 class="h4 card-title">
+                                @if (!string.IsNullOrWhiteSpace(org.IconClass))
+                                {
+                                    <i class="@org.IconClass me-2" aria-hidden="true"></i>
+                                }
+                                @org.Name
+                            </h2>
+                            <p class="card-text">@org.Description</p>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <div class="text-center mt-5">
+        <p class="text-muted">Don't see your kind of group here yet? We're still growing.</p>
+        <a class="btn btn-primary" href="/unit-sites">Browse Unit Sites</a>
+    </div>
+</div>
+
+@code {
+    private bool _loaded;
+    private List<OrganizationType> _organizationTypes = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _organizationTypes = await DashboardService.GetOrganizationTypesAsync();
+        _loaded = true;
+    }
+}

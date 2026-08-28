@@ -1,0 +1,29 @@
+@* Shown by DivisionLayout/UnitLayout in place of the real masthead/content
+   when SiteLayoutBase.IsBlockedByMembersOnly is true — a MembersOnly site
+   hides everything, public and private alike, from anyone who isn't an
+   actual member of it (see RefreshMembersOnlyGateAsync). *@
+
+<div class="container py-5 text-center" style="max-width: 480px;">
+    <h1 class="h3 mb-3">Members Only</h1>
+
+    @if (IsAuthenticated)
+    {
+        <p class="text-muted">
+            @SiteName is only visible to its members right now. Your account doesn't currently
+            have access — if you believe that's wrong, reach out to one of @SiteName's admins.
+        </p>
+    }
+    else
+    {
+        <p class="text-muted">
+            @SiteName is only visible to its members right now. Log in if you're already a
+            member, or reach out to one of its admins.
+        </p>
+        <a class="btn btn-primary" href="/login">Login</a>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string SiteName { get; set; } = string.Empty;
+    [Parameter] public bool IsAuthenticated { get; set; }
+}

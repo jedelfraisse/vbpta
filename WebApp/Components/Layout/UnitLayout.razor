@@ -14,6 +14,7 @@
         // Viewer (see SiteLayoutBase.RefreshUserStateAsync).
         await SiteContext.InitializeAsync(new Uri(NavigationManager.Uri).Host);
         await RefreshUserStateAsync(Site?.Id);
+        await RefreshMembersOnlyGateAsync(Site);
 
         // One-time lazy fallback for a site that has never had its PTA-style
         // logo generated — see SiteAdminService.EnsureGeneratedLogoAsync.
@@ -26,6 +27,12 @@
     }
 }
 
+@if (IsBlockedByMembersOnly)
+{
+    <MembersOnlyGate SiteName="@(Site?.SiteName ?? "This site")" IsAuthenticated="IsAuthenticated" />
+}
+else
+{
 <div class="layout-shell local-shell" style="@ThemeStyle(Site)">
     <div class="theme-topbar"></div>
 
@@ -132,3 +139,4 @@
         <div class="unit-footer-bottom"></div>
     </div>
 </div>
+}

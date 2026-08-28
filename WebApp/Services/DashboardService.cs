@@ -320,4 +320,16 @@ public class DashboardService(IDbContextFactory<AppDbContext> dbFactory)
 		await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
 		return await db.PortalConfigs.FindAsync([SeedData.DefaultGlobalConfigId], cancellationToken);
 	}
+
+	// Backs PortalHome's teaser section and the /organizations page — both
+	// read this same list instead of hardcoding which groups the portal
+	// supports, so a new org type is just a new row (see OrganizationType).
+	public async Task<List<OrganizationType>> GetOrganizationTypesAsync(CancellationToken cancellationToken = default)
+	{
+		await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+		return await db.OrganizationTypes
+			.OrderBy(t => t.SortOrder)
+			.ThenBy(t => t.Name)
+			.ToListAsync(cancellationToken);
+	}
 }

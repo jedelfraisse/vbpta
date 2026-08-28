@@ -34,6 +34,20 @@
             var host = new Uri(Nav.Uri).Host;
             await runtime.InitializeAsync(host);
 
+            // Checked BEFORE the canonical-host redirect below: a Pending/
+            // ActiveListed/Inactive site must go to the portal-side directory
+            // stub regardless of which hostname reached it — otherwise a
+            // visit to the PtaId fallback subdomain would get bounced to the
+            // site's real (still not-ready) hostname first, and only ever
+            // render the live layout instead of the stub. See
+            // RuntimeSiteContext.GetDirectoryRedirectUrl.
+            var directoryUrl = runtime.GetDirectoryRedirectUrl();
+            if (directoryUrl is not null)
+            {
+                Nav.NavigateTo(directoryUrl, forceLoad: true);
+                return;
+            }
+
             // Resolved via a non-canonical host (e.g. the PtaId fallback
             // subdomain, or an old Hostname after a custom Domain was added)?
             // Send the visitor straight to the real one instead of rendering

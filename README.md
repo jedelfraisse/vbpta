@@ -1,307 +1,354 @@
-# PTA Platform — Multi‑Division Website Engine & Public Tool Hub  
+# Central Portal
+## One Platform, Many Communities
+
 **Status: Active Development**
 
-This repository contains the next‑generation PTA platform originally created for the **Virginia Beach Council of PTAs (VBCPTA)** and now evolving into a **multi‑division, multi‑unit website engine** with a **public‑facing tool hub**.
+Central Portal is an open-source **community management platform** — a place for organizations to govern effectively, stay organized, communicate clearly, and engage their members.
 
-> **Note:**  
-> The repository currently contains only documentation (`README.md`, `.gitignore`, `LICENSE`).  
-> The application code will be uploaded once the core system reaches a stable baseline.
+It began as a PTA site engine. Through ongoing design work, that scope grew into something bigger: a platform built around **Communities** as its central concept, where a PTA, a booster club, a scout troop, an HOA, or any other member-driven group can each get its own branded site, membership, and tools — connected under one shared Portal.
 
-The platform is designed to support:
+**PTA is the first organization type Central Portal supports.** The platform is being architected to generalize from there to any community-driven organization.
 
-- **Division PTA councils**  
-- **Local PTA units** under each division  
-- **Independent PTAs** that do not belong to a division  
-- **Public users** who want access to PTA‑friendly tools  
-
-It is fully open source and will support both self‑hosting and managed SaaS deployments.
+> This document describes both **what Central Portal is today** and **where it's headed**. Sections describing the site hierarchy, membership, and branding describe the current, working platform. Sections describing Events, Controllers, Tools, and Displays describe intended architecture — most of it designed, little of it built yet. Those sections are marked **(Planned)**.
 
 ---
 
-## 🌟 Overview
+## What's Here Today
 
-This project is evolving into a **PTA digital infrastructure platform** with three major layers:
+- **A multi-tenant site engine.** Every community — a Division or a Local Unit — gets its own hosted site: custom domain/subdomain, logo, color theme, banner, and social links, with Local Units inheriting a parent Division's branding unless they override it.
+- **Passwordless authentication**, with per-community, per-school-year membership and role assignment (Officer, Site Admin, Division Admin, Super Admin, or a custom named role).
+- **A public directory** of Divisions and Local Units, with per-site visibility status (active, members-only, pending launch, etc.).
+- **A member dashboard** and a **Global Admin console** covering identity & access, sites & content, branding, and system settings.
+- **PTA as the first configured organization type**, with the data model in place to add more without changing the core platform.
 
-### **1. Portal (Top Level)**  
-The main public‑facing site that hosts tools, login, and shared resources.
-
-### **2. Divisions (Middle Level)**  
-Division PTA councils, each with their own site, announcements, and calendar.
-
-### **3. Units (Bottom Level)**  
-Local PTA units under each division, each with their own customizable site.
-
-This structure mirrors how PTAs operate in many states while remaining flexible enough for independent PTAs.
+Everything from here forward describes the direction the platform is headed, not a feature list of what's shipped.
 
 ---
 
-## 🎯 Purpose
+# Mission
 
-This platform exists to:
+Central Portal exists to help organizations:
 
-- Strengthen communication across divisions  
-- Provide a consistent, professional web presence for all units  
-- Support independent PTAs that report directly to state or national  
-- Offer tools that any PTA — or even non‑PTA school groups — can use  
-- Help new PTAs get started quickly  
-- Support continuity as board members change  
-- Reduce reliance on expensive third‑party services  
-- Provide a free, open‑source option for PTAs that want to self‑host  
+## Govern
 
----
+Support organizational structure, policies, leadership, elections, meetings, and continuity.
 
-## 🔗 Integrating Existing PTA Tools (GiveBacks, SignUpGenius, etc.)
+Examples:
 
-This platform is designed not only to **create new PTA tools**, but also to **integrate and enhance the tools PTAs already use today**.
-
-Many PTAs rely on:
-
-- **GiveBacks** for membership, fundraising, and ticketing  
-- **SignUpGenius** for volunteer coordination  
-- **Google Workspace** for documents and collaboration  
-- **Mailchimp / Canva** for communication and design  
-
-The platform’s mission is to:
-
-- Work *with* these tools, not replace them  
-- Provide a unified place to access them  
-- Offer optional replacements when helpful  
-- Fill the gaps where existing tools fall short  
+- Board Management — *available: board positions are tracked per community per year*
+- Officer Tracking — *available: officer roles are part of membership*
+- Governance Support — *planned*
+- Meeting Management — *planned*
+- Voting Tools — *planned*
+- Committee Support — *planned*
 
 ---
 
-## 🏛️ Features for Divisions (PTA Councils)
+## Organize
 
-- Division‑level announcements  
-- Shared district calendar  
-- Awards & recognition  
-- Document library  
-- Links to state and national PTA resources  
-- Division‑wide event listings  
-- Multi‑unit management dashboard  
-- Support for elections, committees, and transitions  
+Provide tools that help communities coordinate activities and operations.
 
----
+Examples:
 
-## 🏫 Features for Local PTA Units
+- Events
+- Volunteer Coordination
+- Scheduling
+- Attendance
+- Talent Shows
+- Fundraisers
+- Community Programs
 
-Each unit (school‑level PTA) will have its own site under its division:
-
-```
-division.localhost
-unit.localhost
-```
-
-or in staging:
-
-```
-division.ptaportal.delfraisse.com
-unit.ptaportal.delfraisse.com
-```
-
-Unit sites include:
-
-- Customizable logo, colors, and branding  
-- Unit‑specific announcements  
-- Unit‑level event calendar  
-- Automatic inclusion of unit events in the division calendar  
-- Document storage  
-- Optional election tools  
-- Simple admin interface for board members  
-- Year‑to‑year continuity helpers  
+**Status: Planned.** None of the above exist in the platform yet — this is the primary direction of near-term development. See [Events](#events-planned) below.
 
 ---
 
-## Independent PTAs (No Division)
+## Communicate
 
-Some PTAs do not belong to a division and report directly to:
+Improve communication between leaders, members, volunteers, supporters, and the community.
 
-- State PTA  
-- National PTA  
-- Or operate independently  
+Examples:
 
-These PTAs can:
+- News
+- Announcements
+- Messaging
+- Public Displays
+- Broadcasts
+- Notifications
 
-- Use the **public tool hub**  
-- Host their own unit site under the portal  
-- Or use their own custom domain  
-
-This is why the **Portal** hosts the tools — so *any* PTA or school group can benefit, even without a division structure.
-
----
-
-## Domain Structure and Flexibility
-
-To keep things simple and predictable, the platform uses the following domain model:
-
-### **Development Environment**
-```
-https://localhost
-https://division.localhost
-https://unit.localhost
-```
-
-### **Staging Environment**
-```
-https://centralportal.delfraisse.com
-https://division.centralportal.delfraisse.com
-https://unit.centralportal.delfraisse.com
-```
-
-### **Custom Domains**
-Each site (division or unit) may optionally attach a custom domain:
-
-```
-vbpta.org
-luxfordpta.org
-```
-
-However:
-
-> **All sites will always remain accessible via their platform subdomain**  
-> (e.g., `unit.centralportal.delfraisse.com`),  
-> even when a custom domain is attached.
-
-This ensures:
-
-- Reliable routing  
-- Consistent admin access  
-- No dependency on external DNS  
-- Easier debugging and support  
+**Status: Planned**, aside from the transactional email the platform already sends (login codes, admin notices).
 
 ---
 
-## 🔧 Public Tool Hub (New)
+## Engage
 
-The main portal includes a login system where users can access PTA‑friendly tools such as:
+Encourage participation and involvement.
 
-### Available / Planned Tools
+Examples:
 
-- **Bingo Runner**  
-- **Digital Raffle Picker**  
-  - Includes “last pick wins” animation  
-- **Volunteer / Event Helpers**  
-- **Randomized student or ticket selectors**  
-- **Silent auction helpers**  
-- **Future PTA utilities as they are developed**  
+- Polls
+- Questions & Answers
+- Raffles
+- Quizzes
+- Interactive Games
+- Membership Incentives
 
----
-
-## 🔐 Roles & Permissions
-
-- **Portal Admins** — manage the entire platform  
-- **Division Admins** — manage division sites and oversee units  
-- **Unit Admins** — manage their school’s website and events  
-- **Board Members** — access continuity and transition tools  
-- **Public Users** — log in to use helper tools  
+**Status: Planned.** See [Event Tools](#event-tools-planned) below.
 
 ---
 
-## 🗺️ Roadmap
+# Platform Architecture
 
-*(Roadmap unchanged — still accurate for pre‑code state.)*
+The platform is built around **Communities**. Every Division and every Local Unit is a community — each gets its own website, branding, content, members, and administrators, while staying connected to the broader Central Portal ecosystem through the shared Portal site above it.
 
----
-
-# 🛠️ Development Setup (Pre‑Code Upload)
-
-The codebase is currently being prepared for upload.  
-This section describes the **intended development workflow** and the behavior of the platform’s **first‑run setup system**.
-
-This project uses:
-
-- **.NET 9**  
-- **Blazor**  
-- **SQL Server**  
-- **EF Core**  
-- **Passwordless authentication**  
-- **(Coming Soon) Docker via .NET Aspire**  
+This part of the architecture is implemented today.
 
 ---
 
-## Local Development (Planned)
+## Portal
 
-During development, the solution will include:
+The top-level Central Portal site.
 
-- **WebApp** — Blazor UI  
-- **SiteEngine** — EF Core models, migrations, and site resolution logic  
+Responsibilities:
 
-There is **no default database name** and **no preconfigured connection string**.  
-The application does **not** create or connect to a database until the developer provides the connection details.
-
----
-
-## First‑Run Setup (SQL Configuration)
-
-When the site is launched for the first time:
-
-1. The application checks `appsettings.json`  
-2. If `ConnectionStrings:DefaultConnection` is **blank or missing**  
-3. The **SetupSetup** screen automatically appears  
-4. The developer enters SQL Server connection information  
-5. The connection string is saved to configuration  
-6. The database is created  
-7. EF Core migrations are applied automatically  
-
-This ensures:
-
-- No accidental connections to the wrong SQL instance  
-- No reliance on LocalDB or hard‑coded defaults  
-- A consistent onboarding experience for all developers  
-- A smooth transition to Aspire‑managed SQL containers later  
-
-Once Aspire is implemented, it will automatically provision and configure the SQL container, replacing the manual setup step.
+- Public information
+- Community directory
+- Shared tools *(directory of tools is scaffolded; most listed tools are planned)*
+- Shared resources
+- Authentication
+- Administration
 
 ---
 
-## SMTP & Developer Login Testing (Recommended)
+## Divisions
 
-The platform uses **passwordless authentication**, meaning users log in by receiving a one‑time email link.
+Communities that support multiple local communities beneath them.
 
-During development, the application behaves exactly as it does in production:
+Examples:
 
-- It sends real passwordless login emails  
-- It uses the configured SMTP server  
-- It expects the developer to click the login link  
+- PTA Councils
+- District Organizations
+- Regional Associations
 
-To avoid sending real emails, developers can run **smtp4dev**, a lightweight local SMTP server that captures outgoing messages for inspection.
+A division may provide:
 
-When smtp4dev is running:
-
-- The app “thinks” it is sending real emails  
-- smtp4dev receives them instantly  
-- Developers open the email in smtp4dev’s web UI  
-- Click the login link  
-- And authenticate normally  
-
-This provides a **realistic login flow** without requiring external email services.
-
-smtp4dev will also be added to the Aspire environment once Aspire is configured.
-
-**smtp4dev GitHub:**  
-[https://github.com/rnwood/smtp4dev](https://github.com/rnwood/smtp4dev)
+- Shared branding — *available*
+- Shared resources — *planned*
+- Shared events — *planned*
+- Shared communications — *planned*
 
 ---
 
-## Testing the Published Version (No IIS Required)
+## Local Units
 
-A batch file will be included to:
+Individual communities operating under a division or independently.
 
-- Publish the site  
-- Run the published output locally  
-- Avoid IIS entirely  
+Examples:
 
-This allows developers to test the **actual published build** exactly as it will run in production.
+- Individual PTAs
+- Booster Clubs
+- Neighborhood Associations
+- Community Groups
+
+Each unit maintains:
+
+- Custom branding — *available*
+- Memberships — *available*
+- Announcements — *planned*
+- Events — *planned*
+- Documents — *planned*
+- Tools — *planned*
 
 ---
 
-## 🤝 Contributing
+# Organization Types
 
-Contributions are welcome once the initial codebase is uploaded.
+The platform is designed to support multiple organization types. This part is implemented — `OrganizationType` is a real, admin-editable list — though today it holds one entry.
+
+Current focus:
+
+- PTA
+
+Future possibilities:
+
+- Scout Organizations
+- Booster Clubs
+- HOAs
+- Nonprofits
+- Civic Associations
+- Community Groups
+
+Organization types may eventually determine:
+
+- Available tools
+- Default branding
+- Recommended workflows
+- Governance templates
 
 ---
 
-## 📄 License
+# Events (Planned)
 
-This project is licensed under the **MIT License**.  
-See the `LICENSE` file for details.
+**Status: Not yet built.** This section describes the intended architecture, not a working feature.
+
+Events are meant to be a core organizational feature — the activities a community runs, built on top of the same Community/Division/Local Unit structure described above.
+
+Examples:
+
+- PTA Meetings
+- Talent Shows
+- Bingo Nights
+- Membership Drives
+- Fundraisers
+- Trainings
+- Town Halls
+- Podcasts
+- Community Events
+
+Every event will belong to a community.
+
+---
+
+# Event Controllers (Planned)
+
+**Status: Not yet built.**
+
+The intent is for each event to be managed by a Controller — a component that defines the primary behavior of an event.
+
+Examples:
+
+- Meeting Controller
+- Talent Show Controller
+- Bingo Controller
+- Raffle Controller
+- Training Controller
+
+Controllers would manage event-specific workflows and data, sitting on top of a shared Event core rather than duplicating it.
+
+---
+
+# Event Tools (Planned)
+
+**Status: Not yet built.**
+
+Tools are meant to provide reusable capabilities that can be attached to events when needed, rather than being built once per event type.
+
+Examples:
+
+- Display Tool
+- Poll Tool
+- Question Tool
+- Volunteer Tool
+- Attendance Tool
+- Judge Tool
+- OBS Integration Tool
+- Membership Incentive Tool
+
+The intent is for tools to be enabled or disabled depending on the organization type and the specific event's requirements.
+
+---
+
+# Displays and Live Events (Planned)
+
+**Status: Not yet built.** The platform has no real-time infrastructure today; this is a meaningful piece of new work, not a small extension.
+
+Certain events may eventually utilize live displays:
+
+- Projectors
+- TVs
+- Browser Sources
+- OBS Overlays
+- Information Kiosks
+- Judge Screens
+- Audience Displays
+
+Displays would connect to the platform and receive:
+
+- Assigned Templates
+- Event Data
+- Tool Data
+
+Examples:
+
+- Meeting Agenda Board
+- Talent Show Main Screen
+- Bingo Board
+- Raffle Winner Screen
+
+---
+
+# Integrations (Planned)
+
+The platform is designed to eventually work alongside existing tools and services communities already rely on.
+
+Examples:
+
+- Givebacks
+- SignUpGenius
+- Google Workspace
+- Mailchimp
+- Canva
+- Streaming Platforms
+- OBS Studio
+
+**Status today:** outbound transactional email (SMTP) is the only integration implemented. The goal for the rest is not necessarily to replace these tools but to provide a centralized place to manage and connect them.
+
+---
+
+# Roles
+
+Examples:
+
+- Super Administrator — *available*
+- Division Administrator — *available*
+- Site Administrator — *available*
+- Officers — *available*
+- Board Members — *available (board positions are tracked per community per year)*
+- Volunteers — *planned*
+- Members — *available*
+- Public Users — *available*
+
+Today, roles are assigned per community. Future tool-specific permissions (see [Event Tools](#event-tools-planned)) will let communities delegate responsibility for a specific function — running a raffle, moderating a poll — without granting full administrative access.
+
+---
+
+# Open Source
+
+Central Portal is fully open source.
+
+Goals include:
+
+- Self-hosting support
+- SaaS deployment support
+- Community contributions
+- Long-term sustainability
+- Reduced dependence on expensive third-party platforms
+
+---
+
+# Roadmap
+
+A rough sense of the path from here, in order:
+
+1. **Tool Registry & permissions.** Finish wiring the existing tool-registry data model into real navigation and access control, so future tools (and Director/Helper-style delegated permissions) have somewhere to plug in.
+2. **Event core.** A shared `Event` concept that belongs to a community, with Division-to-Local-Unit inheritance the same way branding works today.
+3. **Event Controllers.** The first controller (most likely Meetings or a simple community Event) built on the Event core, proving the controller pattern.
+4. **Real-time infrastructure.** The platform has none today; this becomes necessary once Display/Poll/Question tools need live updates.
+5. **Event Tools.** Display, Poll, Question, and similar reusable tools, attachable to any controller.
+6. **Additional Controllers.** Talent Show, Bingo, Raffle, and other event types, built on the same core.
+7. **Integrations.** Connecting to the external services communities already use.
+
+---
+
+# Long-Term Vision
+
+Central Portal aims to become a complete community management platform that helps organizations:
+
+- Govern effectively
+- Stay organized
+- Communicate clearly
+- Engage their communities
+
+while allowing every organization to maintain its own identity, branding, culture, and operating style.
+
+One Platform.
+Many Communities.

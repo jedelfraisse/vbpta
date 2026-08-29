@@ -303,6 +303,8 @@ public DbSet<ParentAccessGrant> ParentAccessGrants => Set<ParentAccessGrant>();
 
 			entity.Property(x => x.Name).HasMaxLength(256).IsRequired();
 			entity.Property(x => x.IdentifierValue).HasMaxLength(64);
+			entity.Property(x => x.Description).HasMaxLength(2000);
+			entity.Property(x => x.ExternalUrl).HasMaxLength(512);
 
 			entity.HasOne(x => x.OrganizationType)
 				.WithMany()

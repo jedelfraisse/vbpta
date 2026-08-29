@@ -1,3 +1,5 @@
+using SiteEngine.Enums;
+
 namespace SiteEngine.Entities;
 
 // The primary entity of the Organization Framework — see OrganizationFramework.md
@@ -38,6 +40,28 @@ public class Organization
 	public ICollection<Organization> ChildOrganizations { get; set; } = new List<Organization>();
 
 	public string Name { get; set; } = string.Empty;
+
+	// Public-facing summary — shown on the community detail page and (excerpted)
+	// in the Community Directory listing. Added during OrganizationPublicExperience
+	// Phase 1; the original Organization Framework had no need for this, but the
+	// public experience plan calls for it as a core detail-page field.
+	public string? Description { get; set; }
+
+	// The Organization's own external website (e.g. a Givebacks page) — distinct
+	// from Site.ExternalUrl, which is a Site-level field for the now-legacy
+	// Site-based directory. See OrganizationPublicExperience-Phase1.md's
+	// "Resolved Decisions": this is one of only two real new stored fields this
+	// phase adds (the other is Visibility) — PresenceType itself is computed
+	// from whether this and SiteId are set, never stored.
+	public string? ExternalUrl { get; set; }
+
+	// Whether this Organization appears in the public Community Directory —
+	// independent of Site visibility/status. Defaults to Public: existing
+	// (backfilled) Organizations are real, already-live communities, and a
+	// newly created Organization shouldn't silently vanish from the directory
+	// with no explanation of why. An admin who wants to stage one before
+	// launch sets this to Pending explicitly.
+	public OrganizationVisibility Visibility { get; set; } = OrganizationVisibility.Public;
 
 	// External identifier value — e.g. a PTA's familiar "00000000" PTA ID #.
 	// Whether this is used at all, and whether it's required, is a policy on

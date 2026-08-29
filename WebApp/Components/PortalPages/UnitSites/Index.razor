@@ -1,55 +1,34 @@
 @page "/unit-sites"
-@using SiteEngine.Entities
 @using SiteEngine.Enums
 @using WebApp.Services
-@inject DashboardService DashboardService
+@inject OrganizationService OrganizationService
+
+@* URL deliberately unchanged (still /unit-sites) — see
+   OrganizationPublicExperience-Phase1.md's "Resolved Decisions": no
+   bookmark/link breaks, only the query behind this page moves from Site to
+   Organization. A future phase may rename the route itself (e.g. to
+   /communities) once this has proven out. *@
 
 <div class="container">
-    <h1>Unit Sites</h1>
-    <p class="lead">Browse Divisions and Local Units</p>
-
-    <h2 class="h4 mt-4">Divisions</h2>
-    @if (_divisionsLoading)
-    {
-        <p class="text-muted">Loading&hellip;</p>
-    }
-    else if (_directoryDivisions.Count == 0)
-    {
-        <p class="text-muted">No Divisions are listed yet.</p>
-    }
-    else
-    {
-        <div class="list-group mb-3">
-            @foreach (var division in _directoryDivisions)
-            {
-                <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" href="@($"/unit-sites/{division.PtaId}")">
-                    <div>
-                        <div class="fw-semibold">@division.SiteName</div>
-                        <span class="text-muted small">PTA ID @division.PtaId</span>
-                    </div>
-                </a>
-            }
-        </div>
-    }
-
-    <h2 class="h4 mt-4">Local Units</h2>
+    <h1>Community Directory</h1>
+    <p class="lead">Browse communities in the directory</p>
 
     <div class="row g-2 mb-3 align-items-center">
         <div class="col-sm-6">
-            <input type="search" class="form-control" placeholder="Search by unit name or PTA ID..."
+            <input type="search" class="form-control" placeholder="Search by name..."
                    value="@_searchText" @oninput="OnSearchChanged" />
         </div>
         <div class="col-sm-4">
-            <select class="form-select" value="@_divisionId" @onchange="OnDivisionChanged">
-                <option value="">All Divisions</option>
-                @foreach (var division in _directoryDivisions)
+            <select class="form-select" value="@_organizationTypeId" @onchange="OnTypeChanged">
+                <option value="">All Organization Types</option>
+                @foreach (var type in _types)
                 {
-                    <option value="@division.Id">@division.SiteName</option>
+                    <option value="@type.Id">@type.Name</option>
                 }
             </select>
         </div>
         <div class="col-sm-2 text-muted small text-sm-end">
-            @_page.TotalCount unit@(_page.TotalCount == 1 ? "" : "s")
+            @_organizations.Count communit@(_organizations.Count == 1 ? "y" : "ies")
         </div>
     </div>
 
@@ -57,95 +36,75 @@
     {
         <p class="text-muted">Loading&hellip;</p>
     }
-    else if (_page.Items.Count == 0)
+    else if (_organizations.Count == 0)
     {
-        <p class="text-muted">No Local Units match your search.</p>
+        <p class="text-muted">No communities match your search.</p>
     }
     else
     {
         <div class="list-group mb-3">
-            @foreach (var unit in _page.Items)
+            @foreach (var org in _organizations)
             {
-                <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" href="@($"/unit-sites/{unit.PtaId}")">
+                <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                   href="@($"/communities/{org.IdentifierValue ?? org.Id.ToString()}")">
                     <div>
-                        <div class="fw-semibold">@unit.SiteName</div>
-                        <span class="text-muted small">@(unit.DivisionName ?? "Independent") &middot; PTA ID @unit.PtaId</span>
+                        <div class="fw-semibold">@org.Name</div>
+                        <span class="text-muted small">
+                            @org.OrganizationTypeName &middot; @org.OrganizationLevelName
+                            @if (org.ParentOrganizationName is not null)
+                            {
+                                <text> &middot; part of @org.ParentOrganizationName</text>
+                            }
+                        </span>
                     </div>
+                    <span class="badge text-bg-light border">@PresenceLabel(org.PresenceType)</span>
                 </a>
             }
         </div>
-
-        @if (_totalPages > 1)
-        {
-            <nav aria-label="Unit Sites pagination">
-                <ul class="pagination justify-content-center">
-                    <li class="page-item @(_page.PageNumber <= 1 ? "disabled" : "")">
-                        <button type="button" class="page-link" @onclick="() => GoToPageAsync(_page.PageNumber - 1)">Previous</button>
-                    </li>
-                    <li class="page-item disabled">
-                        <span class="page-link">Page @_page.PageNumber of @_totalPages</span>
-                    </li>
-                    <li class="page-item @(_page.PageNumber >= _totalPages ? "disabled" : "")">
-                        <button type="button" class="page-link" @onclick="() => GoToPageAsync(_page.PageNumber + 1)">Next</button>
-                    </li>
-                </ul>
-            </nav>
-        }
     }
 </div>
 
 @code {
-    private const int PageSize = 25;
-
-    private List<DirectorySite> _directoryDivisions = new();
-    private bool _divisionsLoading = true;
-
-    private UnitSitePage _page = new(new List<UnitSiteSummary>(), 0, 1, PageSize);
+    // Flat list, not paginated — Phase 1 scale. Grouping/pagination the way
+    // the old Division/Local Unit listing did is a reasonable later
+    // enhancement once there's enough real directory data to need it (see
+    // OrganizationPublicExperience.md's "Future Enhancements").
+    private List<OrganizationTypeSummary> _types = new();
+    private List<OrganizationSummary> _organizations = new();
     private string _searchText = string.Empty;
-    private Guid? _divisionId;
+    private int? _organizationTypeId;
     private bool _loading = true;
-
-    private int _totalPages => Math.Max(1, (int)Math.Ceiling(_page.TotalCount / (double)PageSize));
 
     protected override async Task OnInitializedAsync()
     {
-        await Task.WhenAll(
-            LoadDivisionsAsync(),
-            LoadAsync(pageNumber: 1));
+        _types = await OrganizationService.GetOrganizationTypeSummariesAsync();
+        await LoadAsync();
     }
 
-    private async Task LoadDivisionsAsync()
-    {
-        _divisionsLoading = true;
-        _directoryDivisions = await DashboardService.GetDirectoryDivisionsAsync();
-        _divisionsLoading = false;
-    }
-
-    private async Task LoadAsync(int pageNumber)
+    private async Task LoadAsync()
     {
         _loading = true;
-        _page = await DashboardService.GetUnitSitesAsync(_divisionId, _searchText, pageNumber, PageSize);
+        _organizations = await OrganizationService.GetDirectoryOrganizationsAsync(_searchText, _organizationTypeId);
         _loading = false;
     }
 
     private Task OnSearchChanged(ChangeEventArgs e)
     {
         _searchText = e.Value?.ToString() ?? string.Empty;
-        return LoadAsync(pageNumber: 1);
+        return LoadAsync();
     }
 
-    private Task OnDivisionChanged(ChangeEventArgs e)
+    private Task OnTypeChanged(ChangeEventArgs e)
     {
         var value = e.Value?.ToString();
-        _divisionId = string.IsNullOrEmpty(value) ? null : Guid.Parse(value);
-        return LoadAsync(pageNumber: 1);
+        _organizationTypeId = string.IsNullOrEmpty(value) ? null : int.Parse(value);
+        return LoadAsync();
     }
 
-    private Task GoToPageAsync(int pageNumber)
+    private static string PresenceLabel(PresenceType type) => type switch
     {
-        if (pageNumber < 1 || pageNumber > _totalPages || pageNumber == _page.PageNumber)
-            return Task.CompletedTask;
-
-        return LoadAsync(pageNumber);
-    }
+        PresenceType.Hosted => "Hosted",
+        PresenceType.External => "External Website",
+        _ => "Directory Listing"
+    };
 }

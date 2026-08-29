@@ -13,12 +13,22 @@ public record OrganizationTypeSummary(
 public record OrganizationLevelSummary(Guid Id, int OrganizationTypeId, string Name, int Rank, bool IsSiteEligible, int OrganizationCount);
 public record OperationalCycleSummary(Guid Id, int OrganizationTypeId, string CycleTypeName, string DisplayLabel, DateTimeOffset StartDate, DateTimeOffset EndDate);
 public record OrganizationSummary(
-	Guid Id, string Name, string? IdentifierValue,
+	Guid Id, string Name, string? Description, string? IdentifierValue,
 	int OrganizationTypeId, string OrganizationTypeName,
 	Guid OrganizationLevelId, string OrganizationLevelName, int LevelRank,
 	Guid? ParentOrganizationId, string? ParentOrganizationName,
-	Guid? SiteId, string? SiteName,
-	int ChildCount);
+	Guid? SiteId, string? SiteName, string? SiteHostname, string? SiteDomain,
+	string? ExternalUrl, OrganizationVisibility Visibility,
+	int ChildCount)
+{
+	// Computed, not stored — see OrganizationPublicExperience-Phase1.md's
+	// "Resolved Decisions". Never let this drift out of sync with
+	// SiteId/ExternalUrl by making it a real column; derive it instead.
+	public PresenceType PresenceType =>
+		SiteId is not null ? PresenceType.Hosted
+		: ExternalUrl is not null ? PresenceType.External
+		: PresenceType.DirectoryOnly;
+}
 public record ParentAccessGrantSummary(
 	Guid Id,
 	Guid ParentOrganizationId, string ParentOrganizationName,
@@ -240,6 +250,36 @@ public class OrganizationService(IDbContextFactory<AppDbContext> dbFactory)
 		return new OrgOpResult(true, null);
 	}
 
+	// Renumbers every Level for this Organization Type to a clean 1..N
+	// sequence, in current Rank order — e.g. deleting ranks 4 and 5 leaves
+	// 1, 2, 3, 6; this turns that into 1, 2, 3, 4 without changing relative
+	// order. Ties (two Levels sharing a Rank) break on Name for a
+	// deterministic result. Organization.OrganizationLevelId references the
+	// Level's Id, not its Rank, so no Organization's placement changes —
+	// this only cleans up the display numbering.
+	public async Task<OrgOpResult> RenumberLevelRanksAsync(int organizationTypeId, CancellationToken cancellationToken = default)
+	{
+		await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+		var levels = await db.OrganizationLevels
+			.Where(l => l.OrganizationTypeId == organizationTypeId)
+			.OrderBy(l => l.Rank).ThenBy(l => l.Name)
+			.ToListAsync(cancellationToken);
+
+		for (var i = 0; i < levels.Count; i++)
+		{
+			var expectedRank = i + 1;
+			if (levels[i].Rank != expectedRank)
+			{
+				levels[i].Rank = expectedRank;
+				levels[i].UpdatedAtUtc = DateTimeOffset.UtcNow;
+			}
+		}
+
+		await db.SaveChangesAsync(cancellationToken);
+		return new OrgOpResult(true, null);
+	}
+
 	// ------------------------------------------------------------
 	// Operational Cycle
 	// ------------------------------------------------------------
@@ -349,11 +389,13 @@ public class OrganizationService(IDbContextFactory<AppDbContext> dbFactory)
 		return await query
 			.OrderBy(o => o.OrganizationLevel.Rank).ThenBy(o => o.Name)
 			.Select(o => new OrganizationSummary(
-				o.Id, o.Name, o.IdentifierValue,
+				o.Id, o.Name, o.Description, o.IdentifierValue,
 				o.OrganizationTypeId, o.OrganizationType.Name,
 				o.OrganizationLevelId, o.OrganizationLevel.Name, o.OrganizationLevel.Rank,
 				o.ParentOrganizationId, o.ParentOrganization != null ? o.ParentOrganization.Name : null,
 				o.SiteId, o.Site != null ? o.Site.SiteName : null,
+				o.Site != null ? o.Site.Hostname : null, o.Site != null ? o.Site.Domain : null,
+				o.ExternalUrl, o.Visibility,
 				db.Organizations.Count(c => c.ParentOrganizationId == o.Id)))
 			.ToListAsync(cancellationToken);
 	}
@@ -365,13 +407,80 @@ public class OrganizationService(IDbContextFactory<AppDbContext> dbFactory)
 		return await db.Organizations
 			.Where(o => o.Id == id)
 			.Select(o => new OrganizationSummary(
-				o.Id, o.Name, o.IdentifierValue,
+				o.Id, o.Name, o.Description, o.IdentifierValue,
 				o.OrganizationTypeId, o.OrganizationType.Name,
 				o.OrganizationLevelId, o.OrganizationLevel.Name, o.OrganizationLevel.Rank,
 				o.ParentOrganizationId, o.ParentOrganization != null ? o.ParentOrganization.Name : null,
 				o.SiteId, o.Site != null ? o.Site.SiteName : null,
+				o.Site != null ? o.Site.Hostname : null, o.Site != null ? o.Site.Domain : null,
+				o.ExternalUrl, o.Visibility,
 				db.Organizations.Count(c => c.ParentOrganizationId == o.Id)))
 			.FirstOrDefaultAsync(cancellationToken);
+	}
+
+	// Publicly listed Organizations only (Visibility == Public) — backs the
+	// Community Directory (/unit-sites — see OrganizationPublicExperience-Phase1.md's
+	// "Resolved Decisions": same URL, Organization-backed query). Unlike
+	// GetOrganizationsAsync, this deliberately doesn't expose Pending/Private/
+	// Archived Organizations — an admin previewing one of those does so
+	// through Global Admin, not the public route.
+	public async Task<List<OrganizationSummary>> GetDirectoryOrganizationsAsync(
+		string? searchText = null, int? organizationTypeId = null, CancellationToken cancellationToken = default)
+	{
+		await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+		var query = db.Organizations.Where(o => o.Visibility == OrganizationVisibility.Public);
+
+		if (organizationTypeId is not null)
+			query = query.Where(o => o.OrganizationTypeId == organizationTypeId);
+
+		if (!string.IsNullOrWhiteSpace(searchText))
+		{
+			var pattern = $"%{searchText.Trim()}%";
+			query = query.Where(o => EF.Functions.Like(o.Name, pattern));
+		}
+
+		return await query
+			.OrderBy(o => o.Name)
+			.Select(o => new OrganizationSummary(
+				o.Id, o.Name, o.Description, o.IdentifierValue,
+				o.OrganizationTypeId, o.OrganizationType.Name,
+				o.OrganizationLevelId, o.OrganizationLevel.Name, o.OrganizationLevel.Rank,
+				o.ParentOrganizationId, o.ParentOrganization != null ? o.ParentOrganization.Name : null,
+				o.SiteId, o.Site != null ? o.Site.SiteName : null,
+				o.Site != null ? o.Site.Hostname : null, o.Site != null ? o.Site.Domain : null,
+				o.ExternalUrl, o.Visibility,
+				db.Organizations.Count(c => c.ParentOrganizationId == o.Id)))
+			.ToListAsync(cancellationToken);
+	}
+
+	// Backs the community detail page (/communities/{identifier} — see
+	// OrganizationPublicExperience-Phase1.md). Tries IdentifierValue first
+	// (the common case for Organization Types that use one), then falls back
+	// to parsing the segment as a Guid Id — covers every Organization,
+	// including ones whose Type never uses an identifier at all. Only
+	// publicly visible Organizations resolve; anything else 404s the same as
+	// "not found", same idiom as DashboardService.GetSiteDetailsAsync.
+	public async Task<OrganizationSummary?> GetOrganizationByIdentifierAsync(string identifier, CancellationToken cancellationToken = default)
+	{
+		await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+		var query = db.Organizations.Where(o => o.Visibility == OrganizationVisibility.Public);
+
+		var byIdentifier = await query
+			.Where(o => o.IdentifierValue == identifier)
+			.Select(o => o.Id)
+			.FirstOrDefaultAsync(cancellationToken);
+
+		var resolvedId = byIdentifier != Guid.Empty
+			? byIdentifier
+			: Guid.TryParse(identifier, out var parsedId) ? parsedId : (Guid?)null;
+
+		if (resolvedId is null)
+			return null;
+
+		var org = await GetOrganizationAsync(resolvedId.Value, cancellationToken);
+		return org?.Visibility == OrganizationVisibility.Public ? org : null;
 	}
 
 	// Sites not already linked to an Organization — backs the Site picker on
@@ -391,7 +500,8 @@ public class OrganizationService(IDbContextFactory<AppDbContext> dbFactory)
 
 	public async Task<OrgOpResult> CreateOrganizationAsync(
 		string name, int organizationTypeId, Guid organizationLevelId, Guid? parentOrganizationId, Guid? siteId,
-		string? identifierValue = null, CancellationToken cancellationToken = default)
+		string? identifierValue = null, string? description = null, string? externalUrl = null,
+		OrganizationVisibility visibility = OrganizationVisibility.Public, CancellationToken cancellationToken = default)
 	{
 		name = name.Trim();
 		if (string.IsNullOrWhiteSpace(name))
@@ -415,6 +525,9 @@ public class OrganizationService(IDbContextFactory<AppDbContext> dbFactory)
 			ParentOrganizationId = parentOrganizationId,
 			SiteId = siteId,
 			IdentifierValue = identifierResult.Value,
+			Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
+			ExternalUrl = string.IsNullOrWhiteSpace(externalUrl) ? null : externalUrl.Trim(),
+			Visibility = visibility,
 		});
 
 		try
@@ -431,7 +544,8 @@ public class OrganizationService(IDbContextFactory<AppDbContext> dbFactory)
 
 	public async Task<OrgOpResult> UpdateOrganizationAsync(
 		Guid id, string name, Guid organizationLevelId, Guid? parentOrganizationId, Guid? siteId,
-		string? identifierValue = null, CancellationToken cancellationToken = default)
+		string? identifierValue = null, string? description = null, string? externalUrl = null,
+		OrganizationVisibility visibility = OrganizationVisibility.Public, CancellationToken cancellationToken = default)
 	{
 		name = name.Trim();
 		if (string.IsNullOrWhiteSpace(name))
@@ -459,6 +573,9 @@ public class OrganizationService(IDbContextFactory<AppDbContext> dbFactory)
 		org.ParentOrganizationId = parentOrganizationId;
 		org.SiteId = siteId;
 		org.IdentifierValue = identifierResult.Value;
+		org.Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+		org.ExternalUrl = string.IsNullOrWhiteSpace(externalUrl) ? null : externalUrl.Trim();
+		org.Visibility = visibility;
 		org.UpdatedAtUtc = DateTimeOffset.UtcNow;
 
 		try

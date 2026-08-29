@@ -55,6 +55,14 @@
 }
 else
 {
+    @if (_levels.Count > 0)
+    {
+        <div class="d-flex justify-content-end mb-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@(!HasRankGaps || _renumbering)" @onclick="RenumberAsync">
+                Renumber Ranks
+            </button>
+        </div>
+    }
     <div class="table-responsive">
         <table class="table table-sm align-middle">
             <thead>
@@ -120,10 +128,20 @@ else
 
     private bool _loaded;
     private bool _saving;
+    private bool _renumbering;
     private string? _error;
     private List<OrganizationLevelSummary> _levels = new();
     private List<OrganizationSummary> _organizations = new();
     private Guid? _expandedLevelId;
+
+    // True when the current Rank sequence has a gap or duplicate relative to
+    // a clean 1..N — matches exactly what RenumberLevelRanksAsync would
+    // actually change, so the button only lights up when it would do
+    // something.
+    private bool HasRankGaps =>
+        _levels.OrderBy(l => l.Rank).ThenBy(l => l.Name)
+            .Select((l, i) => l.Rank != i + 1)
+            .Any(changed => changed);
 
     private Guid? _editingId;
     private string _name = "";
@@ -175,6 +193,24 @@ else
             : await OrganizationService.UpdateLevelAsync(_editingId.Value, _name, _rank, _isSiteEligible);
 
         _saving = false;
+
+        if (!result.Success)
+        {
+            _error = result.Error;
+            return;
+        }
+
+        await ReloadAsync();
+    }
+
+    private async Task RenumberAsync()
+    {
+        _renumbering = true;
+        _error = null;
+
+        var result = await OrganizationService.RenumberLevelRanksAsync(OrganizationTypeId);
+
+        _renumbering = false;
 
         if (!result.Success)
         {

@@ -1,0 +1,130 @@
+@page "/communities/{Identifier}"
+@using SiteEngine.Enums
+@using WebApp.Services
+@inject OrganizationService OrganizationService
+@inject DashboardService DashboardService
+
+<PageTitle>@(_org?.Name ?? "Community") — Central Portal</PageTitle>
+
+@if (_loading)
+{
+    <div class="container py-4">
+        <p class="text-muted">Loading&hellip;</p>
+    </div>
+}
+else if (_org is null)
+{
+    @* Not found, or found but not Visibility.Public — GetOrganizationByIdentifierAsync
+       treats both the same way GetSiteDetailsAsync does for Site: don't leak
+       "it exists but is hidden" vs. "never existed" as different responses. *@
+    <div class="container py-4">
+        <h2>Sorry, we couldn't find that community.</h2>
+        <p>
+            It may have been removed, or is no longer publicly listed.
+            <a href="/unit-sites">Back to Community Directory</a>.
+        </p>
+    </div>
+}
+else
+{
+    <div class="container py-4">
+        <p><a href="/unit-sites">&larr; Back to Community Directory</a></p>
+
+        <h1>@_org.Name</h1>
+        <p class="text-muted">
+            @_org.OrganizationTypeName &middot; @_org.OrganizationLevelName
+            @if (_org.ParentOrganizationName is not null)
+            {
+                <text> &middot; part of </text>
+                @if (ParentIdentifier is not null)
+                {
+                    <a href="@($"/communities/{ParentIdentifier}")">@_org.ParentOrganizationName</a>
+                }
+                else
+                {
+                    @_org.ParentOrganizationName
+                }
+            }
+        </p>
+
+        @if (!string.IsNullOrWhiteSpace(_org.Description))
+        {
+            <p>@_org.Description</p>
+        }
+
+        @* Community Presence Model — see OrganizationPublicExperience.md.
+           Deliberately not an auto-redirect (unlike the legacy /unit-sites/{PtaId}
+           page for Active sites): this page is meant to be a stable public
+           profile for every Organization regardless of presence type, not a
+           bounce-through for hosted ones. *@
+        @if (_org.PresenceType == PresenceType.Hosted && !string.IsNullOrEmpty(_hostedUrl))
+        {
+            <p><a class="btn btn-primary" href="@_hostedUrl">Visit Site</a></p>
+        }
+        else if (_org.PresenceType == PresenceType.External)
+        {
+            <p><a class="btn btn-primary" href="@_org.ExternalUrl" target="_blank" rel="noopener noreferrer">Visit Website</a></p>
+        }
+        else
+        {
+            <p class="text-muted small">This community doesn't have a website listed yet.</p>
+        }
+
+        @if (_children.Count > 0)
+        {
+            <h2 class="h4 mt-4">Communities in @_org.Name</h2>
+            <div class="list-group mb-3">
+                @foreach (var child in _children)
+                {
+                    <a class="list-group-item list-group-item-action" href="@($"/communities/{child.IdentifierValue ?? child.Id.ToString()}")">
+                        <div class="fw-semibold">@child.Name</div>
+                        <span class="text-muted small">@child.OrganizationLevelName</span>
+                    </a>
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public string Identifier { get; set; } = string.Empty;
+
+    private OrganizationSummary? _org;
+    private bool _loading = true;
+    private string? _hostedUrl;
+    private List<OrganizationSummary> _children = new();
+
+    // The parent's own IdentifierValue isn't on OrganizationSummary (only its
+    // Name is) — re-resolving it isn't worth a second field on a DTO used
+    // everywhere else too, so this page just re-looks it up on the rare path
+    // where a parent link is actually shown.
+    private string? ParentIdentifier { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _org = await OrganizationService.GetOrganizationByIdentifierAsync(Identifier);
+        _loading = false;
+
+        if (_org is null)
+            return;
+
+        if (_org.PresenceType == PresenceType.Hosted)
+        {
+            var portalConfig = await DashboardService.GetPortalConfigAsync();
+            _hostedUrl = SiteUrlHelper.BuildPublicUrl(_org.SiteHostname, _org.SiteDomain, portalConfig?.PortalDomain);
+        }
+
+        if (_org.ParentOrganizationId is not null)
+        {
+            // Only link if the parent itself is publicly visible — otherwise
+            // it's just name-as-text, not a link that would 404 on click.
+            var parent = await OrganizationService.GetOrganizationAsync(_org.ParentOrganizationId.Value);
+            if (parent is { Visibility: OrganizationVisibility.Public })
+                ParentIdentifier = parent.IdentifierValue ?? parent.Id.ToString();
+        }
+
+        var allOfType = await OrganizationService.GetDirectoryOrganizationsAsync(organizationTypeId: _org.OrganizationTypeId);
+        _children = allOfType.Where(o => o.ParentOrganizationId == _org.Id).ToList();
+    }
+}

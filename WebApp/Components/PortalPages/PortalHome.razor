@@ -12,12 +12,13 @@
         <h1 class="display-5 fw-bold">Welcome to the Central Portal</h1>
         <p class="lead col-lg-8 mx-auto">
             A shared home for PTA groups, school organizations, booster clubs, councils,
-            and community groups to build their online presence, connect with the people
-            they serve, and share tools with one another.
+            and community groups to connect with the people they serve and access shared
+            tools — whether they host their site here, link out to their own website, or
+            simply want to be found.
         </p>
 
         <div class="d-flex flex-wrap justify-content-center gap-2 mt-4">
-            <a class="btn btn-primary btn-lg" href="/unit-sites">Browse Unit Sites</a>
+            <a class="btn btn-primary btn-lg" href="/unit-sites">Browse Communities</a>
             <a class="btn btn-outline-primary btn-lg" href="/portal-tools">Explore Tools</a>
 
             <AuthorizeView>
@@ -42,12 +43,21 @@
     </section>
 
     <!-- ============================================================ -->
-    <!-- WHO WE SERVE                                                  -->
+    <!-- COMMUNITY DIRECTORY                                           -->
     <!-- ============================================================ -->
-    @if (_organizationTypes.Count > 0)
-    {
-        <section class="mb-5">
-            <h2>Who We Serve</h2>
+    <section class="mb-5">
+        <h2>Community Directory</h2>
+        <p>
+            Central Portal is home to communities of many kinds — browse the directory to find
+            PTAs, Scout troops, booster clubs, and more, whether they're hosted here, linked to
+            their own site, or simply listed so you can find them.
+        </p>
+        <p class="mt-3">
+            <a class="btn btn-primary" href="/unit-sites">Browse the Community Directory &rarr;</a>
+        </p>
+
+        @if (_organizationTypes.Count > 0)
+        {
             <div class="row g-3 mt-1">
                 @foreach (var org in _organizationTypes)
                 {
@@ -68,29 +78,9 @@
                 }
             </div>
             <p class="mt-3">
-                <a href="/organizations">Learn more about who we serve &rarr;</a>
+                <a href="/organizations">See all organization types &rarr;</a>
             </p>
-        </section>
-    }
-
-    <!-- ============================================================ -->
-    <!-- HOW IT'S ORGANIZED                                            -->
-    <!-- ============================================================ -->
-    <section class="mb-5">
-        <h2>How It's Organized</h2>
-        <p>
-            The portal follows a simple two-level structure. A <strong>Division</strong> is a
-            larger organizing body — often a city, regional, or district-level council — and
-            each Division can be home to many <strong>Local Units</strong>, the individual
-            groups doing the day-to-day work in their own community.
-        </p>
-        <p>
-            Local Units can also stand on their own without belonging to a Division at all.
-            Either way, every site in the portal fits somewhere in this same familiar shape:
-        </p>
-        <p class="fw-semibold text-center">
-            Central Portal &rarr; Divisions &rarr; Local Units
-        </p>
+        }
     </section>
 
     <!-- ============================================================ -->
@@ -108,10 +98,10 @@
                             You don't need an account to start exploring:
                         </p>
                         <ul>
-                            <li>Browse Divisions and Local Units</li>
-                            <li>Explore each site's public information</li>
-                            <li>Learn about the tools available on the portal</li>
-                            <li>Understand how membership works before you join</li>
+                            <li>Browse Communities</li>
+                            <li>Search the Community Directory</li>
+                            <li>Learn about participating organizations</li>
+                            <li>Discover available tools</li>
                         </ul>
                     </div>
                 </div>
@@ -125,10 +115,10 @@
                             Creating an account opens up a lot more:
                         </p>
                         <ul>
-                            <li>Apply for a Division or Local Unit site</li>
-                            <li>Access member-only content for your groups</li>
-                            <li>Use tools built for members and admins</li>
-                            <li>Manage your memberships in one place</li>
+                            <li>Join communities</li>
+                            <li>Manage memberships</li>
+                            <li>Use community tools</li>
+                            <li>Request hosted community sites</li>
                         </ul>
                     </div>
                 </div>
@@ -146,7 +136,7 @@
                 <p>
                     Your Dashboard is your personal starting point on the portal. It brings
                     together your memberships, any applications you've submitted, and the
-                    unit and Division sites you've recently visited — so you always know
+                    communities you've recently visited — so you always know
                     where things stand across every group you're part of.
                 </p>
                 <a class="btn btn-success" href="/dashboard">Go to Dashboard</a>
@@ -160,11 +150,11 @@
     <section class="text-center">
         <h2>Ready to Explore?</h2>
         <p class="col-lg-6 mx-auto">
-            Start by browsing the Divisions and Local Units already on the portal, or take
+            Start by browsing the communities already in our directory, or take
             a look at the tools available to help your own group get organized.
         </p>
         <div class="d-flex flex-wrap justify-content-center gap-2">
-            <a class="btn btn-primary" href="/unit-sites">Browse Unit Sites</a>
+            <a class="btn btn-primary" href="/unit-sites">Browse Communities</a>
             <a class="btn btn-outline-primary" href="/portal-tools">Explore Tools</a>
 
             <AuthorizeView>

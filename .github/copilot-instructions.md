@@ -1,4 +1,4 @@
-# Copilot Instructions for vbpta-web
+# Copilot Instructions for Central Portal
 
 ## Project context
 - This solution uses **.NET 9**.

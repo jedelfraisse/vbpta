@@ -1,6 +1,6 @@
 # **CLAUDE.md (Updated with Generic Portal + Rich PortalHome Requirements)**
 
-# VBPTA Portal — Architecture & Conventions
+# Central Portal — Architecture & Conventions
 
 These rules govern all scaffolding, page generation, navigation, permissions, and terminology for this project. Apply them to all future code suggestions unless the user explicitly overrides them.
 
@@ -16,7 +16,7 @@ The system originally began as a **VBPTA‑specific portal**, but has now evolve
 - any future organization that needs a Division → Local Unit structure  
 
 The **Portal site** is the neutral, central hub that introduces the platform, explains its purpose, and guides visitors to Divisions, Local Units, and tools.  
-It must **not** be branded as “VBPTA Portal.”  
+It must **not** be branded as any single organization (e.g., “VBPTA”) — it's now called **Central Portal**.  
 It must feel **inclusive**, **organizational**, and **open to all groups**.
 
 ---
@@ -158,7 +158,7 @@ It should clearly explain what the platform is, who it serves, and how it works 
 • Use friendly, inclusive language  
 • Use placeholder text where needed  
 • Do not implement business logic  
-• Do not hard‑code VBPTA branding  
+• Do not hard‑code any single organization's branding  
 • The page should feel like a real landing page, not a placeholder
 
 ---

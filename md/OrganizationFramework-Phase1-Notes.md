@@ -1,6 +1,6 @@
 # Phase 1 Implementation Notes
 
-Status: **Implemented**, 2026-08-26. Companion to [OrganizationFramework.md](OrganizationFramework.md) and [OrganizationFramework-Phase1.md](OrganizationFramework-Phase1.md) — this is the "stop and document" record for decisions made while actually building it, not covered explicitly by either planning doc.
+Status: **Implemented and closed out**, 2026-08-28 — see Phase 1's own Status line. Companion to [OrganizationFramework.md](OrganizationFramework.md) and [OrganizationFramework-Phase1.md](OrganizationFramework-Phase1.md) — this is the "stop and document" record for decisions made while actually building it, not covered explicitly by either planning doc.
 
 ---
 
@@ -58,6 +58,6 @@ This is a real exercise of the production code path and schema, not a mock — b
 
 Everything Phase 1 itself deferred (membership migration, site resolution rewiring, Theme/Tool/Event Framework, SignalR, Controllers) is unchanged — see Phase 1's own "Deferred To Future Phases." Additionally, from this implementation pass specifically:
 
-- A real Global Admin login smoke test, once a non-interactive auth path exists.
+- ~~A real Global Admin login smoke test~~ — done. The original blocker (no non-interactive way to retrieve a passwordless login code) got resolved as a side effect of chasing the login bug itself; the admin has since driven the real Global Admin UI directly (Organization Types, Levels, Organizations, deletion, rank renumbering).
 - Per-Organization Operational Cycle override, if/when membership migration actually needs it.
 - A proper hierarchy tree/visual builder for the Organizations page — today it's a sortable flat list (Level Rank, then Name), which was enough to prove the model but isn't a great editing experience for a deep hierarchy.

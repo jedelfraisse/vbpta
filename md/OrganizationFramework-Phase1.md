@@ -2,7 +2,7 @@
 
 ## Status
 
-Draft
+Complete (2026-08-28). See [OrganizationFramework-Phase1-Notes.md](OrganizationFramework-Phase1-Notes.md) for implementation decisions and validation, and the note under "SMTP Configuration" below for the one deliberate deviation from this doc as originally written.
 
 ---
 
@@ -274,9 +274,7 @@ Responsibilities:
 
 ## SMTP Configuration
 
-Current SMTP functionality remains.
-
-Responsibilities:
+Current SMTP functionality remains — with one deviation from the original plan, made after Phase 1's schema/UI work was otherwise done: every SMTP send (login codes, setup-wizard test, admin verification code, Global Admin test email) was migrated from `System.Net.Mail.SmtpClient` to MailKit, behind one shared `SmtpMailSender`. That legacy client couldn't parse a real SMTP server's EHLO response (a "250-AUTH=..." extension line some servers, including smtp4dev, advertise for old-client compatibility) — a genuine, blocking bug encountered while testing login, not organizational-framework scope creep. Responsibilities are unchanged:
 
 - Login Emails
 - Notifications
@@ -569,7 +567,7 @@ Phase 1 is successful when:
 - ParentAccessGrant exists and supports configurable cross-organization access.
 - Global Admin pages exist for Organization Framework management.
 - PTA, Scout, and Billiards hierarchies can be configured entirely through administration screens.
-- Existing Setup, Authentication, SMTP, and Site Resolution functionality remain unchanged.
+- Existing Setup, Authentication, and Site Resolution functionality remain unchanged. SMTP sending was migrated to MailKit (see "SMTP Configuration" above) — a justified deviation, not a regression: verified working, and every send site was migrated consistently rather than just the one that surfaced the bug.
 - Membership migration strategy is documented.
 - CLAUDE.md is updated to reflect the new hierarchy model.
 
